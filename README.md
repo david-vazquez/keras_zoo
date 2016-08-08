@@ -31,3 +31,28 @@
    4. Frame ID
    5. Camera ID
   
+## Framework
+Keras
+
+## Members
+ 1. Jorge Bernal
+ 2. Adriana Romero
+ 3. Michal Drozdzal
+ 4. David Vázquez
+ 5. People from Clinic? Jorge's Supervisor?
+ 7. Yoshua Bengio? Aaron Courville? Adriana's students?
+
+## TODO
+ - [X] Get Jorge's dataset with labels
+ - [ ] Adapt the dataset to work with FCN8 in lasagne
+ - [ ] First experiments with FCN8 in Lasagne
+ - [ ] First experiments with Unet in Lasagne
+ - [ ] Add DICE evaluations
+ - [ ] Adapt the dataset to work in Keras
+ - [ ] Upload FCN8 code for Keras
+ - [ ] Move Unet model to Keras
+ - [ ] Define experiments
+ - [ ] Get Jorge's baselines for the proposed experiments
+ - [ ] Select journal target (Michail has a proposal of a top medical imaging journal that answer in 1 month)
+ - [ ] Perform experiments
+ - [ ] Write paper
