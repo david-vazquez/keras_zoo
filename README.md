@@ -1,12 +1,14 @@
 # Deep learning for polyp characterization
 
 ## Results
-| Model | Parameters | Train set | Test set                |Tr. Loss|Val. Loss|Val. Acc|Val. Jacc|Test Acc|Test Jacc|Epochs |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| FCN8 | Rep+Conv, lr=1e-4, l2=1e-3    | CVC-612 | CVC-300 | 0.52   | 0.41    | 86.99% | 54.89%  | 86.99% | 54.89%  | 139|
-| FCN8 | Deconv_init, lr=1e-3, l2=1e-5 | CVC-612 | CVC-300 | 0.16   | 0.66    | 81.37% | 52.50%  | 81.37% | 52.50%  | 157|
-| U-Net | ???                          | CVC-??? | CVC-??? | ??.??  | 0.65    | 94.37% | 	0.66%  | ??.??% | ??.??%  | ?? |
+| Id | Model | Parameters | Train set | Test set                |Tr. Loss|Val. Loss|Val. Acc|Val. Jacc|Test Acc|Test Jacc|Epochs |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | FCN8 | Rep+Conv, lr=1e-4, l2=1e-3    | CVC-612 | CVC-300 | 0.52   | 0.41    | 86.99% | 54.89%  | 86.99% | 54.89%  | 139|
+| 2 |FCN8 | Deconv_init, lr=1e-3, l2=1e-5 | CVC-612 | CVC-300 | 0.16   | 0.66    | 81.37% | 52.50%  | 81.37% | 52.50%  | 157|
+| 3 | U-Net | ???                          | CVC-??? | CVC-??? | ??.??  | 0.65    | 94.37% | 	0.66%  | ??.??% | ??.??%  | ?? |
 
+### Experiment 1 (FCN8, Rep+Conv, lr=1e-4, l2=1e-3)
+![image](./images/rep+conv1.png)
 
 ## Posible problems to solve
  1. Polyp/No polyp image classification
