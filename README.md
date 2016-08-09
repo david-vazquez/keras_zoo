@@ -3,8 +3,8 @@
 ## Results
 | Model | Parameters | Train set | Test set                |Tr. Loss|Val. Loss|Val. Acc|Val. Jacc|Test Acc|Test Jacc|Epochs |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| FCN8 | Rep+Conv, lr=1e-4, l2=1e-3    | CVC-612 | CVC-300 | ??.??  | ??.??   | ??.??% | ??.??%  | ??.??% | ??.??%  | ?? |
-| FCN8 | Deconv_init, lr=1e-3, l2=1e-5 | CVC-612 | CVC-300 | ??.??  | ??.??   | ??.??% | ??.??%  | ??.??% | ??.??%  | ?? |
+| FCN8 | Rep+Conv, lr=1e-4, l2=1e-3    | CVC-612 | CVC-300 | 0.52   | 0.41    | 86.99% | 54.89%  | 86.99% | 54.89%  | 139|
+| FCN8 | Deconv_init, lr=1e-3, l2=1e-5 | CVC-612 | CVC-300 | 0.16   | 0.66    | 81.37% | 52.50%  | 81.37% | 52.50%  | 157|
 | U-Net | ???                          | CVC-??? | CVC-??? | ??.??  | 0.65    | 94.37% | 	0.66%  | ??.??% | ??.??%  | ?? |
 
 
@@ -54,8 +54,8 @@ Keras
  - [X] Get Jorge's dataset with labels
  - [X] Adapt the dataset to work with FCN8 in lasagne
  - [X] First experiments with FCN8 in Lasagne
+ - [ ] Init weights with Glorot for Relu or He 
  - [ ] Experiments with FCN8 in Lasagne to get reasonable results
- - [ ] Init weights with Glorot for Relu or He
  - [ ] Weight the class contributions to be able of learning specularities (Very small)
  - [ ] Normalize images using mean and std??
  - [ ] Add data augmentation
