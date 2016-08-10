@@ -60,15 +60,16 @@ Keras
  - [X] Adapt the dataset to work with FCN8 in lasagne
  - [X] First experiments with FCN8 in Lasagne
  - [X] Init weights with Glorot for Relu or He 
- - [ ] Experiments with FCN8 in Lasagne to get reasonable results
- - [ ] Weight the class contributions to be able of learning specularities (Very small)
- - [ ] Normalize images using mean and std??
- - [ ] Add data augmentation
+ - [X] Take voids into account
  - [ ] Define a good split of the data for training/validation/test using the CSV files with the frames metadata
- - [ ] First experiments with Unet in Lasagne
- - [ ] Add DICE evaluations
- - [ ] Adapt the dataset to work in Keras
  - [ ] Upload FCN8 code for Keras
+ - [ ] Normalize images using mean and std??
+ - [ ] Weight the class contributions to be able of learning specularities (Very small) 
+ - [ ] Add DICE evaluation
+ - [ ] Experiments with FCN8 in Lasagne to get reasonable results
+ - [ ] Add data augmentation
+ - [ ] First experiments with Unet in Lasagne
+ - [ ] Adapt the dataset to work in Keras
  - [ ] Move Unet model to Keras
  - [ ] Define experiments
  - [ ] Get Jorge's baselines for the proposed experiments
