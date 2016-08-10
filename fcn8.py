@@ -22,7 +22,7 @@ def build_fcn8(img_shape,
                dropout=False,
                nclasses=8,
                x_test_val=None,
-               load_weights=True,
+               load_weights=False,
                **kwargs):
 
     do = dim_ordering
@@ -37,7 +37,7 @@ def build_fcn8(img_shape,
         inputs.tag.test_value = x_test_val
         theano.config.compute_test_value = "warn"
 
-    sh = K.shape(inputs)
+    sh = inputs._keras_shape
 
     if regularize_weights:
         print "regularizing the weights"
@@ -133,40 +133,46 @@ def build_fcn8(img_shape,
     # DECONTRACTING PATH
 
     # Unpool 1
-    score2 = Deconvolution2D(
-        nb_filter=nclasses, nb_row=4, nb_col=4,
-        output_shape=(None, nclasses, None, None), subsample=(2, 2),
-        border_mode='valid', activation='linear', W_regularizer=l2_reg,
-        dim_ordering=do, trainable=True, name='score2')(score_fr)
-
     score_pool4 = Convolution2D(
           nclasses, 1, 1, activation='relu', border_mode='same',
           dim_ordering=do, W_regularizer=l2_reg,
           trainable=True, name='score_pool4')(pool4)
+    
+    score2 = Deconvolution2D(
+        nb_filter=nclasses, nb_row=4, nb_col=4,
+        output_shape=score_pool4._keras_shape, subsample=(2, 2),
+        border_mode='valid', activation='linear', W_regularizer=l2_reg,
+        dim_ordering=do, trainable=True, name='score2')(score_fr)
+    score_pool4_crop = CropLayer2D(score2._keras_shape, 
+                                   dim_ordering=do,
+                                   name='score_pool4_crop')(score_pool4)
+    
 
-    score_fused = merge([score_pool4, score2], mode=custom_sum,
+    score_fused = merge([score_pool4_crop, score2], mode=custom_sum,
                         output_shape=custom_sum_shape, name='score_fused')
 
     # Unpool 2
-    score4 = Deconvolution2D(
-        nb_filter=nclasses, nb_row=4, nb_col=4,
-        output_shape=(None, nclasses, None, None), subsample=(2, 2),
-        border_mode='valid', activation='linear', W_regularizer=l2_reg,
-        bias=False, dim_ordering=do,
-        trainable=True, name='score4')(score_fused)
-
     score_pool3 = Convolution2D(
         nclasses, 1, 1, activation='relu', border_mode='valid',
         dim_ordering=do, W_regularizer=l2_reg,
         trainable=True, name='score_pool3')(pool3)
 
-    score_final = merge([score_pool3, score4], mode=custom_sum,
+    score4 = Deconvolution2D(
+        nb_filter=nclasses, nb_row=4, nb_col=4,
+        output_shape=score_pool3._keras_shape, subsample=(2, 2),
+        border_mode='valid', activation='linear', W_regularizer=l2_reg,
+        bias=False, dim_ordering=do,
+        trainable=True, name='score4')(score_fused)
+
+    score_pool3_crop = CropLayer2D(score4._keras_shape, dim_ordering=do,
+                                   name='score_pool3_crop')(score_pool3)
+    score_final = merge([score_pool3_crop, score4], mode=custom_sum,
                         output_shape=custom_sum_shape, name='score_final')
 
     # Unpool 3
     upsample = Deconvolution2D(
         nb_filter=nclasses, nb_row=16, nb_col=16,
-        output_shape=(None, nclasses, None, None), subsample=(8, 8),
+        output_shape=inputs._keras_shape, subsample=(8, 8),
         border_mode='valid', activation='linear', dim_ordering=do,
         W_regularizer=l2_reg,
         trainable=True, name='upsample', bias=False)(score_final)
@@ -232,11 +238,9 @@ def custom_sum_shape(tensors):
 
 if __name__ == '__main__':
     start = time.time()
-    input_shape = [2, 223, 223]
+    input_shape = [2, 224, 224]
     seq_len = 1
     batch = 1
-    test_val = \
-        np.random.random(([batch, seq_len] + input_shape)).astype(np.float32)
     print 'BUILD'
     # input_shape = [3, None, None]
     model = build_fcn8(input_shape,
@@ -248,9 +252,5 @@ if __name__ == '__main__':
                        seq_length=seq_len, nclasses=9)
     print 'COMPILING'
     model.compile(loss="binary_crossentropy", optimizer="rmsprop")
+    model.summary()
     print 'END COMPILING'
-    start_predict = time.time()
-    print model.predict(test_val).shape
-    end_predict = time.time()
-    print ('prediction time for'+str([batch, seq_len] + input_shape)+' : ' +
-           str(end_predict-start_predict))
