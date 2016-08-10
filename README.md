@@ -59,7 +59,7 @@ Keras
  - [X] Get Jorge's dataset with labels
  - [X] Adapt the dataset to work with FCN8 in lasagne
  - [X] First experiments with FCN8 in Lasagne
- - [ ] Init weights with Glorot for Relu or He 
+ - [X] Init weights with Glorot for Relu or He 
  - [ ] Experiments with FCN8 in Lasagne to get reasonable results
  - [ ] Weight the class contributions to be able of learning specularities (Very small)
  - [ ] Normalize images using mean and std??
