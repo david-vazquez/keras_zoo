@@ -61,6 +61,8 @@ Keras
  - [X] First experiments with FCN8 in Lasagne
  - [X] Init weights with Glorot for Relu or He 
  - [X] Take voids into account
+ - [ ] Solve issues with the CSV of CVC-612
+ - [ ] Check for bugs in the plots code
  - [ ] Define a good split of the data for training/validation/test using the CSV files with the frames metadata
  - [ ] Upload FCN8 code for Keras
  - [ ] Normalize images using mean and std??
