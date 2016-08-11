@@ -1,6 +1,5 @@
 import time
 import h5py
-import numpy as np
 
 import theano
 
@@ -19,7 +18,6 @@ def build_fcn8(img_shape,
                x_shape=None,
                dim_ordering='th',
                regularize_weights=False,
-               dropout=False,
                nclasses=8,
                x_test_val=None,
                load_weights=False,
@@ -137,16 +135,15 @@ def build_fcn8(img_shape,
           nclasses, 1, 1, activation='relu', border_mode='same',
           dim_ordering=do, W_regularizer=l2_reg,
           trainable=True, name='score_pool4')(pool4)
-    
+
     score2 = Deconvolution2D(
         nb_filter=nclasses, nb_row=4, nb_col=4,
         output_shape=score_pool4._keras_shape, subsample=(2, 2),
         border_mode='valid', activation='linear', W_regularizer=l2_reg,
         dim_ordering=do, trainable=True, name='score2')(score_fr)
-    score_pool4_crop = CropLayer2D(score2._keras_shape, 
+    score_pool4_crop = CropLayer2D(score2._keras_shape,
                                    dim_ordering=do,
                                    name='score_pool4_crop')(score_pool4)
-    
 
     score_fused = merge([score_pool4_crop, score2], mode=custom_sum,
                         output_shape=custom_sum_shape, name='score_fused')
@@ -245,10 +242,8 @@ if __name__ == '__main__':
     # input_shape = [3, None, None]
     model = build_fcn8(input_shape,
                        # test_value=test_val,
-                       batch_size=batch,
                        x_shape=(batch, seq_len, ) + tuple(input_shape),
                        load_weights_fcn8=False,
-                       decontrating_path='recurrent',
                        seq_length=seq_len, nclasses=9)
     print 'COMPILING'
     model.compile(loss="binary_crossentropy", optimizer="rmsprop")
