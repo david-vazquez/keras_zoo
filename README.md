@@ -1,12 +1,18 @@
 # Deep learning for polyp characterization
 
 ## Results
-| Model | Parameters | Train set | Test set                |Tr. Loss|Val. Loss|Val. Acc|Val. Jacc|Test Acc|Test Jacc|Epochs |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| FCN8 | Rep+Conv, lr=1e-4, l2=1e-3    | CVC-612 | CVC-300 | 0.52   | 0.41    | 86.99% | 54.89%  | 86.99% | 54.89%  | 139|
-| FCN8 | Deconv_init, lr=1e-3, l2=1e-5 | CVC-612 | CVC-300 | 0.16   | 0.66    | 81.37% | 52.50%  | 81.37% | 52.50%  | 157|
-| U-Net | ???                          | CVC-??? | CVC-??? | ??.??  | 0.65    | 94.37% | 	0.66%  | ??.??% | ??.??%  | ?? |
+| Id | Model | Parameters                         | Train set        | Val set          | Test set                       |Tr. Loss|Val. Loss|Val. Acc|Val. Jacc|Test Acc|Test Jacc|Epochs |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | FCN8 | Rep+Conv, lr=1e-4, l2=1e-3           | CVC-612          | CVC-300          | CVC-300                         | 0.52   | 0.41    | 86.99% | 54.89%  | 86.99% | 54.89%  | 139|
+| 2 | FCN8 | Rep+Conv, lr=1e-4, l2=1e-3, He(Relu) | CVC-612          | CVC-300          | CVC-300                         | 0.42   | 0.45    | 86.93% | 53.95%  | 86.93% | 53.95%  | 183|
+| 3 |FCN8 | Deconv_init, lr=1e-3, l2=1e-5         | CVC-612          | CVC-300          | CVC-300                         | 0.16   | 0.66    | 81.37% | 52.50%  | 81.37% | 52.50%  | 157|
+| 4 | FCN8 | Rep+Conv, lr=1e-4, l2=1e-3, He(Relu) | CVC-612 (20 seq) | CVC-612  (5 seq) | CVC-612  (5 seq)                | 0.48   | 0.38    | 89.03% | 62.25%  | 89.61% | 63.04%  | 222|
+| 5 | FCN8 | Deconv_init, lr=1e-4, l2=1e-5, He(Relu), voids | CVC-612 (20 seq) | CVC-612  (5 seq) | CVC-612  (5 seq)      | 0.64   | 0.66    | 85.27% | 54.84%  | 85.19% | 52.58%  | 212|
+| 6 | U-Net | ???                                 | CVC-612          | CVC-612          | CVC-612                         | 0.65   | 94.37%  | 	0.66% | ??.??%  | ??.??% | ??.??%  | ?? |
 
+### Experiment 5 (Deconv_init, lr=1e-4, l2=1e-5, He(Relu), voids)
+Note that here the performance is worse because we don't count the void class that was very easy to detect
+![image](./images/deconv_init_voids.png)
 
 ## Posible problems to solve
  1. Polyp/No polyp image classification
@@ -54,16 +60,19 @@ Keras
  - [X] Get Jorge's dataset with labels
  - [X] Adapt the dataset to work with FCN8 in lasagne
  - [X] First experiments with FCN8 in Lasagne
- - [ ] Init weights with Glorot for Relu or He 
- - [ ] Experiments with FCN8 in Lasagne to get reasonable results
- - [ ] Weight the class contributions to be able of learning specularities (Very small)
- - [ ] Normalize images using mean and std??
- - [ ] Add data augmentation
+ - [X] Init weights with Glorot for Relu or He 
+ - [X] Take voids into account
+ - [ ] Solve issues with the CSV of CVC-612
+ - [ ] Check for bugs in the plots code
  - [ ] Define a good split of the data for training/validation/test using the CSV files with the frames metadata
- - [ ] First experiments with Unet in Lasagne
- - [ ] Add DICE evaluations
- - [ ] Adapt the dataset to work in Keras
  - [ ] Upload FCN8 code for Keras
+ - [ ] Normalize images using mean and std??
+ - [ ] Weight the class contributions to be able of learning specularities (Very small) 
+ - [ ] Add DICE evaluation
+ - [ ] Experiments with FCN8 in Lasagne to get reasonable results
+ - [ ] Add data augmentation
+ - [ ] First experiments with Unet in Lasagne
+ - [ ] Adapt the dataset to work in Keras
  - [ ] Move Unet model to Keras
  - [ ] Define experiments
  - [ ] Get Jorge's baselines for the proposed experiments
