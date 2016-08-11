@@ -10,8 +10,9 @@
 | 5 | FCN8 | Deconv_init, lr=1e-4, l2=1e-5, He(Relu), voids | CVC-612 (20 seq) | CVC-612  (5 seq) | CVC-612  (5 seq)      | 0.64   | 0.66    | 85.27% | 54.84%  | 85.19% | 52.58%  | 212|
 | 6 | U-Net | ???                                 | CVC-612          | CVC-612          | CVC-612                         | 0.65   | 94.37%  | 	0.66% | ??.??%  | ??.??% | ??.??%  | ?? |
 
-### Experiment 1 (FCN8, Rep+Conv, lr=1e-4, l2=1e-3)
-![image](./images/rep+conv1.png)
+### Experiment 5 (Deconv_init, lr=1e-4, l2=1e-5, He(Relu), voids)
+Note that here the performance is worse because we don't count the void class that was very easy to detect
+![image](./images/deconv_init_voids.png)
 
 ## Posible problems to solve
  1. Polyp/No polyp image classification
