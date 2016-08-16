@@ -305,7 +305,8 @@ class DirectoryIterator(Iterator):
                 if is_valid:
                     self.filenames.append(fname)
                     self.nb_sample += 1
-            print('Found %d images.' % (self.nb_sample))  
+            print('Found %d images.' % (self.nb_sample)) 
+            self.filenames = np.sort(self.filenames)
             for fname in os.listdir(gt_directory):
                 is_valid = False
                 for extension in white_list_formats:
@@ -316,7 +317,7 @@ class DirectoryIterator(Iterator):
                     self.gt_filenames.append(fname)
                     self.nb_GT_sample += 1
             print('Found %d GT images.' % (self.nb_sample))  
-                  
+            self.gt_filenames = np.sort(self.gt_filenames)
         # second, build an index of the images in the different class subfolders
 
         if not self.class_mode == 'seg_map':
