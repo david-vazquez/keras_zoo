@@ -6,12 +6,13 @@ import theano
 import keras.backend as K
 from keras.layers import Input, merge
 from keras.layers.convolutional import (Convolution2D, MaxPooling2D,
-                                        ZeroPadding2D, Deconvolution2D)
+                                        ZeroPadding2D)
 from keras.layers.core import Dropout
 from keras.models import Model
 from keras.regularizers import l2
 
 from layers.ourlayers import CropLayer2D, MergeSequences, NdSoftmax
+from deconv import Deconvolution2D
 
 
 def build_fcn8(img_shape,
@@ -25,11 +26,7 @@ def build_fcn8(img_shape,
 
     do = dim_ordering
 
-    batch_size = x_shape[0]
-    seq_length = x_shape[1]
-    input_shape = (seq_length, )+tuple(img_shape)
-
-    inputs = Input(shape=input_shape, batch_shape=x_shape)
+    inputs = Input(img_shape)
 
     if x_test_val is not None:
         inputs.tag.test_value = x_test_val
@@ -39,88 +36,88 @@ def build_fcn8(img_shape,
 
     if regularize_weights:
         print "regularizing the weights"
-        l2_reg = l2(0.001)
+        l2_reg = 0.001
     else:
-        l2_reg = None
+        l2_reg = 0.
 
     # Build network
 
     # CONTRACTING PATH
-    flat = MergeSequences(merge=True, batch_size=batch_size,
-                          name='flat')(inputs)
+    # flat = MergeSequences(merge=True, batch_size=batch_size,
+    #                       name='flat')(inputs)
     padded = ZeroPadding2D(padding=(100, 100), dim_ordering=do,
-                           name='pad100')(flat)
+                           name='pad100')(inputs)
 
     # Block 1
     conv1_1 = Convolution2D(
            64, 3, 3, activation='relu', border_mode='valid', dim_ordering=do,
-           name='conv1_1', W_regularizer=l2_reg, trainable=True)(padded)
+           name='conv1_1', W_regularizer=l2(l2_reg), trainable=True)(padded)
     conv1_2 = Convolution2D(
            64, 3, 3, activation='relu', border_mode='same', dim_ordering=do,
-           name='conv1_2', W_regularizer=l2_reg, trainable=True)(conv1_1)
+           name='conv1_2', W_regularizer=l2(l2_reg), trainable=True)(conv1_1)
     pool1 = MaxPooling2D(pool_size=(2, 2), strides=(2, 2), dim_ordering=do,
                          name='pool1')(conv1_2)
 
     # Block 2
     conv2_1 = Convolution2D(
            128, 3, 3, activation='relu', border_mode='same', dim_ordering=do,
-           name='conv2_1', W_regularizer=l2_reg, trainable=True)(pool1)
+           name='conv2_1', W_regularizer=l2(l2_reg), trainable=True)(pool1)
     conv2_2 = Convolution2D(
            128, 3, 3, activation='relu', border_mode='same', dim_ordering=do,
-           name='conv2_2', W_regularizer=l2_reg, trainable=True)(conv2_1)
+           name='conv2_2', W_regularizer=l2(l2_reg), trainable=True)(conv2_1)
     pool2 = MaxPooling2D(pool_size=(2, 2), strides=(2, 2), dim_ordering=do,
                          name='pool2')(conv2_2)
 
     # Block 3
     conv3_1 = Convolution2D(
            256, 3, 3, activation='relu', border_mode='same', dim_ordering=do,
-           name='conv3_1', W_regularizer=l2_reg, trainable=True
+           name='conv3_1', W_regularizer=l2(l2_reg), trainable=True
            )(pool2)
     conv3_2 = Convolution2D(
            256, 3, 3, activation='relu', border_mode='same', dim_ordering=do,
-           name='conv3_2', W_regularizer=l2_reg, trainable=True)(conv3_1)
+           name='conv3_2', W_regularizer=l2(l2_reg), trainable=True)(conv3_1)
     conv3_3 = Convolution2D(
            256, 3, 3, activation='relu', border_mode='same', dim_ordering=do,
-           name='conv3_3', W_regularizer=l2_reg, trainable=True)(conv3_2)
+           name='conv3_3', W_regularizer=l2(l2_reg), trainable=True)(conv3_2)
     pool3 = MaxPooling2D(pool_size=(2, 2), strides=(2, 2), dim_ordering=do,
                          name='pool3')(conv3_3)
 
     # Block 4
     conv4_1 = Convolution2D(
            512, 3, 3, activation='relu', border_mode='same', dim_ordering=do,
-           name='conv4_1', W_regularizer=l2_reg, trainable=True)(pool3)
+           name='conv4_1', W_regularizer=l2(l2_reg), trainable=True)(pool3)
     conv4_2 = Convolution2D(
            512, 3, 3, activation='relu', border_mode='same', dim_ordering=do,
-           name='conv4_2', W_regularizer=l2_reg, trainable=True)(conv4_1)
+           name='conv4_2', W_regularizer=l2(l2_reg), trainable=True)(conv4_1)
     conv4_3 = Convolution2D(
            512, 3, 3, activation='relu', border_mode='same', dim_ordering=do,
-           name='conv4_3', W_regularizer=l2_reg, trainable=True)(conv4_2)
+           name='conv4_3', W_regularizer=l2(l2_reg), trainable=True)(conv4_2)
     pool4 = MaxPooling2D(pool_size=(2, 2), strides=(2, 2), dim_ordering=do,
                          name='pool4')(conv4_3)
 
     # Block 5
     conv5_1 = Convolution2D(
            512, 3, 3, activation='relu', border_mode='same', dim_ordering=do,
-           name='conv5_1', W_regularizer=l2_reg, trainable=True)(pool4)
+           name='conv5_1', W_regularizer=l2(l2_reg), trainable=True)(pool4)
     conv5_2 = Convolution2D(
            512, 3, 3, activation='relu', border_mode='same', dim_ordering=do,
-           name='conv5_2', W_regularizer=l2_reg, trainable=True)(conv5_1)
+           name='conv5_2', W_regularizer=l2(l2_reg), trainable=True)(conv5_1)
     conv5_3 = Convolution2D(
            512, 3, 3, activation='relu', border_mode='same', dim_ordering=do,
-           name='conv5_3', W_regularizer=l2_reg, trainable=True)(conv5_2)
+           name='conv5_3', W_regularizer=l2(l2_reg), trainable=True)(conv5_2)
     pool5 = MaxPooling2D(pool_size=(2, 2), strides=(2, 2), dim_ordering=do,
                          name='pool5')(conv5_3)
 
     # Block 6 (fully conv)
     fc6 = Convolution2D(
           4096, 7, 7, activation='relu', border_mode='valid', dim_ordering=do,
-          name='fc6', W_regularizer=l2_reg, trainable=True)(pool5)
+          name='fc6', W_regularizer=l2(l2_reg), trainable=True)(pool5)
 
     fc6 = Dropout(0.5)(fc6)
 
     fc7 = Convolution2D(
           4096, 1, 1, activation='relu', border_mode='valid', dim_ordering=do,
-          name='fc7', W_regularizer=l2_reg, trainable=True)(fc6)
+          name='fc7', W_regularizer=l2(l2_reg), trainable=True)(fc6)
 
     fc7 = Dropout(0.5)(fc7)
 
@@ -133,13 +130,12 @@ def build_fcn8(img_shape,
     # Unpool 1
     score_pool4 = Convolution2D(
           nclasses, 1, 1, activation='relu', border_mode='same',
-          dim_ordering=do, W_regularizer=l2_reg,
+          dim_ordering=do, W_regularizer=l2(l2_reg),
           trainable=True, name='score_pool4')(pool4)
-
     score2 = Deconvolution2D(
         nb_filter=nclasses, nb_row=4, nb_col=4,
-        output_shape=score_pool4._keras_shape, subsample=(2, 2),
-        border_mode='valid', activation='linear', W_regularizer=l2_reg,
+        input_shape=score_fr._keras_shape, subsample=(2, 2),
+        border_mode='valid', activation='linear', W_regularizer=l2(l2_reg),
         dim_ordering=do, trainable=True, name='score2')(score_fr)
     score_pool4_crop = CropLayer2D(score2._keras_shape,
                                    dim_ordering=do,
@@ -151,13 +147,13 @@ def build_fcn8(img_shape,
     # Unpool 2
     score_pool3 = Convolution2D(
         nclasses, 1, 1, activation='relu', border_mode='valid',
-        dim_ordering=do, W_regularizer=l2_reg,
+        dim_ordering=do, W_regularizer=l2(l2_reg),
         trainable=True, name='score_pool3')(pool3)
 
     score4 = Deconvolution2D(
         nb_filter=nclasses, nb_row=4, nb_col=4,
-        output_shape=score_pool3._keras_shape, subsample=(2, 2),
-        border_mode='valid', activation='linear', W_regularizer=l2_reg,
+        input_shape=score_fused._keras_shape, subsample=(2, 2),
+        border_mode='valid', activation='linear', W_regularizer=l2(l2_reg),
         bias=False, dim_ordering=do,
         trainable=True, name='score4')(score_fused)
 
@@ -169,9 +165,9 @@ def build_fcn8(img_shape,
     # Unpool 3
     upsample = Deconvolution2D(
         nb_filter=nclasses, nb_row=16, nb_col=16,
-        output_shape=inputs._keras_shape, subsample=(8, 8),
+        input_shape=score_final._keras_shape, subsample=(8, 8),
         border_mode='valid', activation='linear', dim_ordering=do,
-        W_regularizer=l2_reg,
+        W_regularizer=l2(l2_reg),
         trainable=True, name='upsample', bias=False)(score_final)
 
     score = CropLayer2D(sh, dim_ordering=do, name='score')(upsample)
@@ -181,9 +177,9 @@ def build_fcn8(img_shape,
     else:
         softmax_fcn8 = NdSoftmax(3)(score)
 
-    deflat = MergeSequences(merge=False, batch_size=batch_size,
-                            name='deflat')(softmax_fcn8)
-    net = Model(input=inputs, output=deflat)
+    # deflat = MergeSequences(merge=False, batch_size=batch_size,
+    #                         name='deflat')(softmax_fcn8)
+    net = Model(input=inputs, output=softmax_fcn8)
 
     # Load weights
     if load_weights:
