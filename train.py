@@ -2,7 +2,7 @@ import argparse
 
 from keras.callbacks import (EarlyStopping,
                              ModelCheckpoint)
-
+from keras.optimizers import RMSprop
 from fcn8 import build_fcn8
 from loader_sem_seg import ImageDataGenerator
 from metrics import categorical_crossentropy_flatt
@@ -12,7 +12,7 @@ def train(dataset, model_name, learning_rate, weight_decay,
           num_epochs, max_patience, batch_size, optimizer='rmsprop',
           savepath='/Tmp/romerosa/deeppolyps/models/'):
 
-    in_shape = (3, 500, 574)
+    in_shape = (3, 288, 384)
     n_classes = 5
 
     # Build model
@@ -28,19 +28,25 @@ def train(dataset, model_name, learning_rate, weight_decay,
 
     # Compile model
     print 'Compiling model'
-    model.compile(loss=categorical_crossentropy_flatt, optimizer="rmsprop")
+    optimizer = RMSprop(lr=0.0001, rho=0.9, epsilon=1e-8, clipnorm=10)
+    model.compile(loss=categorical_crossentropy_flatt, optimizer=optimizer)
     model.summary()
     # Load data
 
     # Data augmentation
     datagen = ImageDataGenerator()
-    data_path = '/home/michal/polyps/CVC-300/'
-    train_generator = datagen.flow_from_directory(data_path + 'bbdd', 
-                                                  batch_size=4,
-                                                  gt_directory=data_path + 'labelled',
-                                                  target_size=(500, 574),
+    train_path = '/home/michal/polyps/CVC-612/'
+    train_generator = datagen.flow_from_directory(train_path + 'bbdd', 
+                                                  batch_size=10,
+                                                  gt_directory=train_path + 'labelled',
+                                                  target_size=(288, 384),
                                                   class_mode='seg_map')
-
+    val_path = '/home/michal/polyps/CVC-300/'
+    val_generator = datagen.flow_from_directory(val_path + 'bbdd',
+                                                batch_size=4,
+                                                gt_directory=val_path + 'labelled',
+                                                target_size=(500, 574),
+                                                class_mode='seg_map')
 
     # Early stopping and model saving
     early_stopping = EarlyStopping(monitor='val_loss', patience=50,
@@ -51,10 +57,11 @@ def train(dataset, model_name, learning_rate, weight_decay,
 
     print('We are ready to run!')
     hist = model.fit_generator(train_generator,
-                               samples_per_epoch=20,
-                               nb_epoch=2
+                               samples_per_epoch=600,
+                               nb_epoch=2)#,
                                # callbacks=[early_stopping, checkpointer],
-                               )
+                               # validation_data=val_generator,
+                               # nb_val_samples=300)
 
 
 def main():

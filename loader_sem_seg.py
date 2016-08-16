@@ -367,9 +367,12 @@ class DirectoryIterator(Iterator):
                 batch_x[i] = x
             else:
                 x, y = self.image_data_generator.random_transform(x, y)
+                # print(np.shape(x), np.shape(y), 
+                #       np.shape(batch_x), np.shape(batch_y))
                 batch_x[i] = x
+                # print("+1!")
                 batch_y[i] = y
-             
+                # print("Almost!") 
         # optionally save augmented images to disk for debugging purposes
         if self.save_to_dir:
             for i in range(current_batch_size):
@@ -390,7 +393,7 @@ class DirectoryIterator(Iterator):
                 batch_y[i, label] = 1.
         elif not self.class_mode == 'seg_map':
             return batch_x
-
+        # print(np.shape(batch_x), np.shape(batch_y))
         return batch_x, batch_y
         
         
