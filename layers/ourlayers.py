@@ -64,8 +64,8 @@ def get_input_shape(output_length, filter_size, stride, pad=0):
 
 
 class CropLayer2D(Layer):
-    def __init__(self, crop_shape, dim_ordering='th', *args, **kwargs):
-        self.crop_shape = crop_shape
+    def __init__(self, img_in, dim_ordering='th', *args, **kwargs):
+        self.img_in = img_in
         assert dim_ordering in ['tf', 'th'], ('dim_ordering must be '
                                               'in [tf, th]')
         self.dim_ordering = dim_ordering
@@ -74,37 +74,24 @@ class CropLayer2D(Layer):
 
     def build(self, input_shape):
         if self.dim_ordering == 'th':
-            self.crop_size = self.crop_shape[-2:]
-            # self.diff = input_shape[-2:] - self.crop_size
+            self.crop_size = self.img_in._keras_shape[-2:]
         if self.dim_ordering == 'tf':
-            self.crop_size = self.crop_shape[1:3]
-            # self.diff = input_shape[-3:-1] - self.crop_size
-
+            self.crop_size = self.img_in._keras_shape[1:3]
         super(CropLayer2D, self).build(input_shape)
 
     def call(self, x, mask=False):
         input_shape = x.shape
-        cs = self.crop_size
+        cs = self.img_in.shape[-2:]
         if self.dim_ordering == 'th':
-            dif = input_shape[-2:] - cs
-        if self.dim_ordering == 'tf':
-            dif = input_shape[-3:-1] - cs
+            dif = input_shape[-2:] - cs 
         dif = dif/2
         if self.dim_ordering == 'th':
             if K.ndim(x) == 5:
                 return x[:, :, :, dif[0]:dif[0]+cs[0], dif[1]:dif[1]+cs[1]]
             return x[:, :, dif[0]:dif[0]+cs[0], dif[1]:dif[1]+cs[1]]
-        if self.dim_ordering == 'tf':
-            if K.ndim(x) == 5:
-                return x[:, :, dif[0]:dif[0]+cs[0], dif[1]:dif[1]+cs[1], :]
-            return x[:, dif[0]:dif[0]+cs[0], dif[1]:dif[1]+cs[1], :]
 
     def get_output_shape_for(self, input_shape):
         if self.dim_ordering == 'th':
-            # if self.ndim == 5:
-            #     return (input_shape[0], input_shape[1], input_shape[2],
-            #             self.crop_size[0], self.crop_size[1]))
-            # else:
             return tuple(input_shape[:-2]) + (self.crop_size[0],
                                               self.crop_size[1])
         if self.dim_ordering == 'tf':

@@ -126,21 +126,24 @@ def build_fcn8(img_shape,
           dim_ordering=do, name='score_fr')(fc7)
 
     # DECONTRACTING PATH
-
+    print("pool4 ", pool4._keras_shape)
     # Unpool 1
     score_pool4 = Convolution2D(
           nclasses, 1, 1, activation='relu', border_mode='same',
           dim_ordering=do, W_regularizer=l2(l2_reg),
           trainable=True, name='score_pool4')(pool4)
+    print("score_pool4", score_pool4._keras_shape)
+    print("score_fr", score_fr._keras_shape)
     score2 = Deconvolution2D(
         nb_filter=nclasses, nb_row=4, nb_col=4,
         input_shape=score_fr._keras_shape, subsample=(2, 2),
         border_mode='valid', activation='linear', W_regularizer=l2(l2_reg),
         dim_ordering=do, trainable=True, name='score2')(score_fr)
-    score_pool4_crop = CropLayer2D(score2._keras_shape,
+    print ("score2 ", score2._keras_shape)
+    score_pool4_crop = CropLayer2D(score2,
                                    dim_ordering=do,
                                    name='score_pool4_crop')(score_pool4)
-
+    print("score_pool4_crop ", score_pool4_crop._keras_shape)
     score_fused = merge([score_pool4_crop, score2], mode=custom_sum,
                         output_shape=custom_sum_shape, name='score_fused')
 
@@ -157,7 +160,7 @@ def build_fcn8(img_shape,
         bias=False, dim_ordering=do,
         trainable=True, name='score4')(score_fused)
 
-    score_pool3_crop = CropLayer2D(score4._keras_shape, dim_ordering=do,
+    score_pool3_crop = CropLayer2D(score4, dim_ordering=do,
                                    name='score_pool3_crop')(score_pool3)
     score_final = merge([score_pool3_crop, score4], mode=custom_sum,
                         output_shape=custom_sum_shape, name='score_final')
@@ -170,7 +173,7 @@ def build_fcn8(img_shape,
         W_regularizer=l2(l2_reg),
         trainable=True, name='upsample', bias=False)(score_final)
 
-    score = CropLayer2D(sh, dim_ordering=do, name='score')(upsample)
+    score = CropLayer2D(inputs, dim_ordering=do, name='score')(upsample)
 
     if do == 'th':
         softmax_fcn8 = NdSoftmax(1)(score)

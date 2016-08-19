@@ -10,12 +10,12 @@ from metrics import categorical_crossentropy_flatt
 
 def train(dataset, model_name, learning_rate, weight_decay,
           num_epochs, max_patience, batch_size, optimizer='rmsprop',
-          savepath='/Tmp/romerosa/deeppolyps/models/',
+          savepath='/home/michal/tmp/',
           train_path='/home/michal/polyps/CVC-612/',
           val_path='/home/michal/polyps/CVC-300/'):
 
     crop_size = (224, 224)
-    in_shape = (3, 224, 224)
+    in_shape = (3, None, None)
     n_classes = 5
 
     # Build model
@@ -108,9 +108,12 @@ def main():
     train(args.dataset, args.model_name, float(args.learning_rate),
           float(args.weight_decay), int(args.num_epochs),
           int(args.max_patience), int(args.batch_size),  args.optimizer,
-          savepath='/Tmp/vazquezd/deeppolyps/models/',
-          train_path='/Tmp/vazquezd/datasets/polyps/CVC-612/',
-          val_path='/Tmp/vazquezd/datasets/polyps/CVC-300/')
+          savepath='/home/michal/tmp',
+          train_path='/home/michal/polyps/CVC-612/',
+          val_path='/home/michal/polyps/CVC-300/')
 
 if __name__ == "__main__":
     main()
+
+
+
