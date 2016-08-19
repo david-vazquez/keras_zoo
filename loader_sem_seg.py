@@ -10,7 +10,7 @@ import os
 import threading
 
 from keras import backend as K
-from keras.preprocessing.image import (Iterator, 
+from keras.preprocessing.image import (Iterator,
                                        img_to_array,
                                        transform_matrix_offset_center,
                                        apply_transform,
@@ -23,9 +23,10 @@ def load_img(path, grayscale=False, target_size=None, crop=False):
     # TODO
     # add resize
     # add crop
+    # Add grayscale
     return img
-    
-    
+
+
 class ImageDataGenerator(object):
     '''Generate minibatches with
     real-time data augmentation.
@@ -76,7 +77,8 @@ class ImageDataGenerator(object):
                  horizontal_flip=False,
                  vertical_flip=False,
                  rescale=None,
-                 dim_ordering='default'):
+                 dim_ordering='default',
+                 crop_size=None):
         if dim_ordering == 'default':
             dim_ordering = K.image_dim_ordering()
         self.__dict__.update(locals())
@@ -107,6 +109,7 @@ class ImageDataGenerator(object):
             raise Exception('zoom_range should be a float or '
                             'a tuple or list of two floats. '
                             'Received arg: ', zoom_range)
+
 
     def flow(self, X, y=None, batch_size=32, shuffle=True, seed=None,
              save_to_dir=None, save_prefix='', save_format='jpeg'):
@@ -202,9 +205,9 @@ class ImageDataGenerator(object):
         x = apply_transform(x, transform_matrix, img_channel_index,
                             fill_mode=self.fill_mode, cval=self.cval)
         if y is not None:
-            x = apply_transform(x, transform_matrix, img_channel_index,
-                            fill_mode=self.fill_mode, cval=self.cval)
-                            
+            y = apply_transform(y, transform_matrix, img_channel_index,
+                                fill_mode=self.fill_mode, cval=self.cval)
+
         if self.channel_shift_range != 0:
             x = random_channel_shift(x, self.channel_shift_range, img_channel_index)
 
@@ -219,6 +222,38 @@ class ImageDataGenerator(object):
                 x = flip_axis(x, img_row_index)
                 if y is not None:
                     y = flip_axis(y, img_row_index)
+
+        # Crop
+        # TODO: tf compatible???
+        crop = list(self.crop_size) if self.crop_size else None
+        if crop:
+            # print ('X before: ' + str(x.shape))
+            # print ('Y before: ' + str(y.shape))
+            # print ('Crop_size: ' + str(self.crop_size))
+            h, w = x.shape[img_row_index], x.shape[img_col_index]
+
+            if crop[0] < h:
+                top = np.random.randint(h - crop[0])
+            else:
+                print('Data augmentation: Crop height >= image size')
+                top, crop[0] = 0, h
+            if crop[1] < w:
+                left = np.random.randint(w - crop[1])
+            else:
+                print('Data augmentation: Crop width >= image size')
+                left, crop[1] = 0, w
+
+            if self.dim_ordering == 'th':
+                x = x[..., :, top:top+crop[0], left:left+crop[1]]
+                if y is not None:
+                    y = y[..., top:top+crop[0], left:left+crop[1]]
+            else:
+                x = x[..., top:top+crop[0], left:left+crop[1], :]
+                if y is not None:
+                    y = y[..., top:top+crop[0], left:left+crop[1]]
+
+            # print ('X after: ' + str(x.shape))
+            # print ('Y after: ' + str(y.shape))
 
         # TODO:
         # channel-wise normalization
@@ -305,7 +340,7 @@ class DirectoryIterator(Iterator):
                 if is_valid:
                     self.filenames.append(fname)
                     self.nb_sample += 1
-            print('Found %d images.' % (self.nb_sample)) 
+            print('Found %d images.' % (self.nb_sample))
             self.filenames = np.sort(self.filenames)
             for fname in os.listdir(gt_directory):
                 is_valid = False
@@ -316,7 +351,7 @@ class DirectoryIterator(Iterator):
                 if is_valid:
                     self.gt_filenames.append(fname)
                     self.nb_GT_sample += 1
-            print('Found %d GT images.' % (self.nb_sample))  
+            print('Found %d GT images.' % (self.nb_sample))
             self.gt_filenames = np.sort(self.gt_filenames)
         # second, build an index of the images in the different class subfolders
 
@@ -335,31 +370,32 @@ class DirectoryIterator(Iterator):
                         self.classes[i] = self.class_indices[subdir]
                         self.filenames.append(os.path.join(subdir, fname))
                         i += 1
-  
+
         super(DirectoryIterator, self).__init__(self.nb_sample, batch_size, shuffle, seed)
 
     def next(self):
         with self.lock:
             index_array, current_index, current_batch_size = next(self.index_generator)
-        # The transformation of images is not under thread lock so it can be done in parallel
+        # The transformation of images is not under thread lock so it can
+        # be done in parallel
         batch_x = np.zeros((current_batch_size,) + self.image_shape)
         if self.class_mode == 'seg_map':
             batch_y = np.zeros((current_batch_size,
-                                1, self.image_shape[1], 
+                                1, self.image_shape[1],
                                 self.image_shape[2]))
         grayscale = self.color_mode == 'grayscale'
         # build batch of image data
         for i, j in enumerate(index_array):
             fname = self.filenames[j]
             gtname = self.gt_filenames[j]
-            img = load_img(os.path.join(self.directory, fname), 
-                           grayscale=grayscale, 
+            img = load_img(os.path.join(self.directory, fname),
+                           grayscale=grayscale,
                            target_size=self.target_size)
             x = img_to_array(img, dim_ordering=self.dim_ordering)
-            x = self.image_data_generator.standardize(x)            
+            x = self.image_data_generator.standardize(x)
             if self.class_mode == 'seg_map':
-                GT = load_img(os.path.join(self.gt_directory, gtname), 
-                              grayscale=True, 
+                GT = load_img(os.path.join(self.gt_directory, gtname),
+                              grayscale=True,
                               target_size=self.target_size)
                 y = img_to_array(GT, dim_ordering=self.dim_ordering)
             if not self.class_mode == 'seg_map':
@@ -367,12 +403,12 @@ class DirectoryIterator(Iterator):
                 batch_x[i] = x
             else:
                 x, y = self.image_data_generator.random_transform(x, y)
-                # print(np.shape(x), np.shape(y), 
+                # print(np.shape(x), np.shape(y),
                 #       np.shape(batch_x), np.shape(batch_y))
                 batch_x[i] = x
                 # print("+1!")
                 batch_y[i] = y
-                # print("Almost!") 
+                # print("Almost!")
         # optionally save augmented images to disk for debugging purposes
         if self.save_to_dir:
             for i in range(current_batch_size):
@@ -395,5 +431,3 @@ class DirectoryIterator(Iterator):
             return batch_x
         # print(np.shape(batch_x), np.shape(batch_y))
         return batch_x, batch_y
-        
-        

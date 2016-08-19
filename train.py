@@ -10,9 +10,12 @@ from metrics import categorical_crossentropy_flatt
 
 def train(dataset, model_name, learning_rate, weight_decay,
           num_epochs, max_patience, batch_size, optimizer='rmsprop',
-          savepath='/Tmp/romerosa/deeppolyps/models/'):
+          savepath='/Tmp/romerosa/deeppolyps/models/',
+          train_path='/home/michal/polyps/CVC-612/',
+          val_path='/home/michal/polyps/CVC-300/'):
 
-    in_shape = (3, 288, 384)
+    crop_size = (224, 224)
+    in_shape = (3, 224, 224)
     n_classes = 5
 
     # Build model
@@ -31,22 +34,23 @@ def train(dataset, model_name, learning_rate, weight_decay,
     optimizer = RMSprop(lr=0.0001, rho=0.9, epsilon=1e-8, clipnorm=10)
     model.compile(loss=categorical_crossentropy_flatt, optimizer=optimizer)
     model.summary()
-    # Load data
 
     # Data augmentation
-    datagen = ImageDataGenerator()
-    train_path = '/home/michal/polyps/CVC-612/'
-    train_generator = datagen.flow_from_directory(train_path + 'bbdd', 
-                                                  batch_size=10,
-                                                  gt_directory=train_path + 'labelled',
-                                                  target_size=(288, 384),
-                                                  class_mode='seg_map')
-    val_path = '/home/michal/polyps/CVC-300/'
-    val_generator = datagen.flow_from_directory(val_path + 'bbdd',
-                                                batch_size=4,
-                                                gt_directory=val_path + 'labelled',
-                                                target_size=(500, 574),
+    dg_tr = ImageDataGenerator(crop_size=crop_size)
+    dg_ts = ImageDataGenerator()
+
+    # Load data
+    train_generator = dg_tr.flow_from_directory(train_path + 'bbdd',
+                                                batch_size=10,
+                                                gt_directory=train_path + 'labelled',
+                                                target_size=crop_size,
                                                 class_mode='seg_map')
+
+    val_generator = dg_ts.flow_from_directory(val_path + 'bbdd',
+                                              batch_size=4,
+                                              gt_directory=val_path + 'labelled',
+                                              target_size=(500, 574),
+                                              class_mode='seg_map')
 
     # Early stopping and model saving
     early_stopping = EarlyStopping(monitor='val_loss', patience=50,
@@ -58,7 +62,9 @@ def train(dataset, model_name, learning_rate, weight_decay,
     print('We are ready to run!')
     hist = model.fit_generator(train_generator,
                                samples_per_epoch=600,
-                               nb_epoch=2)#,
+                               nb_epoch=2,
+                               nb_worker=5,
+                               max_q_size=50)#,
                                # callbacks=[early_stopping, checkpointer],
                                # validation_data=val_generator,
                                # nb_val_samples=300)
@@ -101,7 +107,10 @@ def main():
 
     train(args.dataset, args.model_name, float(args.learning_rate),
           float(args.weight_decay), int(args.num_epochs),
-          int(args.max_patience), int(args.batch_size),  args.optimizer)
+          int(args.max_patience), int(args.batch_size),  args.optimizer,
+          savepath='/Tmp/vazquezd/deeppolyps/models/',
+          train_path='/Tmp/vazquezd/datasets/polyps/CVC-612/',
+          val_path='/Tmp/vazquezd/datasets/polyps/CVC-300/')
 
 if __name__ == "__main__":
     main()
