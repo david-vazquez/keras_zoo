@@ -33,7 +33,7 @@ def get_names(data, ids, select='frames'):
     def select_filenames(select):
         filenames = []
         for i in range(select.shape[0]):
-            filenames.append(str(select[i, 0]))
+            filenames.append(select[i, 0])
         # print "Filenames: " + str(filenames)
         return filenames
 
@@ -70,21 +70,20 @@ def create_paths(path, set):
 
 # Copy images and masks in the folders
 def copy_files(filenames, in_image_path, in_mask_path,
-               out_image_path, out_mask_path):
+               out_image_path, out_mask_path, prefix):
     for i in filenames:
         # Images files
         file_in = os.path.join(in_image_path, str(i) + '.bmp')
-        file_out = os.path.join(out_image_path, str(i) + '.bmp')
+        file_out = os.path.join(out_image_path, prefix + '_' + str(i).zfill(3) + '.bmp')
         shutil.copy(file_in, file_out)
         # Mask files
         file_in = os.path.join(in_mask_path, str(i) + '.tif')
-        file_out = os.path.join(out_mask_path, str(i) + '.tif')
+        file_out = os.path.join(out_mask_path, prefix + '_' + str(i).zfill(3) + '.tif')
         shutil.copy(file_in, file_out)
 
 
 # Find the best split of the data
-def find_best_split(n, data, split_type='frames',
-                    split_prob=(0.6, 0.2, 0.2), max_iters=3000):
+def find_best_split(n, data, split_type, split_prob, max_iters=50000):
 
     # Decide how many samples to add to each set
     size_set = (n*np.asarray(split_prob)).round()
@@ -99,7 +98,7 @@ def find_best_split(n, data, split_type='frames',
     best_n_images = ()
     for i in range(max_iters):
         # Randomize data
-        ids = np.arange(n)
+        ids = np.arange(1, n+1)
         np.random.shuffle(ids)
 
         # Get ids of each set
@@ -110,10 +109,14 @@ def find_best_split(n, data, split_type='frames',
         # print (' > Sets valid: \n' + str(ids_valid))
         # print (' > Sets test:  \n' + str(ids_test))
 
+
         # Get filenames
         train_filenames = get_names(data, ids_train, select=split_type)
         valid_filenames = get_names(data, ids_valid, select=split_type)
         test_filenames = get_names(data, ids_test, select=split_type)
+        # print (' > Images train: \n' + str(len(train_filenames)))
+        # print (' > Images valid: \n' + str(len(valid_filenames)))
+        # print (' > Images test:  \n' + str(len(test_filenames)))
 
         # Count number of images in each set
         n_images = np.asarray((len(train_filenames), len(valid_filenames),
@@ -142,7 +145,7 @@ def split_dataset(in_path='/Tmp/vazquezd/datasets/polyps/CVC-300/',
                   out_path='/Tmp/vazquezd/datasets/polyps_split1/',
                   split_prob=(0.6, 0.2, 0.2),  # (training, validation, test)
                   split_type='frames',  # [frames | sequences | patience]
-                  ):
+                  prefix='CVC-300'):
 
     # Data paths
     image_path = os.path.join(in_path, "bbdd")
@@ -172,11 +175,11 @@ def split_dataset(in_path='/Tmp/vazquezd/datasets/polyps/CVC-300/',
     # Copy images in the folders
     print ('> Copying the files...')
     copy_files(train_filenames, image_path, mask_path,
-               path_train_images, path_train_gt)
+               path_train_images, path_train_gt, prefix)
     copy_files(valid_filenames, image_path, mask_path,
-               path_valid_images, path_valid_gt)
+               path_valid_images, path_valid_gt, prefix)
     copy_files(test_filenames, image_path, mask_path,
-               path_test_images, path_test_gt)
+               path_test_images, path_test_gt, prefix)
 
     print ('> Done!')
 
@@ -185,27 +188,33 @@ def split_dataset(in_path='/Tmp/vazquezd/datasets/polyps/CVC-300/',
 if __name__ == '__main__':
 
     # Pareameters
-    datasets_path = '/Tmp/vazquezd/datasets/'
+    in_datasets_path = '/Tmp/vazquezd/datasets/polyps/'
+    # out_datasets_path = '/data/lisa/exp/vazquezd/datasets/polyps_split2/'
+    out_datasets_path = '/Tmp/vazquezd/datasets/polyps_split/'
     split_prob = (0.6, 0.2, 0.2)  # (training, validation, test)
     split_type = 'patience'  # [frames | sequences | patience]
 
     # Split the datasets
     print('\n\n ---> Spliting CVC-300 <---')
-    split_dataset(in_path=datasets_path+'polyps/CVC-300/',
-                  out_path=datasets_path+'polyps_split/CVC-300/',
-                  split_prob=split_prob, split_type=split_type)
+    split_dataset(in_path=in_datasets_path+'CVC-300/',
+                  out_path=out_datasets_path+'CVC-300/',
+                  split_prob=split_prob, split_type=split_type,
+                  prefix='CVC-300')
 
     print('\n\n ---> Spliting CVC-612 <---')
-    split_dataset(in_path=datasets_path+'polyps/CVC-612/',
-                  out_path=datasets_path+'polyps_split/CVC-612/',
-                  split_prob=split_prob, split_type='patience')
+    split_dataset(in_path=in_datasets_path+'CVC-612/',
+                  out_path=out_datasets_path+'CVC-612/',
+                  split_prob=split_prob, split_type=split_type,
+                  prefix='CVC-612')
 
     print('\n\n ---> Spliting CVC-300 (Combined) <---')
-    split_dataset(in_path=datasets_path+'polyps/CVC-300/',
-                  out_path=datasets_path+'polyps_split/CVC-912/',
-                  split_prob=split_prob, split_type=split_type)
+    split_dataset(in_path=in_datasets_path+'CVC-300/',
+                  out_path=out_datasets_path+'CVC-912/',
+                  split_prob=split_prob, split_type=split_type,
+                  prefix='CVC-300')
 
     print('\n\n ---> Spliting CVC-612 (Combined) <---')
-    split_dataset(in_path=datasets_path+'polyps/CVC-612/',
-                  out_path=datasets_path+'polyps_split/CVC-912/',
-                  split_prob=split_prob, split_type='patience')
+    split_dataset(in_path=in_datasets_path+'CVC-612/',
+                  out_path=out_datasets_path+'CVC-912/',
+                  split_prob=split_prob, split_type=split_type,
+                  prefix='CVC-612')
