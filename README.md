@@ -68,11 +68,11 @@ Keras
  - [X] Weight the class contributions to be able of learning specularities (Very small)  
  - [X] Upload FCN8 code for Keras
    - [X] Adapt the dataset to work in Keras
-   - [ ] Voids
-   - [ ] Multi-size in dataset loader
+   - [X] Voids
+   - [X] Multi-size in dataset loader
    - [ ] Show images
    - [ ] Plot results
-   - [ ] DICE index
+   - [ ] Jaccard and DICE index
    - [ ] Test data augmentation
    - [ ] Move Unet model to Keras
  - [ ] Normalize images using mean and std??
