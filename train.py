@@ -1,11 +1,20 @@
+# Import libraries
 import argparse
-
 from keras.callbacks import (EarlyStopping,
                              ModelCheckpoint)
 from keras.optimizers import RMSprop
 from fcn8 import build_fcn8
 from loader_sem_seg import ImageDataGenerator
 from metrics import cce_flatt
+
+
+# class Save_images(Callback):
+#     def __init__(self,
+#                  path='./'):
+#         super(Save_images, self).__init__()
+#         self.path = path
+#
+#     def on_epoch_end(self, epoch, logs={}):
 
 
 # Train the network
@@ -15,30 +24,34 @@ def train(dataset, model_name, learning_rate, weight_decay,
           train_path='/home/michal/polyps/CVC-612/',
           val_path='/home/michal/polyps/CVC-300/',
           crop_size=(224, 224), in_shape=(3, None, None), n_classes=5,
-          load_weights=False):
+          load_weights=False, void_class=[4]):
+
+    # Remove void classes from number of classes
+    n_classes = n_classes - len(void_class)
 
     # Build model
-    print ' > Building model'
+    print ' > Building model...'
     if model_name == 'fcn8':
         model = build_fcn8(in_shape, regularize_weights=weight_decay,
                            nclasses=n_classes, load_weights=load_weights)
     else:
         raise ValueError('Unknown model')
-    #TODO set void class as a parameter
-    void_class = [4]
-    n_classes = n_classes - len(void_class)
+
+    # TODO: What is this??
+    model.output
+
     # Compile model
-    print ' > Compiling model'
+    print ' > Compiling model...'
     optimizer = RMSprop(lr=0.0001, rho=0.9, epsilon=1e-8, clipnorm=10)
     model.compile(loss=cce_flatt(void_class), optimizer=optimizer)
+    # TODO: Add metrics: Jaccard and DICE
 
     # Show model structure
     model.summary()
 
     # Data augmentation methods
     dg_tr = ImageDataGenerator(crop_size=crop_size)
-    dg_ts = ImageDataGenerator(crop_size=crop_size)
-    # TODO: Allow to define target_size=None for minibatches of size 1
+    dg_ts = ImageDataGenerator()
 
     # Load data
     train_generator = dg_tr.flow_from_directory(train_path + 'images',
@@ -48,7 +61,7 @@ def train(dataset, model_name, learning_rate, weight_decay,
                                                 class_mode='seg_map')
 
     val_generator = dg_ts.flow_from_directory(val_path + 'images',
-                                              batch_size=10,
+                                              batch_size=1,
                                               gt_directory=val_path + 'masks',
                                               target_size=crop_size,
                                               class_mode='seg_map')
@@ -62,9 +75,8 @@ def train(dataset, model_name, learning_rate, weight_decay,
                                    save_best_only=True)
 
     # TODO: Add show images callback
-    # TODO: Void labels
 
-    print('We are ready to run!')
+    print(' > Training the model...')
     hist = model.fit_generator(train_generator,
                                samples_per_epoch=60,
                                nb_epoch=2,
@@ -76,13 +88,10 @@ def train(dataset, model_name, learning_rate, weight_decay,
 # Main function
 def main():
     # Get parameters from file parser
-    parser = argparse.ArgumentParser(description='FCN8 model training')
-    parser.add_argument('-dataset', default='polyp',
-                        help='Dataset')
-    parser.add_argument('-model_name', default='fcn8',
-                        help='Model')
-    parser.add_argument('-learning_rate', default=0.0001,
-                        help='Learning Rate')
+    parser = argparse.ArgumentParser(description='Unet model training')
+    parser.add_argument('-dataset', default='camvid', help='Dataset')
+    parser.add_argument('-model_name', default='fcn8', help='Model')
+    parser.add_argument('-learning_rate', default=0.0001, help='Learning Rate')
     parser.add_argument('-weight_decay', default=0.0,
                         help='regularization constant')
     parser.add_argument('--num_epochs', '-ne', type=int, default=1000,
@@ -90,21 +99,20 @@ def main():
                         'number of epochs.')
     parser.add_argument('-max_patience', type=int, default=100,
                         help='Max patience (early stopping)')
-    parser.add_argument('-batch_size', type=int, default=10,
-                        help='Batch size')
+    parser.add_argument('-batch_size', type=int, default=10, help='Batch size')
     parser.add_argument('--optimizer', '-opt', default='rmsprop',
                         help='Optimizer')
     args = parser.parse_args()
 
     # Michail paths
-    savepath = '/home/michal/tmp/',
-    train_path = '/home/michal/polyps/CVC-612/'
-    val_path = '/home/michal/polyps/CVC-300/'
+    # savepath = '/home/michal/tmp',
+    # train_path = '/home/michal/polyps/CVC-612/'
+    # val_path = '/home/michal/polyps/CVC-300/')
 
     # David paths
-    # savepath = '/Tmp/vazquezd/results/deepPolyp/'
-    # train_path = '/Tmp/vazquezd/datasets/polyps_split/CVC-912/train/'
-    # val_path = '/Tmp/vazquezd/datasets/polyps_split/CVC-912/valid/'
+    savepath = '/Tmp/vazquezd/results/deepPolyp/'
+    train_path = '/Tmp/vazquezd/datasets/polyps_split2/CVC-912/train/'
+    val_path = '/Tmp/vazquezd/datasets/polyps_split2/CVC-912/valid/'
 
     # Train the network
     train(args.dataset, args.model_name, float(args.learning_rate),

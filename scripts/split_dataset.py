@@ -2,7 +2,7 @@
 import numpy as np
 import os
 import shutil
-
+import skimage.io as io
 
 # Get the metadata info from the dataset
 def read_csv(file_name, select='frames'):
@@ -80,6 +80,25 @@ def copy_files(filenames, in_image_path, in_mask_path,
         file_in = os.path.join(in_mask_path, str(i) + '.tif')
         file_out = os.path.join(out_mask_path, prefix + '_' + str(i).zfill(3) + '.tif')
         shutil.copy(file_in, file_out)
+
+
+# Copy images and masks in the folders
+def copy_files_change_void(filenames, in_image_path, in_mask_path,
+                           out_image_path, out_mask_path, prefix):
+    for i in filenames:
+        # Images files
+        file_in = os.path.join(in_image_path, str(i) + '.bmp')
+        file_out = os.path.join(out_image_path, prefix + '_' + str(i).zfill(3) + '.bmp')
+        shutil.copy(file_in, file_out)
+        # Mask files
+        file_in = os.path.join(in_mask_path, str(i) + '.tif')
+        file_out = os.path.join(out_mask_path, prefix + '_' + str(i).zfill(3) + '.tif')
+        mask = io.imread(file_in)
+        mask = mask.astype('int32')
+        mask[mask == 0] = 5  # Set the void mask value to 5 instead to 0
+        mask = mask - 1  # Start the first class as 0 instead in 1
+        io.imsave(file_out, mask)
+        #shutil.copy(file_in, file_out)
 
 
 # Find the best split of the data
@@ -174,11 +193,11 @@ def split_dataset(in_path='/Tmp/vazquezd/datasets/polyps/CVC-300/',
 
     # Copy images in the folders
     print ('> Copying the files...')
-    copy_files(train_filenames, image_path, mask_path,
+    copy_files_change_void(train_filenames, image_path, mask_path,
                path_train_images, path_train_gt, prefix)
-    copy_files(valid_filenames, image_path, mask_path,
+    copy_files_change_void(valid_filenames, image_path, mask_path,
                path_valid_images, path_valid_gt, prefix)
-    copy_files(test_filenames, image_path, mask_path,
+    copy_files_change_void(test_filenames, image_path, mask_path,
                path_test_images, path_test_gt, prefix)
 
     print ('> Done!')
@@ -190,7 +209,7 @@ if __name__ == '__main__':
     # Pareameters
     in_datasets_path = '/Tmp/vazquezd/datasets/polyps/'
     # out_datasets_path = '/data/lisa/exp/vazquezd/datasets/polyps_split2/'
-    out_datasets_path = '/Tmp/vazquezd/datasets/polyps_split/'
+    out_datasets_path = '/Tmp/vazquezd/datasets/polyps_split2/'
     split_prob = (0.6, 0.2, 0.2)  # (training, validation, test)
     split_type = 'patience'  # [frames | sequences | patience]
 

@@ -22,7 +22,6 @@ def load_img(path, grayscale=False, target_size=None, crop=False):
     img = io.imread(path)
     # TODO
     # add resize
-    # add crop
     # Add grayscale
     return img
 
@@ -405,6 +404,10 @@ class DirectoryIterator(Iterator):
                 x, y = self.image_data_generator.random_transform(x, y)
                 # print(np.shape(x), np.shape(y),
                 #       np.shape(batch_x), np.shape(batch_y))
+                if current_batch_size == 1:
+                    batch_x = np.zeros((current_batch_size,) + x.shape)
+                    batch_y = np.zeros((current_batch_size, 1, y.shape[1],
+                                        y.shape[2]))
                 batch_x[i] = x
                 # print("+1!")
                 batch_y[i] = y
