@@ -39,6 +39,7 @@ def train(dataset, model_name, learning_rate, weight_decay,
     # Data augmentation methods
     dg_tr = ImageDataGenerator(crop_size=crop_size)
     dg_ts = ImageDataGenerator(crop_size=crop_size)
+    # TODO: Allow to define target_size=None for minibatches of size 1
 
     # Load data
     train_generator = dg_tr.flow_from_directory(train_path + 'images',
@@ -60,6 +61,9 @@ def train(dataset, model_name, learning_rate, weight_decay,
     # Define model saving callback
     checkpointer = ModelCheckpoint(filepath="./weights.hdf5", verbose=1,
                                    save_best_only=True)
+
+    # TODO: Add show images callback
+    # TODO: Void labels
 
     print('We are ready to run!')
     hist = model.fit_generator(train_generator,
