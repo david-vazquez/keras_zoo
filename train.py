@@ -5,16 +5,8 @@ from keras.callbacks import (EarlyStopping,
 from keras.optimizers import RMSprop
 from fcn8 import build_fcn8
 from loader_sem_seg import ImageDataGenerator
-from metrics import cce_flatt
-
-
-# class Save_images(Callback):
-#     def __init__(self,
-#                  path='./'):
-#         super(Save_images, self).__init__()
-#         self.path = path
-#
-#     def on_epoch_end(self, epoch, logs={}):
+from metrics import cce_flatt, jaccard
+from callbacks.callbacks import ValJaccard
 
 
 # Train the network
@@ -53,18 +45,18 @@ def train(dataset, model_name, learning_rate, weight_decay,
     dg_tr = ImageDataGenerator(crop_size=crop_size)
     dg_ts = ImageDataGenerator()
 
-    # Load data
-    train_generator = dg_tr.flow_from_directory(train_path + 'images',
-                                                batch_size=10,
-                                                gt_directory=train_path + 'masks',
-                                                target_size=crop_size,
-                                                class_mode='seg_map')
+    # Create the data generators
+    train_gen = dg_tr.flow_from_directory(train_path + 'images',
+                                          batch_size=10,
+                                          gt_directory=train_path + 'masks',
+                                          target_size=crop_size,
+                                          class_mode='seg_map')
 
-    val_generator = dg_ts.flow_from_directory(val_path + 'images',
-                                              batch_size=1,
-                                              gt_directory=val_path + 'masks',
-                                              target_size=crop_size,
-                                              class_mode='seg_map')
+    valid_gen = dg_ts.flow_from_directory(val_path + 'images',
+                                          batch_size=1,
+                                          gt_directory=val_path + 'masks',
+                                          target_size=crop_size,
+                                          class_mode='seg_map')
 
     # Define early stopping callback
     early_stopping = EarlyStopping(monitor='val_loss', patience=50,
@@ -74,15 +66,18 @@ def train(dataset, model_name, learning_rate, weight_decay,
     checkpointer = ModelCheckpoint(filepath="./weights.hdf5", verbose=1,
                                    save_best_only=True)
 
+    # Define the jaccard callback
+    val_jaccard = ValJaccard(nclasses=n_classes, valid_gen=valid_gen,
+                             epoch_length=50)  # TODO: Define size
+
     # TODO: Add show images callback
 
     print(' > Training the model...')
-    hist = model.fit_generator(train_generator,
-                               samples_per_epoch=60,
-                               nb_epoch=2,
-                               callbacks=[early_stopping, checkpointer],
-                               validation_data=val_generator,
-                               nb_val_samples=300)
+    hist = model.fit_generator(train_gen, samples_per_epoch=60, nb_epoch=2,  # TODO: Define size
+                               validation_data=valid_gen, nb_val_samples=300,
+                               callbacks=[early_stopping, checkpointer,
+                                          val_jaccard]
+                               )
 
 
 # Main function
