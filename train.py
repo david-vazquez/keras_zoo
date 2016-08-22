@@ -5,7 +5,7 @@ from keras.callbacks import (EarlyStopping,
 from keras.optimizers import RMSprop
 from fcn8 import build_fcn8
 from loader_sem_seg import ImageDataGenerator
-from metrics import categorical_crossentropy_flatt
+from metrics import cce_flatt
 
 
 # Train the network
@@ -24,14 +24,13 @@ def train(dataset, model_name, learning_rate, weight_decay,
                            nclasses=n_classes, load_weights=load_weights)
     else:
         raise ValueError('Unknown model')
-
-    # TODO: What is this??
-    model.output
-
+    #TODO set void class as a parameter
+    void_class = [4]
+    n_classes = n_classes - len(void_class)
     # Compile model
     print ' > Compiling model'
     optimizer = RMSprop(lr=0.0001, rho=0.9, epsilon=1e-8, clipnorm=10)
-    model.compile(loss=categorical_crossentropy_flatt, optimizer=optimizer)
+    model.compile(loss=cce_flatt(void_class), optimizer=optimizer)
 
     # Show model structure
     model.summary()
@@ -77,10 +76,13 @@ def train(dataset, model_name, learning_rate, weight_decay,
 # Main function
 def main():
     # Get parameters from file parser
-    parser = argparse.ArgumentParser(description='Unet model training')
-    parser.add_argument('-dataset', default='camvid', help='Dataset')
-    parser.add_argument('-model_name', default='fcn8', help='Model')
-    parser.add_argument('-learning_rate', default=0.0001, help='Learning Rate')
+    parser = argparse.ArgumentParser(description='FCN8 model training')
+    parser.add_argument('-dataset', default='polyp',
+                        help='Dataset')
+    parser.add_argument('-model_name', default='fcn8',
+                        help='Model')
+    parser.add_argument('-learning_rate', default=0.0001,
+                        help='Learning Rate')
     parser.add_argument('-weight_decay', default=0.0,
                         help='regularization constant')
     parser.add_argument('--num_epochs', '-ne', type=int, default=1000,
@@ -88,20 +90,21 @@ def main():
                         'number of epochs.')
     parser.add_argument('-max_patience', type=int, default=100,
                         help='Max patience (early stopping)')
-    parser.add_argument('-batch_size', type=int, default=10, help='Batch size')
+    parser.add_argument('-batch_size', type=int, default=10,
+                        help='Batch size')
     parser.add_argument('--optimizer', '-opt', default='rmsprop',
                         help='Optimizer')
     args = parser.parse_args()
 
     # Michail paths
-    # savepath = '/home/michal/tmp',
-    # train_path = '/home/michal/polyps/CVC-612/'
-    # val_path = '/home/michal/polyps/CVC-300/')
+    savepath = '/home/michal/tmp/',
+    train_path = '/home/michal/polyps/CVC-612/'
+    val_path = '/home/michal/polyps/CVC-300/'
 
     # David paths
-    savepath = '/Tmp/vazquezd/results/deepPolyp/'
-    train_path = '/Tmp/vazquezd/datasets/polyps_split/CVC-912/train/'
-    val_path = '/Tmp/vazquezd/datasets/polyps_split/CVC-912/valid/'
+    # savepath = '/Tmp/vazquezd/results/deepPolyp/'
+    # train_path = '/Tmp/vazquezd/datasets/polyps_split/CVC-912/train/'
+    # val_path = '/Tmp/vazquezd/datasets/polyps_split/CVC-912/valid/'
 
     # Train the network
     train(args.dataset, args.model_name, float(args.learning_rate),

@@ -63,17 +63,23 @@ Keras
  - [X] Init weights with Glorot for Relu or He 
  - [X] Take voids into account
  - [X] Check for bugs in the plots code 
- - [ ] Solve issues with the CSV of CVC-612
- - [ ] Define a good split of the data for training/validation/test using the CSV files with the frames metadata
- - [ ] Upload FCN8 code for Keras
+ - [X] Solve issues with the CSV of CVC-612
+ - [X] Define a good split of the data for training/validation/test using the CSV files with the frames metadata
+ - [X] Weight the class contributions to be able of learning specularities (Very small)  
+ - [X] Upload FCN8 code for Keras
+   - [X] Adapt the dataset to work in Keras
+   - [ ] Voids
+   - [ ] Multi-size in dataset loader
+   - [ ] Show images
+   - [ ] Plot results
+   - [ ] DICE index
+   - [ ] Test data augmentation
+   - [ ] Move Unet model to Keras
  - [ ] Normalize images using mean and std??
- - [ ] Weight the class contributions to be able of learning specularities (Very small) 
  - [ ] Add DICE evaluation
  - [ ] Experiments with FCN8 in Lasagne to get reasonable results
- - [ ] Add data augmentation
+ - [ ] Experiments data augmentation
  - [ ] First experiments with Unet in Lasagne
- - [ ] Adapt the dataset to work in Keras
- - [ ] Move Unet model to Keras
  - [ ] Define experiments
  - [ ] Get Jorge's baselines for the proposed experiments
  - [ ] Select journal target (Michail has a proposal of a top medical imaging journal that answer in 1 month)
