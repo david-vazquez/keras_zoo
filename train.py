@@ -68,13 +68,11 @@ def train(dataset, model_name, learning_rate, weight_decay,
 
     # Define the jaccard callback
     val_jaccard = ValJaccard(nclasses=n_classes, valid_gen=valid_gen,
-                             epoch_length=50)  # TODO: Define size
-
-    # TODO: Add show images callback
+                             epoch_length=183, void_label=void_class[0])  # TODO: Define size
 
     print(' > Training the model...')
-    hist = model.fit_generator(train_gen, samples_per_epoch=60, nb_epoch=2,  # TODO: Define size
-                               validation_data=valid_gen, nb_val_samples=300,
+    hist = model.fit_generator(train_gen, samples_per_epoch=547, nb_epoch=2,  # TODO: Define size
+                               validation_data=valid_gen, nb_val_samples=183,  # TODO: Define size
                                callbacks=[early_stopping, checkpointer,
                                           val_jaccard]
                                )

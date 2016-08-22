@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 from keras import backend as K
+import theano.tensor as T
 
 
 def cce_flatt(void_class):
