@@ -70,13 +70,13 @@ Keras
    - [X] Adapt the dataset to work in Keras
    - [X] Voids
    - [X] Multi-size in dataset loader
-   - [ ] Show images
+   - [X] Show images
+   - [X] Jaccard index   
+   - [ ] Normalize images using mean and std?? 0-1??
    - [ ] Plot results
-   - [ ] Jaccard and DICE index
-   - [ ] Test data augmentation
+   - [ ] Test data augmentation   
+   - [ ] DICE index
    - [ ] Move Unet model to Keras
- - [ ] Normalize images using mean and std??
- - [ ] Add DICE evaluation
  - [ ] Experiments with FCN8 in Lasagne to get reasonable results
  - [ ] Experiments data augmentation
  - [ ] First experiments with Unet in Lasagne
