@@ -71,7 +71,8 @@ Keras
    - [X] Voids
    - [X] Multi-size in dataset loader
    - [X] Show images
-   - [X] Jaccard index   
+   - [X] Jaccard index
+   - [X] Add layers visualization
    - [ ] Normalize images using mean and std?? 0-1??
    - [ ] Plot results
    - [ ] Test data augmentation   
