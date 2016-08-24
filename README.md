@@ -77,6 +77,9 @@ Keras
    - [ ] Test data augmentation   
    - [ ] DICE index
    - [ ] Move Unet model to Keras
+ - [ ] Jorge: Change lumen annotations
+ - [ ] Jorge: Get more images (If posible)
+ - [ ] Jorge: Get baselines results on CVC-300 and CVC-612
  - [ ] Experiments with FCN8 in Lasagne to get reasonable results
  - [ ] Experiments data augmentation
  - [ ] First experiments with Unet in Lasagne
