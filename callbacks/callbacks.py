@@ -12,6 +12,7 @@ import scipy.misc
 import seaborn as sns
 
 
+# Converts a label mask to RGB to be shown
 def my_label2rgb(labels, colors, bglabel=None, bg_color=(0., 0., 0.)):
     output = np.zeros(labels.shape + (3,), dtype=np.float64)
     for i in range(len(colors)):
@@ -22,6 +23,7 @@ def my_label2rgb(labels, colors, bglabel=None, bg_color=(0., 0., 0.)):
     return output
 
 
+# Converts a label mask to RGB to be shown and overlaps over an image
 def my_label2rgboverlay(labels, colors, image, bglabel=None,
                         bg_color=(0., 0., 0.), alpha=0.2):
     image_float = gray2rgb(img_as_float(rgb2gray(image)))
@@ -55,30 +57,71 @@ def save_img(image_batch, mask_batch, output, out_images_folder, epoch,
     return images
 
 
-# Computes the confusion matrix
-def confusion_matrix(model, val_gen, epoch_length, nclasses,
-                     color_map, tag, void_label, out_images_folder, epoch):
+# Compute the masked categorical crossentropy
+def cat_cross_entropy_voids(y_pred, y_true, void_label, _EPS=10e-8,
+                            dim_ordering='th'):
+
+    # Move classes to the end (bc01 -> b01c)
+    if dim_ordering == 'th':
+        y_true = y_true.transpose([0, 2, 3, 1])
+        y_pred = y_pred.transpose([0, 2, 3, 1])
+
+    # Reshape to (b01, n_classes)
+    y_true = y_true.flatten()  # reshape(-1, sh_t[-1])
+    y_pred = y_pred.reshape(-1, y_pred.shape[-1])
+
+    # Compute the void mask
+    mask = np.ones_like(y_true).astype('int32')
+    if void_label is not None:
+        mask[y_true == void_label] = 0.
+        y_true[y_true == void_label] = 0.
+
+    # Avoid numerical instability with _EPSILON clipping
+    y_pred = np.clip(y_pred, _EPS, 1.0 - _EPS)
+
+    # Compute the negative log likelihood for each pixel
+    cost = np.zeros_like(y_pred[:, 0])
+    for i in xrange(len(cost)):
+        cost[i] = -np.log(y_pred[i, y_true[i]])
+
+    # Compute the average cost
+    cost *= mask
+    cost = np.sum(cost) / np.sum(mask).astype(float)
+
+    # Return the cost
+    return cost
+
+
+# Computes the desired metrics (And saves images)
+def compute_metrics(model, val_gen, epoch_length, nclasses, metrics,
+                    color_map, tag, void_label, out_images_folder, epoch):
     # Create a data generator
     data_gen_queue, _stop = generator_queue(val_gen, max_q_size=10)
 
+    # Create the metrics output dictionary
+    metrics_out = {}
+
     # Create the confusion matrix
-    CM = np.zeros((nclasses, nclasses))
+    cm = np.zeros((nclasses, nclasses))
+    hist_loss = []
+
+    # Process the dataset
     for _ in range(epoch_length):
         # Get data for this minibatch
         data = data_gen_queue.get()
         x_true = data[0]
-        y_true = data[1]
+        y_true = data[1].astype('int32')
 
         # Get prediction for this minibatch
         y_pred = model.predict(x_true)
+
+        # Compute the loss
+        hist_loss.append(cat_cross_entropy_voids(y_pred, y_true, void_label))
+
+        # Compute the argmax
         y_pred = np.argmax(y_pred, axis=1)
 
-        # Show shapes
-        # print ('x_true shape: ' + str(x_true.shape))
-        # print ('y_true shape: ' + str(y_true.shape))
-        # print ('y_pred shape: ' + str(y_pred.shape))
-
-        # Save output images
+        # Save output images (Only first minibatch)
         if _ == 0:
             y_true = np.reshape(y_true, (y_true.shape[0], y_true.shape[2],
                                          y_true.shape[3]))
@@ -89,49 +132,69 @@ def confusion_matrix(model, val_gen, epoch_length, nclasses,
         y_true = y_true.flatten()
         y_pred = y_pred.flatten()
 
-        # Show flatten shapes
-        # print ('y_true shape: ' + str(y_true.shape))
-        # print ('y_pred shape: ' + str(y_pred.shape))
-
         # Fill the confusion matrix
         for i in range(nclasses):
             for j in range(nclasses):
-                CM[i, j] += ((y_pred == i) * (y_true == j)).sum()
+                cm[i, j] += ((y_pred == i) * (y_true == j)).sum()
 
     # Stop data generator
     _stop.set()
-    # Return confusion matrix
-    return CM
+
+    # Compute metrics
+    TP_perclass = cm.diagonal().astype('float32')
+    jaccard_perclass = TP_perclass/(cm.sum(1) + cm.sum(0) - TP_perclass)
+    jaccard = np.nanmean(jaccard_perclass)
+    accuracy = TP_perclass.sum()/cm.sum()
+    loss = np.mean(hist_loss)
+
+    # Fill metrics output
+    for m in metrics:
+        if m.endswith('jaccard'):
+            metrics_out[m] = jaccard
+        elif m.endswith('jaccard_perclass'):
+            metrics_out[m] = jaccard_perclass
+        elif m.endswith('acc') or m.endswith('accuracy'):
+            metrics_out[m] = accuracy
+        elif m.endswith('cm'):
+            metrics_out[m] = cm
+        elif m.endswith('loss'):
+            metrics_out[m] = loss
+        else:
+            print('Metric {} unknown'.format(m))
+
+    # Return metrics out
+    return metrics_out
 
 
 # Jaccard value computation callback
 class ValJaccard(Callback):
     # Constructor
-    def __init__(self, nclasses, valid_gen, epoch_length, void_label, *args):
+    def __init__(self, nclasses, valid_gen, epoch_length, void_label,
+                 out_images_folder, metrics, *args):
         super(Callback, self).__init__()
+        # Save input parameters
         self.nclasses = nclasses
         self.valid_gen = valid_gen
         self.epoch_length = epoch_length
         self.void_label = void_label
+        self.out_images_folder = out_images_folder
+        self.metrics = metrics
+
         # Create the colormaping for showing labels
         self.color_map = sns.hls_palette(nclasses+1)
 
     # Compute jaccard value at the end of each epoch
     def on_epoch_end(self, epoch, logs={}):
-        # Compute the confusion matrix
-        CM = confusion_matrix(self.model, self.valid_gen, self.epoch_length,
-                              self.nclasses, color_map=self.color_map,
-                              tag="valid", void_label=self.void_label,
-                              out_images_folder='./', epoch=epoch)
+        # Compute the metrics
+        metrics_out = compute_metrics(self.model, self.valid_gen,
+                                      self.epoch_length, self.nclasses,
+                                      metrics=self.metrics,
+                                      color_map=self.color_map, tag="valid",
+                                      void_label=self.void_label,
+                                      out_images_folder=self.out_images_folder,
+                                      epoch=epoch)
 
-        # Compute and print the TP per class
-        TP_perclass = CM.diagonal().astype('float32')
-        print(TP_perclass.astype('int32'))
-        # Compute the jaccard
-        jaccard = TP_perclass/(CM.sum(1) + CM.sum(0) - TP_perclass)
-        print(CM.sum(1).astype('int32'))
-        print(CM.sum(0).astype('int32'))
-        # Compute jaccard mean ignoring NaNs
-        jaccard = np.nanmean(jaccard)
-        print('Jaccard: ' + str(jaccard))
-        print('Acc: ' + str(TP_perclass.sum()/CM.sum()))
+        # Save the metrics in the logs
+        for k, v in metrics_out.iteritems():
+            logs[k] = v
+        print ('logs: ' + str(logs))

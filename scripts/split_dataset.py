@@ -207,9 +207,10 @@ def split_dataset(in_path='/Tmp/vazquezd/datasets/polyps/CVC-300/',
 if __name__ == '__main__':
 
     # Pareameters
-    in_datasets_path = '/Tmp/vazquezd/datasets/polyps/'
-    # out_datasets_path = '/data/lisa/exp/vazquezd/datasets/polyps_split2/'
-    out_datasets_path = '/Tmp/vazquezd/datasets/polyps_split2/'
+    in_datasets_path = '/data/lisa/exp/vazquezd/datasets/polyps/'
+    #in_datasets_path = '/Tmp/vazquezd/datasets/polyps/'
+    out_datasets_path = '/data/lisa/exp/vazquezd/datasets/polyps_split2/'
+    #out_datasets_path = '/Tmp/vazquezd/datasets/polyps_split2/'
     split_prob = (0.6, 0.2, 0.2)  # (training, validation, test)
     split_type = 'patience'  # [frames | sequences | patience]
 

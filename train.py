@@ -1,25 +1,36 @@
-# Import libraries
+# Import python libraries
 import argparse
+import os
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Import keras libraries
 from keras.callbacks import (EarlyStopping,
                              ModelCheckpoint)
 from keras.optimizers import RMSprop
+from keras.utils.visualize_util import plot
+
+# Import project libraries
 from fcn8 import build_fcn8
 from loader_sem_seg import ImageDataGenerator
-from metrics import cce_flatt, jaccard
+from metrics import cce_flatt
 from callbacks.callbacks import ValJaccard
 
 
 # Train the network
 def train(dataset, model_name, learning_rate, weight_decay,
-          num_epochs, max_patience, batch_size, optimizer='rmsprop',
-          savepath='/home/michal/tmp/',
-          train_path='/home/michal/polyps/CVC-612/',
-          val_path='/home/michal/polyps/CVC-300/',
+          num_epochs, max_patience, batch_size, optimizer,
+          savepath, train_path, valid_path, test_path,
           crop_size=(224, 224), in_shape=(3, None, None), n_classes=5,
           load_weights=False, void_class=[4]):
 
     # Remove void classes from number of classes
     n_classes = n_classes - len(void_class)
+
+    # TODO: Get the number of images directly from data loader
+    n_images_train = 547  # 547
+    n_images_val = 183  # 183
+    n_images_test = 182  # 182
 
     # Build model
     print ' > Building model...'
@@ -40,49 +51,90 @@ def train(dataset, model_name, learning_rate, weight_decay,
 
     # Show model structure
     model.summary()
-
-    # Data augmentation methods
-    dg_tr = ImageDataGenerator(crop_size=crop_size)
-    dg_ts = ImageDataGenerator()
+    plot(model, to_file=savepath+'model.png')
 
     # Create the data generators
+    print ('\n > Reading training set...')
+    dg_tr = ImageDataGenerator(crop_size=crop_size)
     train_gen = dg_tr.flow_from_directory(train_path + 'images',
-                                          batch_size=10,
+                                          batch_size=batch_size,
                                           gt_directory=train_path + 'masks',
                                           target_size=crop_size,
                                           class_mode='seg_map')
 
-    valid_gen = dg_ts.flow_from_directory(val_path + 'images',
+    print ('\n > Reading validation set...')
+    dg_va = ImageDataGenerator()
+    valid_gen = dg_va.flow_from_directory(valid_path + 'images',
                                           batch_size=1,
-                                          gt_directory=val_path + 'masks',
+                                          gt_directory=valid_path + 'masks',
                                           target_size=crop_size,
                                           class_mode='seg_map')
 
+    print ('\n > Reading testing set...')
+    dg_ts = ImageDataGenerator()
+    test_gen = dg_ts.flow_from_directory(test_path + 'images',
+                                         batch_size=1,
+                                         gt_directory=test_path + 'masks',
+                                         target_size=crop_size,
+                                         class_mode='seg_map')
+
+    # Define the jaccard validation callback
+    val_jaccard = ValJaccard(nclasses=n_classes, valid_gen=valid_gen,
+                             metrics=['val_loss', 'val_jaccard', 'val_acc',
+                                      'val_jaccard_perclass'],
+                             epoch_length=n_images_val,
+                             void_label=void_class[0],
+                             out_images_folder=savepath)
+
     # Define early stopping callback
-    early_stopping = EarlyStopping(monitor='val_loss', patience=50,
-                                   verbose=0, mode='auto')
+    early_stopping = EarlyStopping(monitor='val_jaccard', mode='max',
+                                   patience=max_patience, verbose=0)
 
     # Define model saving callback
-    checkpointer = ModelCheckpoint(filepath="./weights.hdf5", verbose=1,
+    checkpointer = ModelCheckpoint(filepath=savepath+"weights.hdf5", verbose=1,
+                                   monitor='val_jaccard', mode='max',
                                    save_best_only=True)
 
-    # Define the jaccard callback
-    val_jaccard = ValJaccard(nclasses=n_classes, valid_gen=valid_gen,
-                             epoch_length=183, void_label=void_class[0])  # TODO: Define size
+    # Train the model
+    print('\n > Training the model...')
+    hist = model.fit_generator(train_gen, samples_per_epoch=n_images_train,
+                               nb_epoch=num_epochs,
+                               # validation_data=valid_gen,
+                               # nb_val_samples=n_images_val,
+                               callbacks=[val_jaccard, early_stopping,
+                                          checkpointer])
 
-    print(' > Training the model...')
-    hist = model.fit_generator(train_gen, samples_per_epoch=547, nb_epoch=2,  # TODO: Define size
-                               validation_data=valid_gen, nb_val_samples=183,  # TODO: Define size
-                               callbacks=[early_stopping, checkpointer,
-                                          val_jaccard]
-                               )
+    # Show the trained model history
+    print('\n > Show the trained model history...')
+    print(hist.history.keys())
+    plt.plot(hist.history['loss'],
+             label='train loss ({:.3f})'.format(np.min(hist.history['loss'])))
+    plt.plot(hist.history['val_loss'],
+             label='valid loss ({:.3f})'.format(np.min(hist.history['val_loss'])))
+    plt.plot(hist.history['val_jaccard'],
+             label='validation jaccard ({:.3f})'.format(np.max(hist.history['val_jaccard'])))
+
+    # Add title
+    plt.title('Model training history')
+
+    # Add axis labels
+    plt.ylabel('Metric')
+    plt.xlabel('Epoch')
+
+    # Add legend
+    plt.legend(loc='upper left')
+
+    # plt.legend(['train loss', 'valid loss', 'valid jaccard'], loc='upper left')
+
+    # Show plot
+    plt.show()
 
 
 # Main function
 def main():
     # Get parameters from file parser
     parser = argparse.ArgumentParser(description='Unet model training')
-    parser.add_argument('-dataset', default='camvid', help='Dataset')
+    parser.add_argument('-dataset', default='polyps', help='Dataset')
     parser.add_argument('-model_name', default='fcn8', help='Model')
     parser.add_argument('-learning_rate', default=0.0001, help='Learning Rate')
     parser.add_argument('-weight_decay', default=0.0,
@@ -100,20 +152,34 @@ def main():
     # Michail paths
     # savepath = '/home/michal/tmp',
     # train_path = '/home/michal/polyps/CVC-612/'
-    # val_path = '/home/michal/polyps/CVC-300/')
+    # valid_path = '/home/michal/polyps/CVC-300/')
+    # test_path = '/home/michal/polyps/CVC-300/')
 
     # David paths
-    savepath = '/Tmp/vazquezd/results/deepPolyp/'
-    train_path = '/Tmp/vazquezd/datasets/polyps_split2/CVC-912/train/'
-    val_path = '/Tmp/vazquezd/datasets/polyps_split2/CVC-912/valid/'
+    savepath = '/Tmp/vazquezd/results/deepPolyp/fcn8/tmp1/'
+    dataset_path = '/Tmp/vazquezd/datasets/polyps_split2/CVC-912/'
+    train_path = dataset_path + 'train/'
+    valid_path = dataset_path + 'valid/'
+    test_path = dataset_path + 'test/'
+
+    # Create output folders
+    if not os.path.exists(savepath):
+        os.makedirs(savepath)
 
     # Train the network
-    train(args.dataset, args.model_name, float(args.learning_rate),
-          float(args.weight_decay), int(args.num_epochs),
-          int(args.max_patience), int(args.batch_size),  args.optimizer,
-          savepath=savepath, train_path=train_path, val_path=val_path,
-          crop_size=(224, 224))
-
+    train(dataset=args.dataset,
+          model_name=args.model_name,
+          learning_rate=float(args.learning_rate),
+          weight_decay=float(args.weight_decay),
+          num_epochs=int(args.num_epochs),
+          max_patience=int(args.max_patience),
+          batch_size=int(args.batch_size),
+          optimizer=args.optimizer,
+          savepath=savepath,
+          train_path=train_path, valid_path=valid_path, test_path=test_path,
+          crop_size=(224, 224), in_shape=(3, None, None), n_classes=5,
+          load_weights=False,
+          void_class=[4])
 
 # Entry point of the script
 if __name__ == "__main__":
