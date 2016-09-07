@@ -72,6 +72,9 @@ Keras
  - [X] Solve issues with the CSV of CVC-612
  - [X] Define a good split of the data for training/validation/test using the CSV files with the frames metadata
  - [X] Weight the class contributions to be able of learning specularities (Very small)  
+ - [X] Jorge: Get baselines results on CVC-300 and CVC-612 
+ - [X] Experiments with FCN8 in Lasagne to get reasonable results 
+ - [ ] Experiments data augmentation
  - [X] Upload FCN8 code for Keras
    - [X] Adapt the dataset to work in Keras
    - [X] Voids
@@ -79,19 +82,15 @@ Keras
    - [X] Show images
    - [X] Jaccard index
    - [X] Add layers visualization
+   - [X] Plot results
+   - [X] Test data augmentation   
    - [ ] Normalize images using mean and std?? 0-1??
-   - [ ] Plot results
-   - [ ] Test data augmentation   
    - [ ] DICE index
    - [ ] Move Unet model to Keras
  - [ ] Jorge: Change lumen annotations
  - [ ] Jorge: Get more images (If posible)
- - [ ] Jorge: Get baselines results on CVC-300 and CVC-612
- - [ ] Experiments with FCN8 in Lasagne to get reasonable results
- - [ ] Experiments data augmentation
- - [ ] First experiments with Unet in Lasagne
+ - [ ] First experiments with Unet
  - [ ] Define experiments
- - [ ] Get Jorge's baselines for the proposed experiments
  - [ ] Select journal target (Michail has a proposal of a top medical imaging journal that answer in 1 month)
  - [ ] Add Frame ID (In the original video) to the datasets csv
  - [ ] Perform experiments
