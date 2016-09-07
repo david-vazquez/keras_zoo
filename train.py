@@ -98,7 +98,7 @@ def train(dataset, model_name, learning_rate, weight_decay,
                                           target_size=crop_size,
                                           class_mode='seg_map',
                                           classes=n_classes,
-                                          save_to_dir=savepath,
+                                          #save_to_dir=savepath,
                                           save_prefix='data_augmentation',
                                           save_format='png')
 

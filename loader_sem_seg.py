@@ -97,10 +97,8 @@ def apply_warp(x, warp_field, fill_mode='reflect',
     warp_field_arr = sitk.GetArrayFromImage(warp_field)
     max_deformation = np.max(np.abs(warp_field_arr))
     pad = np.ceil(max_deformation).astype(np.int32)
-    print ('pad: ' + str(pad))
     warp_field_padded_arr = pad_image(warp_field_arr, pad_amount=pad,
                                       mode='nearest')
-    print ('warp_field_padded_arr shape: ' + str(warp_field_padded_arr.shape))
     warp_field_padded = sitk.GetImageFromArray(warp_field_padded_arr,
                                                isVector=True)
 
@@ -111,12 +109,11 @@ def apply_warp(x, warp_field, fill_mode='reflect',
     warp_filter.SetEdgePaddingValue(np.min(x).astype(np.double))
     for i, image in enumerate(x):
         image_padded = pad_image(image, pad_amount=pad, mode=fill_mode,
-                                 constant=fill_constant)
-        print ('image_padded shape: ' + str(image_padded.shape))
+                                 constant=fill_constant).T
         image_f = sitk.GetImageFromArray(image_padded)
         image_f_warped = warp_filter.Execute(image_f, warp_field_padded)
         image_warped = sitk.GetArrayFromImage(image_f_warped)
-        x_warped[i] = image_warped[pad:-pad, pad:-pad]
+        x_warped[i] = image_warped[pad:-pad, pad:-pad].T
 
     return x_warped
 
@@ -182,8 +179,8 @@ class ImageDataGenerator(object):
                  horizontal_flip=False,
                  vertical_flip=False,
                  rescale=None,
-                 spline_warp=True,
-                 warp_sigma=0.,
+                 spline_warp=False,
+                 warp_sigma=0.1,
                  warp_grid_size=3,
                  dim_ordering='default',
                  crop_size=None):
@@ -332,20 +329,16 @@ class ImageDataGenerator(object):
                     y = flip_axis(y, img_row_index)
 
         if self.spline_warp:
-            print ('X shape: ' + str(x.shape))
-            print ('Y shape: ' + str(x.shape))
             warp_field = gen_warp_field(shape=x.shape[-2:],
                                         sigma=self.warp_sigma,
                                         grid_size=self.warp_grid_size)
             #print ('Warp_field: ' + str(warp_field))
             x = apply_warp(x, warp_field, fill_mode=self.fill_mode,
                            fill_constant=self.cval)
-            print ('X shape: ' + str(x.shape))
             if y is not None:
                 y = np.round(apply_warp(y, warp_field,
                                         fill_mode=self.fill_mode,
                                         fill_constant=self.cvalMask))
-            print ('Y shape: ' + str(y.shape))
 
         # Crop
         # TODO: tf compatible???
