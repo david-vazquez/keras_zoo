@@ -1,6 +1,12 @@
 # Deep learning for polyp characterization
 
-## Results
+## Results Keras
+| Id | Model | Parameters                         | Train set        | Val set          | Test set                       |Tr. Loss|Val. Loss|Val. Acc|Val. Jacc|Test Acc|Test Jacc|Epochs |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | FCN8 | Deconv, lr=1e-4, l2=0           | CVC-912 (Tr)          | CVC-912 (Val)          | CVC-912 (Ts)              | 0.079  | 0.37    | ??.??% | 54.60%  | ??.??% | ??.??%  | 203|
+
+
+## Results Lasagne
 | Id | Model | Parameters                         | Train set        | Val set          | Test set                       |Tr. Loss|Val. Loss|Val. Acc|Val. Jacc|Test Acc|Test Jacc|Epochs |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | FCN8 | Rep+Conv, lr=1e-4, l2=1e-3           | CVC-612          | CVC-300          | CVC-300                         | 0.52   | 0.41    | 86.99% | 54.89%  | 86.99% | 54.89%  | 139|
