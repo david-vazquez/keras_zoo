@@ -1,6 +1,7 @@
 # Import python libraries
 import argparse
 import os
+import sys
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -15,6 +16,20 @@ from fcn8 import build_fcn8
 from loader_sem_seg import ImageDataGenerator
 from metrics import cce_flatt
 from callbacks.callbacks import ValJaccard
+
+
+# Save the printf to a log file
+class Logger(object):
+    def __init__(self, log_file):
+        self.terminal = sys.stdout
+        self.log = open(log_file, "a", 0)
+
+    def write(self, message):
+        self.terminal.write(message)
+        self.log.write(message)
+
+    def flush(self):
+        pass
 
 
 # Train the network
@@ -55,12 +70,37 @@ def train(dataset, model_name, learning_rate, weight_decay,
 
     # Create the data generators
     print ('\n > Reading training set...')
-    dg_tr = ImageDataGenerator(crop_size=crop_size)
+    dg_tr = ImageDataGenerator(crop_size=crop_size,  # Crop the image to a fixed size
+                               featurewise_center=False,  # Set input mean to 0 over the dataset
+                               samplewise_center=False,  # Set each sample mean to 0
+                               featurewise_std_normalization=False,  # Divide inputs by std of the dataset
+                               samplewise_std_normalization=False,  # Divide each input by its std
+                               zca_whitening=False,  # Apply ZCA whitening
+                               rotation_range=180,  # Randomly rotate images in the range (degrees, 0 to 180)
+                               width_shift_range=0.0,  # Randomly shift images horizontally (fraction of total width)
+                               height_shift_range=0.0,  # Randomly shift images vertically (fraction of total height)
+                               shear_range=0.,  # Shear Intensity (Shear angle in counter-clockwise direction as radians)
+                               zoom_range=0.1,  # Float or [lower, upper]. Range for random zoom. If a float, [lower, upper] = [1-zoom_range, 1+zoom_range]
+                               channel_shift_range=0.,  # Range for random channel shifts.
+                               fill_mode='constant',  # One of {"constant", "nearest", "reflect" or "wrap"}. Points outside the boundaries of the input are filled according to the given mode.
+                               cval=0.,  # Value used for points outside the boundaries when fill_mode = "constant".
+                               cvalMask=n_classes,  # Void class value
+                               horizontal_flip=True,  # Randomly flip images horizontally
+                               vertical_flip=True, # Randomly flip images vertically
+                               rescale=None,  # Rescaling factor. Defaults to None. If None or 0, no rescaling is applied, otherwise we multiply the data by the value provided (before applying any other transformation).
+                               spline_warp=True,
+                               warp_sigma=0.1,
+                               warp_grid_size=3
+                               )
     train_gen = dg_tr.flow_from_directory(train_path + 'images',
                                           batch_size=batch_size,
                                           gt_directory=train_path + 'masks',
                                           target_size=crop_size,
-                                          class_mode='seg_map')
+                                          class_mode='seg_map',
+                                          classes=n_classes,
+                                          save_to_dir=savepath,
+                                          save_prefix='data_augmentation',
+                                          save_format='png')
 
     print ('\n > Reading validation set...')
     dg_va = ImageDataGenerator()
@@ -68,7 +108,8 @@ def train(dataset, model_name, learning_rate, weight_decay,
                                           batch_size=1,
                                           gt_directory=valid_path + 'masks',
                                           target_size=crop_size,
-                                          class_mode='seg_map')
+                                          class_mode='seg_map',
+                                          classes=n_classes)
 
     print ('\n > Reading testing set...')
     dg_ts = ImageDataGenerator()
@@ -76,7 +117,8 @@ def train(dataset, model_name, learning_rate, weight_decay,
                                          batch_size=1,
                                          gt_directory=test_path + 'masks',
                                          target_size=crop_size,
-                                         class_mode='seg_map')
+                                         class_mode='seg_map',
+                                         classes=n_classes)
 
     # Define the jaccard validation callback
     val_jaccard = ValJaccard(nclasses=n_classes, valid_gen=valid_gen,
@@ -113,6 +155,8 @@ def train(dataset, model_name, learning_rate, weight_decay,
              label='valid loss ({:.3f})'.format(np.min(hist.history['val_loss'])))
     plt.plot(hist.history['val_jaccard'],
              label='validation jaccard ({:.3f})'.format(np.max(hist.history['val_jaccard'])))
+    plt.plot(hist.history['val_acc'],
+             label='validation accuracy ({:.3f})'.format(np.max(hist.history['val_acc'])))
 
     # Add title
     plt.title('Model training history')
@@ -123,6 +167,9 @@ def train(dataset, model_name, learning_rate, weight_decay,
 
     # Add legend
     plt.legend(loc='upper left')
+
+    # Save fig
+    plt.savefig(savepath+'plot.png')
 
     # plt.legend(['train loss', 'valid loss', 'valid jaccard'], loc='upper left')
 
@@ -156,7 +203,7 @@ def main():
     # test_path = '/home/michal/polyps/CVC-300/')
 
     # David paths
-    savepath = '/Tmp/vazquezd/results/deepPolyp/fcn8/tmp1/'
+    savepath = '/Tmp/vazquezd/results/deepPolyp/fcn8/tmpDA2/'
     dataset_path = '/Tmp/vazquezd/datasets/polyps_split2/CVC-912/'
     train_path = dataset_path + 'train/'
     valid_path = dataset_path + 'valid/'
@@ -165,6 +212,9 @@ def main():
     # Create output folders
     if not os.path.exists(savepath):
         os.makedirs(savepath)
+
+    # Enable log file
+    sys.stdout = Logger(savepath + "logfile.log")
 
     # Train the network
     train(dataset=args.dataset,

@@ -8,15 +8,120 @@ import scipy.ndimage as ndi
 from six.moves import range
 import os
 import threading
+import seaborn as sns
+import scipy.misc
+import SimpleITK as sitk
 
 from keras import backend as K
 from keras.preprocessing.image import (Iterator,
                                        img_to_array,
                                        transform_matrix_offset_center,
                                        apply_transform,
-                                       flip_axis)
+                                       flip_axis,
+                                       array_to_img)
+from callbacks.callbacks import (my_label2rgb,
+                                 my_label2rgboverlay)
 
 
+# Pad image
+def pad_image(x, pad_amount, mode='reflect', constant=0.):
+    e = pad_amount
+    shape = list(x.shape)
+    shape[:2] += 2*e
+    if mode == 'constant':
+        x_padded = np.ones(shape, dtype=np.float32)*constant
+        x_padded[e:-e, e:-e] = x.copy()
+    else:
+        x_padded = np.zeros(shape, dtype=np.float32)
+        x_padded[e:-e, e:-e] = x.copy()
+
+    if mode == 'reflect':
+        x_padded[:e, e:-e] = np.flipud(x[:e, :])  # left edge
+        x_padded[-e:, e:-e] = np.flipud(x[-e:, :])  # right edge
+        x_padded[e:-e, :e] = np.fliplr(x[:, :e])  # top edge
+        x_padded[e:-e, -e:] = np.fliplr(x[:, -e:])  # bottom edge
+        x_padded[:e, :e] = np.fliplr(np.flipud(x[:e, :e]))  # top-left corner
+        x_padded[-e:, :e] = np.fliplr(np.flipud(x[-e:, :e]))  # top-right corner
+        x_padded[:e, -e:] = np.fliplr(np.flipud(x[:e, -e:]))  # bottom-left corner
+        x_padded[-e:, -e:] = np.fliplr(np.flipud(x[-e:, -e:]))  # bottom-right corner
+    elif mode == 'zero' or mode == 'constant':
+        pass
+    elif mode == 'nearest':
+        x_padded[:e, e:-e] = x[[0], :]  # left edge
+        x_padded[-e:, e:-e] = x[[-1], :]  # right edge
+        x_padded[e:-e, :e] = x[:, [0]]  # top edge
+        x_padded[e:-e, -e:] = x[:, [-1]]  # bottom edge
+        x_padded[:e, :e] = x[[0], [0]]  # top-left corner
+        x_padded[-e:, :e] = x[[-1], [0]]  # top-right corner
+        x_padded[:e, -e:] = x[[0], [-1]]  # bottom-left corner
+        x_padded[-e:, -e:] = x[[-1], [-1]]  # bottom-right corner
+    else:
+        raise ValueError("Unsupported padding mode \"{}\"".format(mode))
+    return x_padded
+
+
+# Define warp
+def gen_warp_field(shape, sigma=0.1, grid_size=3):
+    # Initialize bspline transform
+    args = shape+(sitk.sitkFloat32,)
+    ref_image = sitk.Image(*args)
+    tx = sitk.BSplineTransformInitializer(ref_image, [grid_size, grid_size])
+
+    # Initialize shift in control points:
+    # mesh size = number of control points - spline order
+    p = sigma * np.random.randn(grid_size+3, grid_size+3, 2)
+
+    # Anchor the edges of the image
+    p[:, 0, :] = 0
+    p[:, -1:, :] = 0
+    p[0, :, :] = 0
+    p[-1:, :, :] = 0
+
+    # Set bspline transform parameters to the above shifts
+    tx.SetParameters(p.flatten())
+
+    # Compute deformation field
+    displacement_filter = sitk.TransformToDisplacementFieldFilter()
+    displacement_filter.SetReferenceImage(ref_image)
+    displacement_field = displacement_filter.Execute(tx)
+
+    return displacement_field
+
+
+# Apply warp
+def apply_warp(x, warp_field, fill_mode='reflect',
+               interpolator=sitk.sitkLinear,
+               fill_constant=0):
+    # Expand deformation field (and later the image), padding for the largest
+    # deformation
+    warp_field_arr = sitk.GetArrayFromImage(warp_field)
+    max_deformation = np.max(np.abs(warp_field_arr))
+    pad = np.ceil(max_deformation).astype(np.int32)
+    print ('pad: ' + str(pad))
+    warp_field_padded_arr = pad_image(warp_field_arr, pad_amount=pad,
+                                      mode='nearest')
+    print ('warp_field_padded_arr shape: ' + str(warp_field_padded_arr.shape))
+    warp_field_padded = sitk.GetImageFromArray(warp_field_padded_arr,
+                                               isVector=True)
+
+    # Warp x, one filter slice at a time
+    x_warped = np.zeros(x.shape, dtype=np.float32)
+    warp_filter = sitk.WarpImageFilter()
+    warp_filter.SetInterpolator(interpolator)
+    warp_filter.SetEdgePaddingValue(np.min(x).astype(np.double))
+    for i, image in enumerate(x):
+        image_padded = pad_image(image, pad_amount=pad, mode=fill_mode,
+                                 constant=fill_constant)
+        print ('image_padded shape: ' + str(image_padded.shape))
+        image_f = sitk.GetImageFromArray(image_padded)
+        image_f_warped = warp_filter.Execute(image_f, warp_field_padded)
+        image_warped = sitk.GetArrayFromImage(image_f_warped)
+        x_warped[i] = image_warped[pad:-pad, pad:-pad]
+
+    return x_warped
+
+
+# Load image
 def load_img(path, grayscale=False, target_size=None, crop=False):
     import skimage.io as io
     img = io.imread(path)
@@ -73,9 +178,13 @@ class ImageDataGenerator(object):
                  channel_shift_range=0.,
                  fill_mode='nearest',
                  cval=0.,
+                 cvalMask=0.,
                  horizontal_flip=False,
                  vertical_flip=False,
                  rescale=None,
+                 spline_warp=True,
+                 warp_sigma=0.,
+                 warp_grid_size=3,
                  dim_ordering='default',
                  crop_size=None):
         if dim_ordering == 'default':
@@ -205,7 +314,7 @@ class ImageDataGenerator(object):
                             fill_mode=self.fill_mode, cval=self.cval)
         if y is not None:
             y = apply_transform(y, transform_matrix, img_channel_index,
-                                fill_mode=self.fill_mode, cval=self.cval)
+                                fill_mode=self.fill_mode, cval=self.cvalMask)
 
         if self.channel_shift_range != 0:
             x = random_channel_shift(x, self.channel_shift_range, img_channel_index)
@@ -221,6 +330,22 @@ class ImageDataGenerator(object):
                 x = flip_axis(x, img_row_index)
                 if y is not None:
                     y = flip_axis(y, img_row_index)
+
+        if self.spline_warp:
+            print ('X shape: ' + str(x.shape))
+            print ('Y shape: ' + str(x.shape))
+            warp_field = gen_warp_field(shape=x.shape[-2:],
+                                        sigma=self.warp_sigma,
+                                        grid_size=self.warp_grid_size)
+            #print ('Warp_field: ' + str(warp_field))
+            x = apply_warp(x, warp_field, fill_mode=self.fill_mode,
+                           fill_constant=self.cval)
+            print ('X shape: ' + str(x.shape))
+            if y is not None:
+                y = np.round(apply_warp(y, warp_field,
+                                        fill_mode=self.fill_mode,
+                                        fill_constant=self.cvalMask))
+            print ('Y shape: ' + str(y.shape))
 
         # Crop
         # TODO: tf compatible???
@@ -415,12 +540,37 @@ class DirectoryIterator(Iterator):
         # optionally save augmented images to disk for debugging purposes
         if self.save_to_dir:
             for i in range(current_batch_size):
-                img = array_to_img(batch_x[i], self.dim_ordering, scale=True)
+
                 fname = '{prefix}_{index}_{hash}.{format}'.format(prefix=self.save_prefix,
                                                                   index=current_index + i,
                                                                   hash=np.random.randint(1e4),
                                                                   format=self.save_format)
-                img.save(os.path.join(self.save_to_dir, fname))
+
+                if self.class_mode == 'seg_map':
+                    # Save images
+                    def save_img(img, mask, fname, color_map, void_label):
+                        img = img.transpose((1, 2, 0)) / 255.
+                        mask = mask.reshape(mask.shape[1:3])
+                        label_mask = my_label2rgboverlay(mask,
+                                                         colors=color_map,
+                                                         image=img,
+                                                         bglabel=void_label,
+                                                         alpha=0.2)
+                        combined_image = np.concatenate((img, label_mask),
+                                                        axis=1)
+                        scipy.misc.toimage(combined_image).save(fname)
+
+                    nclasses = self.classes  # TODO: Change
+                    color_map = sns.hls_palette(nclasses+1)
+                    void_label = nclasses
+                    save_img(batch_x[i], batch_y[i],
+                             os.path.join(self.save_to_dir, fname), color_map,
+                             void_label)
+
+                else:
+                    img = array_to_img(batch_x[i], self.dim_ordering,
+                                       scale=True)
+                    img.save(os.path.join(self.save_to_dir, fname))
         # build batch of labels
         if self.class_mode == 'sparse':
             batch_y = self.classes[index_array]
