@@ -3,8 +3,6 @@
 ## Results Keras
 | Id | Model | Parameters                         | Train set        | Val set          | Test set                       |Tr. Loss|Val. Loss|Val. Acc|Val. Jacc|Test Acc|Test Jacc|Epochs |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | FCN8 | Deconv, lr=1e-4, l2=0           | CVC-912 (Tr)          | CVC-912 (Val)          | CVC-912 (Ts)              | 0.079  | 0.37    | ??.??% | 54.60%  | ??.??% | ??.??%  | 203|
-
 | 1 | FCN8 | Deconv, lr=1e-4, l2=0, No Data Augm    | CVC-912 (Tr)          | CVC-912 (Val)          | CVC-912 (Ts)       | 0.122  | 0.486    | 87.80% | 51.50%  | 85.91% | 42.62%  | 249|
 | 2 | FCN8 | Deconv, lr=1e-4, l2=0, Data Augm (No Elast)  | CVC-912 (Tr)          | CVC-912 (Val)          | CVC-912 (Ts) | 0.190  | 0.322    | 91.20% | 54.70%  | 84.73% | 44.28%  | 333|
 | 3 | FCN8 | Deconv, lr=1e-4, l2=0, Data Augm (Elast)     | CVC-912 (Tr)          | CVC-912 (Val)          | CVC-912 (Ts) | 0.351  | 0.383    | 85.90% | 48.40%  | 87.98% | 42.21%  | 130|
