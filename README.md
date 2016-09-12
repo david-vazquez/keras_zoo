@@ -1,11 +1,12 @@
 # Deep learning for polyp characterization
 
 ## Results Keras
-| Id | Model | Parameters                         | Train set        | Val set          | Test set                       |Tr. Loss|Val. Loss|Val. Acc|Val. Jacc|Test Acc|Test Jacc|Epochs |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | FCN8 | Deconv, lr=1e-4, l2=0, No Data Augm    | CVC-912 (Tr)          | CVC-912 (Val)          | CVC-912 (Ts)       | 0.122  | 0.486    | 87.80% | 51.50%  | 85.91% | 42.62%  | 249|
-| 2 | FCN8 | Deconv, lr=1e-4, l2=0, Data Augm (No Elast)  | CVC-912 (Tr)          | CVC-912 (Val)          | CVC-912 (Ts) | 0.190  | 0.322    | 91.20% | 54.70%  | 84.73% | 44.28%  | 333|
-| 3 | FCN8 | Deconv, lr=1e-4, l2=0, Data Augm (Elast)     | CVC-912 (Tr)          | CVC-912 (Val)          | CVC-912 (Ts) | 0.351  | 0.383    | 85.90% | 48.40%  | 87.98% | 42.21%  | 130|
+| Id | Model | Parameters                         | Train set        | Val set          | Test set                       |Tr. Loss|Val. Loss|Val. Acc|Val. Jacc|Test Acc|Test Jacc|Epochs | Jaccard per class (Bckg, pol, Spec, Lum)|
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | Jorge |                                     |                  |                  | CVC-912 (Ts)                    |        |         | 81.87% | 44.77%  | 75.58% | 41.19%  |       | [ 0.73937106  0.22136171  0.44868447  0.23820789] |
+| 1 | FCN8 | Deconv, lr=1e-4, l2=0, No Data Augm    | CVC-912 (Tr)          | CVC-912 (Val)          | CVC-912 (Ts)       | 0.122  | 0.486    | 87.80% | 51.50%  | 85.91% | 42.62%  | 249  | [ 0.85325795,  0.29827629,  0.30281457,  0.25047626] |
+| 2 | FCN8 | Deconv, lr=1e-4, l2=0, Data Augm (No Elast)  | CVC-912 (Tr)          | CVC-912 (Val)          | CVC-912 (Ts) | 0.190  | 0.322    | 91.20% | 54.70%  | 84.73% | 44.28%  | 333  |  [ 0.83794987,  0.31044316,  0.3372514 ,  0.28589097] |
+| 3 | FCN8 | Deconv, lr=1e-4, l2=0, Data Augm (Elast)     | CVC-912 (Tr)          | CVC-912 (Val)          | CVC-912 (Ts) | 0.351  | 0.383    | 85.90% | 48.40%  | 87.98% | 42.21%  | 130  | [ 0.87407016,  0.37360921,  0.19433604,  0.24643553] |
 
 ### Experiment 1 (Deconv, lr=1e-4, l2=0, No Data Augm )
 ![image](./images/FCN8_NoDA.png)
@@ -82,7 +83,7 @@ Keras
  - [X] Weight the class contributions to be able of learning specularities (Very small)  
  - [X] Jorge: Get baselines results on CVC-300 and CVC-612 
  - [X] Experiments with FCN8 in Lasagne to get reasonable results 
- - [ ] Experiments data augmentation
+ - [X] Experiments data augmentation
  - [X] Upload FCN8 code for Keras
    - [X] Adapt the dataset to work in Keras
    - [X] Voids
@@ -92,7 +93,13 @@ Keras
    - [X] Add layers visualization
    - [X] Plot results
    - [X] Test data augmentation   
-   - [ ] Normalize images using mean and std?? 0-1??
+     - [ ] Elastic nearest neighbour
+     - [ ] Image bilinear and mask Nearest
+     - [ ] Class weight balancing
+     - [ ] Image shear
+   - [ ] Normalize images using mean and std
+   - [ ] Regularization
+   - [ ] Ensembles
    - [ ] DICE index
    - [ ] Move Unet model to Keras
  - [ ] Jorge: Change lumen annotations
