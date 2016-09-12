@@ -56,27 +56,27 @@ def train(dataset, model_name, learning_rate, weight_decay,
 
     # Create the data generators
     print ('\n > Reading training set...')
-    dg_tr = ImageDataGenerator(crop_size=crop_size  #,  # Crop the image to a fixed size
-                            #    featurewise_center=False,  # Set input mean to 0 over the dataset
-                            #    samplewise_center=False,  # Set each sample mean to 0
-                            #    featurewise_std_normalization=False,  # Divide inputs by std of the dataset
-                            #    samplewise_std_normalization=False,  # Divide each input by its std
-                            #    zca_whitening=False,  # Apply ZCA whitening
-                            #    rotation_range=180,  # Randomly rotate images in the range (degrees, 0 to 180)
-                            #    width_shift_range=0.0,  # Randomly shift images horizontally (fraction of total width)
-                            #    height_shift_range=0.0,  # Randomly shift images vertically (fraction of total height)
-                            #    shear_range=0.,  # Shear Intensity (Shear angle in counter-clockwise direction as radians)
-                            #    zoom_range=0.1,  # Float or [lower, upper]. Range for random zoom. If a float, [lower, upper] = [1-zoom_range, 1+zoom_range]
-                            #    channel_shift_range=0.,  # Range for random channel shifts.
-                            #    fill_mode='constant',  # One of {"constant", "nearest", "reflect" or "wrap"}. Points outside the boundaries of the input are filled according to the given mode.
-                            #    cval=0.,  # Value used for points outside the boundaries when fill_mode = "constant".
-                            #    cvalMask=n_classes,  # Void class value
-                            #    horizontal_flip=True,  # Randomly flip images horizontally
-                            #    vertical_flip=True, # Randomly flip images vertically
-                            #    rescale=None,  # Rescaling factor. Defaults to None. If None or 0, no rescaling is applied, otherwise we multiply the data by the value provided (before applying any other transformation).
-                            #    spline_warp=True,
-                            #    warp_sigma=0.1,
-                            #    warp_grid_size=3
+    dg_tr = ImageDataGenerator(crop_size=crop_size,  # Crop the image to a fixed size
+                               featurewise_center=False,  # Set input mean to 0 over the dataset
+                               samplewise_center=False,  # Set each sample mean to 0
+                               featurewise_std_normalization=False,  # Divide inputs by std of the dataset
+                               samplewise_std_normalization=False,  # Divide each input by its std
+                               zca_whitening=False,  # Apply ZCA whitening
+                               rotation_range=180,  # Randomly rotate images in the range (degrees, 0 to 180)
+                               width_shift_range=0.0,  # Randomly shift images horizontally (fraction of total width)
+                               height_shift_range=0.0,  # Randomly shift images vertically (fraction of total height)
+                               shear_range=0,  # Shear Intensity (Shear angle in counter-clockwise direction as radians)
+                               zoom_range=0.1,  # Float or [lower, upper]. Range for random zoom. If a float, [lower, upper] = [1-zoom_range, 1+zoom_range]
+                               channel_shift_range=0.,  # Range for random channel shifts.
+                               fill_mode='constant',  # One of {"constant", "nearest", "reflect" or "wrap"}. Points outside the boundaries of the input are filled according to the given mode.
+                               cval=0.,  # Value used for points outside the boundaries when fill_mode = "constant".
+                               cvalMask=n_classes,  # Void class value
+                               horizontal_flip=True,  # Randomly flip images horizontally
+                               vertical_flip=True, # Randomly flip images vertically
+                               rescale=None,  # Rescaling factor. Defaults to None. If None or 0, no rescaling is applied, otherwise we multiply the data by the value provided (before applying any other transformation).
+                               spline_warp=False,
+                               warp_sigma=0.1,
+                               warp_grid_size=3
                                )
     train_gen = dg_tr.flow_from_directory(train_path + 'images',
                                           batch_size=batch_size,
@@ -84,7 +84,7 @@ def train(dataset, model_name, learning_rate, weight_decay,
                                           target_size=crop_size,
                                           class_mode='seg_map',
                                           classes=n_classes,
-                                          #save_to_dir=savepath,
+                                          # save_to_dir=savepath,
                                           save_prefix='data_augmentation',
                                           save_format='png')
 
@@ -166,7 +166,7 @@ def main():
     parser.add_argument('-model_file', default='weights.hdf5',
                         help='Model file')
     parser.add_argument('-learning_rate', default=0.0001, help='Learning Rate')
-    parser.add_argument('-weight_decay', default=0.0,
+    parser.add_argument('-weight_decay', default=0.000001,
                         help='regularization constant')
     parser.add_argument('--num_epochs', '-ne', type=int, default=1000,
                         help='Optional. Int to indicate the max'
@@ -185,7 +185,7 @@ def main():
     # test_path = '/home/michal/polyps/CVC-300/')
 
     # David paths
-    savepath = '/Tmp/vazquezd/results/deepPolyp/fcn8/noDataAugm/'
+    savepath = '/Tmp/vazquezd/results/deepPolyp/fcn8/DataAugmNoElastWD1e-6/'
     dataset_path = '/Tmp/vazquezd/datasets/polyps_split2/CVC-912/'
     train_path = dataset_path + 'train/'
     valid_path = dataset_path + 'valid/'
