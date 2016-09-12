@@ -106,6 +106,7 @@ Keras
  - [ ] Jorge: Get more images (If posible)
  - [ ] Deconv init
  - [ ] Different learning rates for bias than for weights
+ - [ ] Batch normalization
  - [ ] First experiments with Unet
  - [ ] Define experiments
  - [ ] Select journal target (Michail has a proposal of a top medical imaging journal that answer in 1 month)
