@@ -7,6 +7,16 @@
 | 2 | FCN8 | Deconv, lr=1e-4, l2=0, Data Augm (No Elast)  | CVC-912 (Tr)          | CVC-912 (Val)          | CVC-912 (Ts) | 0.190  | 0.322    | 91.20% | 54.70%  | 84.73% | 44.28%  | 333|
 | 3 | FCN8 | Deconv, lr=1e-4, l2=0, Data Augm (Elast)     | CVC-912 (Tr)          | CVC-912 (Val)          | CVC-912 (Ts) | 0.351  | 0.383    | 85.90% | 48.40%  | 87.98% | 42.21%  | 130|
 
+### Experiment 1 (Deconv, lr=1e-4, l2=0, No Data Augm )
+![image](./images/FCN8_NoDA.png)
+
+### Experiment 2 (Deconv, lr=1e-4, l2=0, Data Augm (No Elast) )
+![image](./images/FCN8_DANoElast.png)
+
+### Experiment 3 (Deconv, lr=1e-4, l2=0, Data Augm (Elast) )
+![image](./images/FCN8_DAElast.png)
+
+
 ## Results Lasagne
 | Id | Model | Parameters                         | Train set        | Val set          | Test set                       |Tr. Loss|Val. Loss|Val. Acc|Val. Jacc|Test Acc|Test Jacc|Epochs |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -17,9 +27,6 @@
 | 5 | FCN8 | Deconv_init, lr=1e-4, l2=1e-5, He(Relu), voids | CVC-612 (20 seq) | CVC-612  (5 seq) | CVC-612  (5 seq)      | 0.64   | 0.66    | 85.27% | 54.84%  | 85.19% | 52.58%  | 212|
 | 6 | U-Net | ???                                 | CVC-612          | CVC-612          | CVC-612                         | 0.65   | 94.37%  | 	0.66% | ??.??%  | ??.??% | ??.??%  | ?? |
 
-### Experiment 5 (Deconv_init, lr=1e-4, l2=1e-5, He(Relu), voids)
-Note that here the performance is worse because we don't count the void class that was very easy to detect
-![image](./images/deconv_init_voids.png)
 
 ## Posible problems to solve
  1. Polyp/No polyp image classification
