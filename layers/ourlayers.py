@@ -83,7 +83,7 @@ class CropLayer2D(Layer):
         input_shape = x.shape
         cs = self.img_in.shape[-2:]
         if self.dim_ordering == 'th':
-            dif = input_shape[-2:] - cs 
+            dif = input_shape[-2:] - cs
         dif = dif/2
         if self.dim_ordering == 'th':
             if K.ndim(x) == 5:
@@ -97,6 +97,12 @@ class CropLayer2D(Layer):
         if self.dim_ordering == 'tf':
             return ((input_shape[:1], ) + tuple(self.crop_size) +
                     (input_shape[-1], ))
+
+    # def get_config(self):
+    #     config = {'img_in': self.img_in,
+    #               'dim_ordering': self.dim_ordering}
+    #     base_config = super(CropLayer2D, self).get_config()
+    #     return dict(list(base_config.items()) + list(config.items()))
 
 
 class MergeSequences(Layer):

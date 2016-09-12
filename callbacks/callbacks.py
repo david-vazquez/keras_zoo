@@ -1,60 +1,12 @@
 # Imports
+# import theano.tensor as T
+# from keras import backend as K
+# import scipy.misc
 from keras.callbacks import Callback
 from keras.engine.training import generator_queue
+from tools.save_images import save_img
 import numpy as np
-from keras import backend as K
-import theano.tensor as T
-
-from skimage.color import label2rgb
-from skimage import img_as_float
-from skimage.color import rgb2gray, gray2rgb
-import scipy.misc
 import seaborn as sns
-
-
-# Converts a label mask to RGB to be shown
-def my_label2rgb(labels, colors, bglabel=None, bg_color=(0., 0., 0.)):
-    output = np.zeros(labels.shape + (3,), dtype=np.float64)
-    for i in range(len(colors)):
-        if i != bglabel:
-            output[(labels == i).nonzero()] = colors[i]
-    if bglabel is not None:
-        output[(labels == bglabel).nonzero()] = bg_color
-    return output
-
-
-# Converts a label mask to RGB to be shown and overlaps over an image
-def my_label2rgboverlay(labels, colors, image, bglabel=None,
-                        bg_color=(0., 0., 0.), alpha=0.2):
-    image_float = gray2rgb(img_as_float(rgb2gray(image)))
-    label_image = my_label2rgb(labels, colors, bglabel=bglabel,
-                               bg_color=bg_color)
-    output = image_float * alpha + label_image * (1 - alpha)
-    return output
-
-
-# Save images
-def save_img(image_batch, mask_batch, output, out_images_folder, epoch,
-             color_map, tag, void_label):
-    output[(mask_batch == void_label).nonzero()] = void_label
-    images = []
-    for j in xrange(output.shape[0]):
-        img = image_batch[j].transpose((1, 2, 0)) / 255.
-        label_out = my_label2rgb(output[j], bglabel=void_label,
-                                 colors=color_map)
-        label_mask = my_label2rgboverlay(mask_batch[j], colors=color_map,
-                                         image=img, bglabel=void_label,
-                                         alpha=0.2)
-        label_overlay = my_label2rgboverlay(output[j], colors=color_map,
-                                            image=img, bglabel=void_label,
-                                            alpha=0.5)
-
-        combined_image = np.concatenate((img, label_mask, label_out,
-                                         label_overlay), axis=1)
-        out_name = out_images_folder + tag + '_epoch' + str(epoch) + '_img' + str(j) + '.png'
-        scipy.misc.toimage(combined_image).save(out_name)
-        images.append(combined_image)
-    return images
 
 
 # Compute the masked categorical crossentropy
@@ -94,7 +46,8 @@ def cat_cross_entropy_voids(y_pred, y_true, void_label, _EPS=10e-8,
 
 # Computes the desired metrics (And saves images)
 def compute_metrics(model, val_gen, epoch_length, nclasses, metrics,
-                    color_map, tag, void_label, out_images_folder, epoch):
+                    color_map, tag, void_label, out_images_folder, epoch,
+                    save_all_images=False):
     # Create a data generator
     data_gen_queue, _stop = generator_queue(val_gen, max_q_size=10)
 
@@ -122,7 +75,7 @@ def compute_metrics(model, val_gen, epoch_length, nclasses, metrics,
         y_pred = np.argmax(y_pred, axis=1)
 
         # Save output images (Only first minibatch)
-        if _ == 0:
+        if save_all_images or not save_all_images and _ == 0:
             y_true = np.reshape(y_true, (y_true.shape[0], y_true.shape[2],
                                          y_true.shape[3]))
             save_img(x_true, y_true, y_pred, out_images_folder, epoch,
@@ -167,34 +120,65 @@ def compute_metrics(model, val_gen, epoch_length, nclasses, metrics,
 
 
 # Jaccard value computation callback
-class ValJaccard(Callback):
+class Evaluate_model(Callback):
     # Constructor
-    def __init__(self, nclasses, valid_gen, epoch_length, void_label,
-                 out_images_folder, metrics, *args):
+    def __init__(self, n_classes, void_label, save_path,
+                 valid_gen, valid_epoch_length, valid_metrics,
+                 test_gen=None, test_epoch_length=None, test_metrics=None,
+                  *args):
         super(Callback, self).__init__()
         # Save input parameters
-        self.nclasses = nclasses
-        self.valid_gen = valid_gen
-        self.epoch_length = epoch_length
+        self.n_classes = n_classes
         self.void_label = void_label
-        self.out_images_folder = out_images_folder
-        self.metrics = metrics
+        self.save_path = save_path
+
+        self.valid_gen = valid_gen
+        self.valid_epoch_length = valid_epoch_length
+        self.valid_metrics = valid_metrics
+
+        self.test_gen = test_gen
+        self.test_epoch_length = test_epoch_length
+        self.test_metrics = test_metrics
 
         # Create the colormaping for showing labels
-        self.color_map = sns.hls_palette(nclasses+1)
+        self.color_map = sns.hls_palette(n_classes+1)
+        self.last_epoch = 0
 
-    # Compute jaccard value at the end of each epoch
+    # Compute metrics for validation set at the end of each epoch
     def on_epoch_end(self, epoch, logs={}):
         # Compute the metrics
         metrics_out = compute_metrics(self.model, self.valid_gen,
-                                      self.epoch_length, self.nclasses,
-                                      metrics=self.metrics,
+                                      self.valid_epoch_length, self.n_classes,
+                                      metrics=self.valid_metrics,
                                       color_map=self.color_map, tag="valid",
                                       void_label=self.void_label,
-                                      out_images_folder=self.out_images_folder,
+                                      out_images_folder=self.save_path,
                                       epoch=epoch)
+        self.last_epoch = epoch
 
         # Save the metrics in the logs
         for k, v in metrics_out.iteritems():
             logs[k] = v
-        print ('logs: ' + str(logs))
+        print ('logs valid: ' + str(logs))
+
+    # Compute metrics for testing set at the end of the training
+    def on_train_end(self, logs={}):
+        if (self.test_gen is not None and
+            self.test_epoch_length is not None and
+            self.test_metrics is not None):
+            # Compute the metrics
+            metrics_out = compute_metrics(self.model,
+                                          self.test_gen,
+                                          self.test_epoch_length,
+                                          self.n_classes,
+                                          metrics=self.test_metrics,
+                                          color_map=self.color_map, tag="test",
+                                          void_label=self.void_label,
+                                          out_images_folder=self.save_path,
+                                          epoch=self.last_epoch,
+                                          save_all_images=True)
+
+            # Save the metrics in the logs
+            for k, v in metrics_out.iteritems():
+                logs[k] = v
+            print ('logs test: ' + str(logs))
