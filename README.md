@@ -104,6 +104,8 @@ Keras
    - [ ] Move Unet model to Keras
  - [ ] Jorge: Change lumen annotations
  - [ ] Jorge: Get more images (If posible)
+ - [ ] Deconv init
+ - [ ] Different learning rates for bias than for weights
  - [ ] First experiments with Unet
  - [ ] Define experiments
  - [ ] Select journal target (Michail has a proposal of a top medical imaging journal that answer in 1 month)
