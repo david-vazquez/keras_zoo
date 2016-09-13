@@ -27,7 +27,7 @@ def train(dataset, model_name, learning_rate, weight_decay,
           num_epochs, max_patience, batch_size, optimizer,
           savepath, train_path, valid_path, test_path,
           crop_size=(224, 224), in_shape=(3, None, None), n_classes=5,
-          weights_file=False, void_class=[4], show_model=False):
+          weights_file=False, void_class=[4], show_model=False, plot_hist=True):
 
     # Remove void classes from number of classes
     n_classes = n_classes - len(void_class)
@@ -142,7 +142,7 @@ def train(dataset, model_name, learning_rate, weight_decay,
                                    patience=max_patience, verbose=0)
 
     # Define model saving callback
-    checkpointer = ModelCheckpoint(filepath=savepath+"weights.hdf5", verbose=1,
+    checkpointer = ModelCheckpoint(filepath=savepath+"weights.hdf5", verbose=0,
                                    monitor='val_jaccard', mode='max',
                                    save_best_only=True,
                                    save_weights_only=True)
@@ -168,11 +168,14 @@ def train(dataset, model_name, learning_rate, weight_decay,
                                    out_images_folder=savepath,
                                    epoch=0,
                                    save_all_images=True)
-    print ('Test metrics: ' + str(test_metrics))
+    
+    for k in sorted(test_metrics.keys()):
+        print('{}: {}'.format(k, test_metrics[k]))
 
     # Show the trained model history
-    print('\n > Show the trained model history...')
-    plot_history(hist, savepath)
+    if plot_hist:
+        print('\n > Show the trained model history...')
+        plot_history(hist, savepath)
 
 
 # Main function
@@ -200,7 +203,7 @@ def main():
     usr = getuser()
     if usr == 'michal':
         # Michal paths
-        savepath = '/home/michal/tmp',
+        savepath = '/home/michal/tmp'
         dataset_path = '/home/michal/polyps/polyps_split2/CVC-912/'
         train_path = dataset_path + 'train/'
         valid_path = dataset_path + 'valid/'
