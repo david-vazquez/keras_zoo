@@ -93,7 +93,7 @@ def train(dataset, model_name, learning_rate, weight_decay,
     valid_gen = dg_va.flow_from_directory(valid_path + 'images',
                                           batch_size=1,
                                           gt_directory=valid_path + 'masks',
-                                          target_size=crop_size,
+                                          target_size=crop_size, # TODO: AHHHHHHHHHHH
                                           class_mode='seg_map',
                                           classes=n_classes)
 
@@ -102,7 +102,7 @@ def train(dataset, model_name, learning_rate, weight_decay,
     test_gen = dg_ts.flow_from_directory(test_path + 'images',
                                          batch_size=1,
                                          gt_directory=test_path + 'masks',
-                                         target_size=crop_size,
+                                         target_size=crop_size, # TODO: AHHHHHHHHHHH
                                          class_mode='seg_map',
                                          classes=n_classes)
 
