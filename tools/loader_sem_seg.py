@@ -404,7 +404,9 @@ class DirectoryIterator(Iterator):
         self.directory = directory
         self.gt_directory = gt_directory
         self.image_data_generator = image_data_generator
-        self.target_size = tuple(target_size)
+        if target_size is None and batch_size > 1:
+            raise ValueError('Target_size None works only with batch_size=1')
+        self.target_size = (None, None) if target_size is None else tuple(target_size)
         if color_mode not in {'rgb', 'grayscale'}:
             raise ValueError('Invalid color mode:', color_mode,
                              '; expected "rgb" or "grayscale".')
@@ -506,11 +508,17 @@ class DirectoryIterator(Iterator):
             index_array, current_index, current_batch_size = next(self.index_generator)
         # The transformation of images is not under thread lock so it can
         # be done in parallel
-        batch_x = np.zeros((current_batch_size,) + self.image_shape)
+        if self.target_size[0] is None:
+            batch_x = 0
+        else:
+            batch_x = np.zeros((current_batch_size,) + self.image_shape)
         if self.class_mode == 'seg_map':
-            batch_y = np.zeros((current_batch_size,
-                                1, self.image_shape[1],
-                                self.image_shape[2]))
+            if self.target_size[0] is None:
+                batch_y = 0
+            else:
+                batch_y = np.zeros((current_batch_size,
+                                    1, self.image_shape[1],
+                                    self.image_shape[2]))
         grayscale = self.color_mode == 'grayscale'
         # build batch of image data
         for i, j in enumerate(index_array):
@@ -528,19 +536,18 @@ class DirectoryIterator(Iterator):
                 y = img_to_array(GT, dim_ordering=self.dim_ordering)
             if not self.class_mode == 'seg_map':
                 x = self.image_data_generator.random_transform(x)
-                batch_x[i] = x
+                if current_batch_size > 1:
+                    batch_x[i] = x
+                else:
+                    batch_x = np.expand_dims(x, axis=0)
             else:
                 x, y = self.image_data_generator.random_transform(x, y)
-                # print(np.shape(x), np.shape(y),
-                #       np.shape(batch_x), np.shape(batch_y))
-                if current_batch_size == 1:
-                    batch_x = np.zeros((current_batch_size,) + x.shape)
-                    batch_y = np.zeros((current_batch_size, 1, y.shape[1],
-                                        y.shape[2]))
-                batch_x[i] = x
-                # print("+1!")
-                batch_y[i] = y
-                # print("Almost!")
+                if current_batch_size > 1:
+                    batch_x[i] = x
+                    batch_y[i] = y
+                else:
+                    batch_x = np.expand_dims(x, axis=0)
+                    batch_y = np.expand_dims(y, axis=0)
         # optionally save augmented images to disk for debugging purposes
         if self.save_to_dir:
             for i in range(current_batch_size):
@@ -586,5 +593,5 @@ class DirectoryIterator(Iterator):
                 batch_y[i, label] = 1.
         elif not self.class_mode == 'seg_map':
             return batch_x
-        # print(np.shape(batch_x), np.shape(batch_y))
+        # print(self.directory, np.shape(batch_x), np.shape(batch_y))
         return batch_x, batch_y

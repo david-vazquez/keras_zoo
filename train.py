@@ -18,8 +18,8 @@ from callbacks.callbacks import Evaluate_model, compute_metrics
 from tools.loader_sem_seg import ImageDataGenerator
 from tools.logger import Logger
 from tools.plot_history import plot_history
-
-
+from models.model import assemble_model
+sys.setrecursionlimit(99999)
 # Train the network
 def train(dataset, model_name, learning_rate, weight_decay,
           num_epochs, max_patience, batch_size, optimizer,
@@ -41,6 +41,23 @@ def train(dataset, model_name, learning_rate, weight_decay,
         model = build_fcn8(in_shape, regularize_weights=weight_decay,
                            nclasses=n_classes, weights_file=weights_file)
         model.output
+    elif model_name =='resunet':
+        model_kwargs = {
+            'input_shape' : in_shape,
+            'num_classes' : n_classes,
+            'input_num_filters' : 32,
+            'main_block_depth' : [3, 8, 10, 3],
+            'num_main_blocks' : 3,
+            'num_init_blocks' : 1,
+            'W_regularizer' : weight_decay, 
+            'dropout' : 0.2,
+            'short_skip' : True,
+            'long_skip' : True,
+            'use_skip_blocks' : False,
+            'relative_num_across_filters' : 1,
+            'long_skip_merge_mode' : 'sum'}
+        model = assemble_model(**model_kwargs)
+     
     else:
         raise ValueError('Unknown model')
 
@@ -94,7 +111,7 @@ def train(dataset, model_name, learning_rate, weight_decay,
     valid_gen = dg_va.flow_from_directory(valid_path + 'images',
                                           batch_size=1,
                                           gt_directory=valid_path + 'masks',
-                                          target_size=crop_size,
+                                          target_size=None,
                                           class_mode='seg_map',
                                           classes=n_classes)
 
@@ -103,7 +120,7 @@ def train(dataset, model_name, learning_rate, weight_decay,
     test_gen = dg_ts.flow_from_directory(test_path + 'images',
                                          batch_size=1,
                                          gt_directory=test_path + 'masks',
-                                         target_size=crop_size,
+                                         target_size=None,
                                          class_mode='seg_map',
                                          classes=n_classes)
 
@@ -140,6 +157,7 @@ def train(dataset, model_name, learning_rate, weight_decay,
 
     # Compute test metrics
     print('\n > Testing the model...')
+    model.load_weights(savepath+"weights.hdf5")
     color_map = sns.hls_palette(n_classes+1)
     test_metrics = compute_metrics(model, test_gen, n_images_test, n_classes,
                                    metrics=['test_loss',
@@ -163,7 +181,7 @@ def main():
     # Get parameters from file parser
     parser = argparse.ArgumentParser(description='DeepPolyp model training')
     parser.add_argument('-dataset', default='polyps', help='Dataset')
-    parser.add_argument('-model_name', default='fcn8', help='Model')
+    parser.add_argument('-model_name', default='resunet', help='Model')
     parser.add_argument('-model_file', default='weights.hdf5',
                         help='Model file')
     parser.add_argument('-learning_rate', default=0.0001, help='Learning Rate')
@@ -184,9 +202,10 @@ def main():
     if usr == 'michal':
         # Michal paths
         savepath = '/home/michal/tmp',
-        train_path = '/home/michal/polyps/CVC-612/'
-        valid_path = '/home/michal/polyps/CVC-300/'
-        test_path = '/home/michal/polyps/CVC-300/'
+        dataset_path = '/home/michal/polyps/polyps_split2/CVC-912/'
+        train_path = dataset_path + 'train/'
+        valid_path = dataset_path + 'valid/'
+        test_path = dataset_path + 'test/'
     elif usr == 'vazquezd' or usr == 'romerosa':
         shared_dataset_path = '/data/lisa/exp/vazquezd/datasets/polyps_split2/CVC-912/'
         dataset_path = '/Tmp/'+usr+'/datasets/polyps_split2/CVC-912/'
