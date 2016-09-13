@@ -2,8 +2,9 @@
 import argparse
 import os
 import sys
-import numpy as np
 import seaborn as sns
+from getpass import getuser
+import shutil
 
 # Import keras libraries
 from keras.callbacks import EarlyStopping, ModelCheckpoint
@@ -178,18 +179,31 @@ def main():
                         help='Optimizer')
     args = parser.parse_args()
 
-    # Michail paths
-    # savepath = '/home/michal/tmp',
-    # train_path = '/home/michal/polyps/CVC-612/'
-    # valid_path = '/home/michal/polyps/CVC-300/')
-    # test_path = '/home/michal/polyps/CVC-300/')
+    # Define paths according to user
+    usr = getuser()
+    if usr == 'michal':
+        # Michal paths
+        savepath = '/home/michal/tmp',
+        train_path = '/home/michal/polyps/CVC-612/'
+        valid_path = '/home/michal/polyps/CVC-300/'
+        test_path = '/home/michal/polyps/CVC-300/'
+    elif usr == 'vazquezd' or usr == 'romerosa':
+        shared_dataset_path = '/data/lisa/exp/vazquezd/datasets/polyps_split2/CVC-912/'
+        dataset_path = '/Tmp/'+usr+'/datasets/polyps_split2/CVC-912/'
+        # Copy the data to the local path if not existing
+        if not os.path.exists(dataset_path):
+            print('The local path {} does not exist. Copying '
+                  'dataset...'.format(dataset_path))
+            shutil.copytree(shared_dataset_path, dataset_path)
+            print('Done.')
 
-    # David paths
-    savepath = '/Tmp/vazquezd/results/deepPolyp/fcn8/DataAugmNoElastWD1e-6/'
-    dataset_path = '/Tmp/vazquezd/datasets/polyps_split2/CVC-912/'
-    train_path = dataset_path + 'train/'
-    valid_path = dataset_path + 'valid/'
-    test_path = dataset_path + 'test/'
+        savepath = '/Tmp/'+usr+'/results/deepPolyp/fcn8/DataAugmNoElastWD1e-6/'
+        train_path = dataset_path + 'train/'
+        valid_path = dataset_path + 'valid/'
+        test_path = dataset_path + 'test/'
+
+    else:
+        raise ValueError('User unknown, please add your own paths!')
 
     # Create output folders
     if not os.path.exists(savepath):

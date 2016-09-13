@@ -2,12 +2,8 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 import numpy as np
-import re
-from scipy import linalg
-import scipy.ndimage as ndi
 from six.moves import range
 import os
-import threading
 import seaborn as sns
 import scipy.misc
 import SimpleITK as sitk
@@ -18,7 +14,10 @@ from keras.preprocessing.image import (Iterator,
                                        transform_matrix_offset_center,
                                        apply_transform,
                                        flip_axis,
-                                       array_to_img)
+                                       array_to_img,
+                                       NumpyArrayIterator,
+                                       random_channel_shift)
+
 from tools.save_images import my_label2rgb, my_label2rgboverlay
 
 
@@ -214,21 +213,22 @@ class ImageDataGenerator(object):
                             'a tuple or list of two floats. '
                             'Received arg: ', zoom_range)
 
-
     def flow(self, X, y=None, batch_size=32, shuffle=True, seed=None,
              save_to_dir=None, save_prefix='', save_format='jpeg'):
         return NumpyArrayIterator(
             X, y, self,
             batch_size=batch_size, shuffle=shuffle, seed=seed,
             dim_ordering=self.dim_ordering,
-            save_to_dir=save_to_dir, save_prefix=save_prefix, save_format=save_format)
+            save_to_dir=save_to_dir, save_prefix=save_prefix,
+            save_format=save_format)
 
     def flow_from_directory(self, directory,
                             target_size=(256, 256), color_mode='rgb',
                             classes=None, class_mode='categorical',
                             batch_size=32, shuffle=True, seed=None,
                             gt_directory=None,
-                            save_to_dir=None, save_prefix='', save_format='jpeg'):
+                            save_to_dir=None, save_prefix='',
+                            save_format='jpeg'):
         return DirectoryIterator(
             directory, self,
             target_size=target_size, color_mode=color_mode,
@@ -236,7 +236,8 @@ class ImageDataGenerator(object):
             dim_ordering=self.dim_ordering,
             batch_size=batch_size, shuffle=shuffle, seed=seed,
             gt_directory=gt_directory,
-            save_to_dir=save_to_dir, save_prefix=save_prefix, save_format=save_format)
+            save_to_dir=save_to_dir, save_prefix=save_prefix,
+            save_format=save_format)
 
     def standardize(self, x):
         if self.rescale:
@@ -267,19 +268,22 @@ class ImageDataGenerator(object):
 
         # use composition of homographies to generate final transform that needs to be applied
         if self.rotation_range:
-            theta = np.pi / 180 * np.random.uniform(-self.rotation_range, self.rotation_range)
+            theta = np.pi / 180 * np.random.uniform(-self.rotation_range,
+                                                    self.rotation_range)
         else:
             theta = 0
         rotation_matrix = np.array([[np.cos(theta), -np.sin(theta), 0],
                                     [np.sin(theta), np.cos(theta), 0],
                                     [0, 0, 1]])
         if self.height_shift_range:
-            tx = np.random.uniform(-self.height_shift_range, self.height_shift_range) * x.shape[img_row_index]
+            tx = np.random.uniform(-self.height_shift_range,
+                                   self.height_shift_range) * x.shape[img_row_index]
         else:
             tx = 0
 
         if self.width_shift_range:
-            ty = np.random.uniform(-self.width_shift_range, self.width_shift_range) * x.shape[img_col_index]
+            ty = np.random.uniform(-self.width_shift_range,
+                                   self.width_shift_range) * x.shape[img_col_index]
         else:
             ty = 0
 
@@ -417,7 +421,8 @@ class DirectoryIterator(Iterator):
             else:
                 self.image_shape = (1,) + self.target_size
         self.classes = classes
-        if class_mode not in {'categorical', 'binary', 'sparse', 'seg_map', None}:
+        if class_mode not in {'categorical', 'binary', 'sparse',
+                              'seg_map', None}:
             raise ValueError('Invalid class_mode:', class_mode,
                              '; expected one of "categorical", '
                              '"binary", "sparse", "seg_map" or None.')
