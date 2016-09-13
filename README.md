@@ -48,7 +48,7 @@
  1. Generate a public dataset that allows to perform different experiments
  2. Test a set of baselines for this dataset
   1, Jorge's published methods
-  2. Deep learning methods: FCN8 y UNET
+  2. Deep learning methods: FCN8 & UNET
  
 ## Dataset
  1. Two datasets with: 300 and 612 color and fully annotated frames
@@ -101,6 +101,7 @@ Keras
    - [ ] Regularization
    - [ ] Ensembles
    - [ ] DICE index
+   - [ ] Add gradient reversal to make the network agnostic to the patients (http://www.jmlr.org/proceedings/papers/v37/ganin15.pdf)
    - [ ] Move Unet model to Keras
  - [ ] Jorge: Change lumen annotations
  - [ ] Jorge: Get more images (If posible)
