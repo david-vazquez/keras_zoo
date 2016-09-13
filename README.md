@@ -4,9 +4,10 @@
 | Id | Model | Parameters                         | Train set        | Val set          | Test set                       |Tr. Loss|Val. Loss|Val. Acc|Val. Jacc|Test Acc|Test Jacc|Epochs | Jaccard per class (Bckg, pol, Spec, Lum)|
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 0 | Jorge |                                     |                  |                  | CVC-912 (Ts)                    |        |         | 81.87% | 44.77%  | 75.58% | 41.19%  |       | [ 0.73937106  0.22136171  0.44868447  0.23820789] |
-| 1 | FCN8 | Deconv, lr=1e-4, l2=0, No Data Augm    | CVC-912 (Tr)          | CVC-912 (Val)          | CVC-912 (Ts)       | 0.122  | 0.486    | 87.80% | 51.50%  | 85.91% | 42.62%  | 249  | [ 0.85325795,  0.29827629,  0.30281457,  0.25047626] |
-| 2 | FCN8 | Deconv, lr=1e-4, l2=0, Data Augm (No Elast)  | CVC-912 (Tr)          | CVC-912 (Val)          | CVC-912 (Ts) | 0.190  | 0.322    | 91.20% | 54.70%  | 84.73% | 44.28%  | 333  |  [ 0.83794987,  0.31044316,  0.3372514 ,  0.28589097] |
-| 3 | FCN8 | Deconv, lr=1e-4, l2=0, Data Augm (Elast)     | CVC-912 (Tr)          | CVC-912 (Val)          | CVC-912 (Ts) | 0.351  | 0.383    | 85.90% | 48.40%  | 87.98% | 42.21%  | 130  | [ 0.87407016,  0.37360921,  0.19433604,  0.24643553] |
+| 1 | FCN8 | Deconv, lr=1e-4, l2=0, No Data Augm    | CVC-912 (Tr)          | CVC-912 (Val)          | CVC-912 (Ts)       | 0.122  | 0.486    | 87.80% | 51.50%  | 89.90% | 48.35%  | 249  | [0.89426552,  0.38210112,  0.30895791,  0.34876279] |
+| 2 | FCN8 | Deconv, lr=1e-4, l2=0, Data Augm (No Elast)  | CVC-912 (Tr)          | CVC-912 (Val)          | CVC-912 (Ts) | 0.190  | 0.322    | 91.20% | 54.70%  | 82.43% | 42.03%  | 333  | [0.81224501,  0.27955095,  0.26045998,  0.32914331] |
+| 3 | FCN8 | Deconv, lr=1e-4, l2=0, Data Augm (Elast)     | CVC-912 (Tr)          | CVC-912 (Val)          | CVC-912 (Ts) | 0.351  | 0.383    | 85.90% | 48.40%  | 87.29% | 42.79%  | 130  | [0.86779401,  0.32364056,  0.28232848,  0.23794606] |
+| 4 | FCN8 | Deconv, lr=1e-4, l2=0, Data Augm (Shear noElast) INACABADO!!  | CVC-912 (Tr)      | CVC-912 (Val)          | CVC-912 (Ts) | ??.??  | ??.??    | ??.??% | ??.??%  | 88.53% | 53.66%  | ???  | [0.87491244,  0.4771292 ,  0.35366248,  0.44082371] |
 
 ### Experiment 1 (Deconv, lr=1e-4, l2=0, No Data Augm )
 ![image](./images/FCN8_NoDA.png)
