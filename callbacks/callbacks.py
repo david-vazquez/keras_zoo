@@ -163,6 +163,7 @@ class Evaluate_model(Callback):
 
     # Compute metrics for testing set at the end of the training
     def on_train_end(self, logs={}):
+        # TODO: Load best model!!!
         if (self.test_gen is not None and
             self.test_epoch_length is not None and
             self.test_metrics is not None):

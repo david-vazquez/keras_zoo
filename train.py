@@ -20,6 +20,8 @@ from tools.logger import Logger
 from tools.plot_history import plot_history
 from models.model import assemble_model
 sys.setrecursionlimit(99999)
+
+
 # Train the network
 def train(dataset, model_name, learning_rate, weight_decay,
           num_epochs, max_patience, batch_size, optimizer,
@@ -36,28 +38,27 @@ def train(dataset, model_name, learning_rate, weight_decay,
     n_images_test = 182  # 182
 
     # Build model
-    print '\n > Building model...'
+    print '\n > Building model (' + model_name + ')...'
     if model_name == 'fcn8':
         model = build_fcn8(in_shape, regularize_weights=weight_decay,
                            nclasses=n_classes, weights_file=weights_file)
         model.output
-    elif model_name =='resunet':
+    elif model_name == 'resunet':
         model_kwargs = {
-            'input_shape' : in_shape,
-            'num_classes' : n_classes,
-            'input_num_filters' : 32,
-            'main_block_depth' : [3, 8, 10, 3],
-            'num_main_blocks' : 3,
-            'num_init_blocks' : 1,
-            'W_regularizer' : weight_decay,
-            'dropout' : 0.2,
-            'short_skip' : True,
-            'long_skip' : True,
-            'use_skip_blocks' : False,
-            'relative_num_across_filters' : 1,
-            'long_skip_merge_mode' : 'sum'}
+            'input_shape': in_shape,
+            'num_classes': n_classes,
+            'input_num_filters': 32,
+            'main_block_depth': [3, 8, 10, 3],
+            'num_main_blocks': 3,
+            'num_init_blocks': 1,
+            'W_regularizer': weight_decay,
+            'dropout': 0.2,
+            'short_skip': True,
+            'long_skip': True,
+            'use_skip_blocks': False,
+            'relative_num_across_filters': 1,
+            'long_skip_merge_mode': 'sum'}
         model = assemble_model(**model_kwargs)
-
     else:
         raise ValueError('Unknown model')
 
@@ -65,7 +66,7 @@ def train(dataset, model_name, learning_rate, weight_decay,
     print '\n > Compiling model...'
     optimizer = RMSprop(lr=0.0001, rho=0.9, epsilon=1e-8, clipnorm=10)
     model.compile(loss=cce_flatt(void_class), optimizer=optimizer)
-    # TODO: Add metrics: Jaccard and DICE
+    # TODO: Add metrics: DICE
 
     # Show model structure
     if show_model:
@@ -80,17 +81,17 @@ def train(dataset, model_name, learning_rate, weight_decay,
                                featurewise_std_normalization=False,  # Divide inputs by std of the dataset
                                samplewise_std_normalization=False,  # Divide each input by its std
                                zca_whitening=False,  # Apply ZCA whitening
-                               rotation_range=180,  # Randomly rotate images in the range (degrees, 0 to 180)
+                               rotation_range=0,  # Randomly rotate images in the range (degrees, 0 to 180)
                                width_shift_range=0.0,  # Randomly shift images horizontally (fraction of total width)
                                height_shift_range=0.0,  # Randomly shift images vertically (fraction of total height)
-                               shear_range=0,  # Shear Intensity (Shear angle in counter-clockwise direction as radians)
-                               zoom_range=0.1,  # Float or [lower, upper]. Range for random zoom. If a float, [lower, upper] = [1-zoom_range, 1+zoom_range]
+                               shear_range=0.5,  # 0.5,  # Shear Intensity (Shear angle in counter-clockwise direction as radians)
+                               zoom_range=0.0,  # Float or [lower, upper]. Range for random zoom. If a float, [lower, upper] = [1-zoom_range, 1+zoom_range]
                                channel_shift_range=0.,  # Range for random channel shifts.
                                fill_mode='constant',  # One of {"constant", "nearest", "reflect" or "wrap"}. Points outside the boundaries of the input are filled according to the given mode.
                                cval=0.,  # Value used for points outside the boundaries when fill_mode = "constant".
                                cvalMask=n_classes,  # Void class value
-                               horizontal_flip=True,  # Randomly flip images horizontally
-                               vertical_flip=True, # Randomly flip images vertically
+                               horizontal_flip=False,  # Randomly flip images horizontally
+                               vertical_flip=False, # Randomly flip images vertically
                                rescale=None,  # Rescaling factor. Defaults to None. If None or 0, no rescaling is applied, otherwise we multiply the data by the value provided (before applying any other transformation).
                                spline_warp=False,
                                warp_sigma=0.1,
@@ -150,14 +151,12 @@ def train(dataset, model_name, learning_rate, weight_decay,
     print('\n > Training the model...')
     hist = model.fit_generator(train_gen, samples_per_epoch=n_images_train,
                                nb_epoch=num_epochs,
-                               # validation_data=valid_gen,
-                               # nb_val_samples=n_images_val,
                                callbacks=[evaluate_model, early_stopping,
                                           checkpointer])
 
     # Compute test metrics
     print('\n > Testing the model...')
-    model.load_weights(savepath+"weights.hdf5")
+    model.load_weights(savepath + "weights.hdf5")
     color_map = sns.hls_palette(n_classes+1)
     test_metrics = compute_metrics(model, test_gen, n_images_test, n_classes,
                                    metrics=['test_loss',
@@ -181,11 +180,11 @@ def main():
     # Get parameters from file parser
     parser = argparse.ArgumentParser(description='DeepPolyp model training')
     parser.add_argument('-dataset', default='polyps', help='Dataset')
-    parser.add_argument('-model_name', default='resunet', help='Model')
+    parser.add_argument('-model_name', default='fcn8', help='Model')
     parser.add_argument('-model_file', default='weights.hdf5',
                         help='Model file')
     parser.add_argument('-learning_rate', default=0.0001, help='Learning Rate')
-    parser.add_argument('-weight_decay', default=0.000001,
+    parser.add_argument('-weight_decay', default=0.0,
                         help='regularization constant')
     parser.add_argument('--num_epochs', '-ne', type=int, default=1000,
                         help='Optional. Int to indicate the max'
@@ -216,7 +215,7 @@ def main():
             shutil.copytree(shared_dataset_path, dataset_path)
             print('Done.')
 
-        savepath = '/Tmp/'+usr+'/results/deepPolyp/fcn8/DataAugmNoElastWD1e-6/'
+        savepath = '/Tmp/'+usr+'/results/deepPolyp/fcn8/DataAugmShear05/'
         train_path = dataset_path + 'train/'
         valid_path = dataset_path + 'valid/'
         test_path = dataset_path + 'test/'

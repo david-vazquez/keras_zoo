@@ -39,9 +39,9 @@ def pad_image(x, pad_amount, mode='reflect', constant=0.):
         x_padded[e:-e, :e] = np.fliplr(x[:, :e])  # top edge
         x_padded[e:-e, -e:] = np.fliplr(x[:, -e:])  # bottom edge
         x_padded[:e, :e] = np.fliplr(np.flipud(x[:e, :e]))  # top-left corner
-        x_padded[-e:, :e] = np.fliplr(np.flipud(x[-e:, :e]))  # top-right corner
-        x_padded[:e, -e:] = np.fliplr(np.flipud(x[:e, -e:]))  # bottom-left corner
-        x_padded[-e:, -e:] = np.fliplr(np.flipud(x[-e:, -e:]))  # bottom-right corner
+        x_padded[-e:, :e] = np.fliplr(np.flipud(x[-e:, :e]))  # top-right cor
+        x_padded[:e, -e:] = np.fliplr(np.flipud(x[:e, -e:]))  # bot-left cor
+        x_padded[-e:, -e:] = np.fliplr(np.flipud(x[-e:, -e:]))  # bot-right cor
     elif mode == 'zero' or mode == 'constant':
         pass
     elif mode == 'nearest':
@@ -120,9 +120,7 @@ def apply_warp(x, warp_field, fill_mode='reflect',
 def load_img(path, grayscale=False, target_size=None, crop=False):
     import skimage.io as io
     img = io.imread(path)
-    # TODO
-    # add resize
-    # Add grayscale
+    # TODO: Add grayscale
     return img
 
 
@@ -151,8 +149,8 @@ class ImageDataGenerator(object):
         horizontal_flip: whether to randomly flip images horizontally.
         vertical_flip: whether to randomly flip images vertically.
         rescale: rescaling factor. If None or 0, no rescaling is applied,
-            otherwise we multiply the data by the value provided (before applying
-            any other transformation).
+            otherwise we multiply the data by the value provided (before
+            applying any other transformation).
         dim_ordering: 'th' or 'tf'. In 'th' mode, the channels dimension
             (the depth) is at index 1, in 'tf' mode it is at index 3.
             It defaults to the `image_dim_ordering` value found in your
@@ -191,9 +189,9 @@ class ImageDataGenerator(object):
         self.rescale = rescale
 
         if dim_ordering not in {'tf', 'th'}:
-            raise Exception('dim_ordering should be "tf" (channel after row and '
-                            'column) or "th" (channel before row and column). '
-                            'Received arg: ', dim_ordering)
+            raise Exception('dim_ordering should be "tf" (channel after row '
+                            'and column) or "th" (channel before row and '
+                            'column). Received arg: ', dim_ordering)
         self.dim_ordering = dim_ordering
         if dim_ordering == 'th':
             self.channel_index = 1
@@ -266,7 +264,8 @@ class ImageDataGenerator(object):
         img_col_index = self.col_index - 1
         img_channel_index = self.channel_index - 1
 
-        # use composition of homographies to generate final transform that needs to be applied
+        # use composition of homographies to generate final transform that
+        # needs to be applied
         if self.rotation_range:
             theta = np.pi / 180 * np.random.uniform(-self.rotation_range,
                                                     self.rotation_range)
@@ -459,7 +458,8 @@ class DirectoryIterator(Iterator):
                             break
                     if is_valid:
                         self.nb_sample += 1
-            print('Found %d images belonging to %d classes.' % (self.nb_sample, self.nb_class))
+            print('Found %d images belonging to %d classes.' % (self.nb_sample,
+                                                                self.nb_class))
         else:
             for fname in os.listdir(directory):
                 is_valid = False
@@ -483,7 +483,6 @@ class DirectoryIterator(Iterator):
                     self.nb_GT_sample += 1
             print('Found %d GT images.' % (self.nb_sample))
             self.gt_filenames = np.sort(self.gt_filenames)
-        # second, build an index of the images in the different class subfolders
 
         if not self.class_mode == 'seg_map':
             self.classes = np.zeros((self.nb_sample,), dtype='int32')
@@ -501,7 +500,8 @@ class DirectoryIterator(Iterator):
                         self.filenames.append(os.path.join(subdir, fname))
                         i += 1
 
-        super(DirectoryIterator, self).__init__(self.nb_sample, batch_size, shuffle, seed)
+        super(DirectoryIterator, self).__init__(self.nb_sample, batch_size,
+                                                shuffle, seed)
 
     def next(self):
         with self.lock:
