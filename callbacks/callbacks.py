@@ -2,12 +2,25 @@
 # import theano.tensor as T
 # from keras import backend as K
 # import scipy.misc
-from keras.callbacks import Callback
+from keras.callbacks import Callback, Progbar, ProgbarLogger
 from keras.engine.training import generator_queue
 from tools.save_images import save_img
 import numpy as np
 import seaborn as sns
 
+
+# PROGBAR replacements
+def progbar__set_params(self, params):
+    self.params = params
+    self.params['metrics'].extend(self.valid_metrics)
+
+
+def progbar_on_epoch_begin(self, epoch, logs={}):
+    if self.verbose:
+        print('Epoch %d/%d' % (epoch + 1, self.nb_epoch))
+        self.progbar = Progbar(target=self.params['nb_sample'],
+                               verbose=self.verbose)
+    self.seen = 0
 
 # Compute the masked categorical crossentropy
 def cat_cross_entropy_voids(y_pred, y_true, void_label, _EPS=10e-8,
@@ -48,6 +61,13 @@ def cat_cross_entropy_voids(y_pred, y_true, void_label, _EPS=10e-8,
 def compute_metrics(model, val_gen, epoch_length, nclasses, metrics,
                     color_map, tag, void_label, out_images_folder, epoch,
                     save_all_images=False):
+    
+    if 'test_jaccard_perclass' in metrics:
+        metrics.remove('test_jaccard_perclass')
+        for i in range(nclasses):
+            metrics.append(str(i) + '_test_jacc_percl')
+ 
+    
     # Create a data generator
     data_gen_queue, _stop = generator_queue(val_gen, max_q_size=10)
 
@@ -104,8 +124,8 @@ def compute_metrics(model, val_gen, epoch_length, nclasses, metrics,
     for m in metrics:
         if m.endswith('jaccard'):
             metrics_out[m] = jaccard
-        elif m.endswith('jaccard_perclass'):
-            metrics_out[m] = jaccard_perclass
+        elif m.endswith('jacc_percl'):
+            metrics_out[m] = jaccard_perclass[int(m.split('_')[0])]
         elif m.endswith('acc') or m.endswith('accuracy'):
             metrics_out[m] = accuracy
         elif m.endswith('cm'):
@@ -143,6 +163,14 @@ class Evaluate_model(Callback):
         # Create the colormaping for showing labels
         self.color_map = sns.hls_palette(n_classes+1)
         self.last_epoch = 0
+        if 'val_jaccard_perclass' in self.valid_metrics:
+            self.valid_metrics.remove('val_jaccard_perclass')
+            for i in range(n_classes):
+                self.valid_metrics.append(str(i) + '_val_jacc_percl')
+        setattr(ProgbarLogger, 'valid_metrics',
+                self.valid_metrics)
+        setattr(ProgbarLogger, '_set_params', progbar__set_params)
+        # setattr(ProgbarLogger, 'on_epoch_begin', progbar_on_epoch_begin)
 
     # Compute metrics for validation set at the end of each epoch
     def on_epoch_end(self, epoch, logs={}):
@@ -159,26 +187,4 @@ class Evaluate_model(Callback):
         # Save the metrics in the logs
         for k, v in metrics_out.iteritems():
             logs[k] = v
-        print ('logs valid: ' + str(logs))
 
-    # Compute metrics for testing set at the end of the training
-    def on_train_end(self, logs={}):
-        if (self.test_gen is not None and
-            self.test_epoch_length is not None and
-            self.test_metrics is not None):
-            # Compute the metrics
-            metrics_out = compute_metrics(self.model,
-                                          self.test_gen,
-                                          self.test_epoch_length,
-                                          self.n_classes,
-                                          metrics=self.test_metrics,
-                                          color_map=self.color_map, tag="test",
-                                          void_label=self.void_label,
-                                          out_images_folder=self.save_path,
-                                          epoch=self.last_epoch,
-                                          save_all_images=True)
-
-            # Save the metrics in the logs
-            for k, v in metrics_out.iteritems():
-                logs[k] = v
-            print ('logs test: ' + str(logs))
