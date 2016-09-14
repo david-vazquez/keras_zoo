@@ -10,6 +10,7 @@
 | 3 | FCN8 | Deconv, lr=1e-4, l2=0, Data Augm (Elast)     | CVC-912 (Tr)          | CVC-912 (Val)          | CVC-912 (Ts) | 0.351  | 0.383    | 85.90% | 48.40%  | 87.29% | 42.79%  | 130  | [0.86779401,  0.32364056,  0.28232848,  0.23794606] |
 | 4 | FCN8 | Deconv, lr=1e-4, l2=0, Data Augm (Elast NN)  | CVC-912 (Tr)          | CVC-912 (Val)          | CVC-912 (Ts) | 0.229  | 0.341    | 88.74% | 51.10%  | 89.82% | 48.33%  | 256  | [0.89206086,  0.47399949,  0.24423865,  0.32314031] |
 | 5 | FCN8 | Deconv, lr=1e-4, l2=0, Data Augm (Shear noElast)  | CVC-912 (Tr)      | CVC-912 (Val)          | CVC-912 (Ts) | 0.152  | 0.204    | 94.00% | 62.39%  | 89.69% | 55.13%  | ???  | [0.88818576,  0.51609229,  0.38878289,  0.41218452] |
+| 6 | resunet | lr=1e-4, l2=1e-4, Data Augm (noShear noElast)  | CVC-912 (Tr)      | CVC-912 (Val)          | CVC-912 (Ts) | 0.276  | 0.277    | 91.24% | 52.87%  | 85.32% | 48.41%  | 243  | [0.8424,  0.2683,  0.4269,  0.3988] |
 
 ### Experiment 1 (Deconv, lr=1e-4, l2=0, No Data Augm )
 ![image](./images/FCN8_NoDA.png)
