@@ -95,20 +95,24 @@ Keras
    - [X] Jaccard index
    - [X] Add layers visualization
    - [X] Plot results
+   - [X] Regularization
    - [X] Test data augmentation   
-     - [ ] Elastic nearest neighbour
+     - [X] Elastic nearest neighbour
+     - [X] Image shear
      - [ ] Image bilinear and mask Nearest
      - [ ] Class weight balancing
-     - [ ] Image shear
+   - [ ] Test different deconvolutions 
+     - [ ] Deconv init
+     - [ ] Unpool
+     - [ ] Repetition + Convolution
    - [ ] Normalize images using mean and std
-   - [ ] Regularization
    - [ ] Ensembles
    - [ ] DICE index
    - [ ] Add gradient reversal to make the network agnostic to the patients (http://www.jmlr.org/proceedings/papers/v37/ganin15.pdf)
    - [ ] Move Unet model to Keras
  - [ ] Jorge: Change lumen annotations
  - [ ] Jorge: Get more images (If posible)
- - [ ] Deconv init
+ 
  - [ ] Different learning rates for bias than for weights
  - [ ] Batch normalization
  - [ ] First experiments with Unet
