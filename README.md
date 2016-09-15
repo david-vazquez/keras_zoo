@@ -13,7 +13,7 @@
 | 6 | resunet | lr=1e-4, l2=1e-4, Data Augm (noShear noElast)  | CVC-912 (Tr)      | CVC-912 (Val)          | CVC-912 (Ts) | 0.276  | 0.277    | 91.24% | 52.87%  | 85.32% | 48.41%  | 243  | [0.8424,  0.2683,  0.4269,  0.3988] |
 | 7 | fcn8 | lr=1e-4, l2=0, Data Augm (Elast, Shear(.41), Rot(180), Warp(10, 3), Crop )  | CVC-912 (Tr)      | CVC-912 (Val)          | CVC-912 (Ts) | 0.199  |  0.204   | 93.18% | 59.75% |  87.52% |50.15 %| 140  | [0.866525760217, 0.416273424807, 0.365415822596, 0.357791154721] |
 
-*Observations:* 
+**Observations:** 
 - The best mean jaccard does not seem to be the best in terms of polyp detection. Validation loss seems to be a better proxy, however, early stopping on the polyp-class jaccard would most likely be the most beneficial option. Or we could early stop different models on different per class metrics and do model averaging at test time.
 
 ### Experiment 1 (Deconv, lr=1e-4, l2=0, No Data Augm )
