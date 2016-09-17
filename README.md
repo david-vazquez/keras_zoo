@@ -16,7 +16,7 @@
 | 9 | fcn8 | lr=1e-4, l2=0, Data Augm (Flip, Rot(180), Crop)  | CVC-912 (Tr)      | CVC-912 (Val)          | CVC-912 (Ts) | 0.267  |  0.340   | 87.42% | 50.68% |  87.66% |44.44 %| 226  | [0.87059292,  0.36487132,  0.26324498,  0.27922294] |
 | 10 | fcn8 | lr=1e-4, l2=0, Data Augm (Zoom(0.1), Crop)  | CVC-912 (Tr)      | CVC-912 (Val)          | CVC-912 (Ts) | 0.098  |  0.371   | 90.72% | 57.72% |  90.40% |50.41 %| 234  | [0.89959234,  0.40648192,  0.33234649,  0.37825429] |
 | 11 | fcn8 | lr=1e-4, l2=0, Data Augm (Shear(0.5), Crop)  | CVC-912 (Tr)      | CVC-912 (Val)          | CVC-912 (Ts) | 0.112  |  0.333   | 90.48% | 56.83% |  90.28% |51.70 %| 251  | [0.897379764481, 0.463613590256, 0.338904191903, 0.368358490143] |
-
+| 12 | FCN8 | Deconv, lr=1e-4, l2=0, No Data Augm, Crop, RGBNorm | CVC-912 (Tr)  | CVC-912 (Val)          | CVC-912 (Ts)  | 0.097  | 0.277    | 92.70% | 57.52%  | 87.57% | 48.70%  | 241  | [0.8674, 0.31240, 0.31246, 45.5598] |
 
 **Observations:** 
 - The best mean jaccard does not seem to be the best in terms of polyp detection. Validation loss seems to be a better proxy, however, early stopping on the polyp-class jaccard would most likely be the most beneficial option. Or we could early stop different models on different per class metrics and do model averaging at test time.
