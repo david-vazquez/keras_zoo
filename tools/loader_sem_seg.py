@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 import numpy as np
+from numpy import ma
 from six.moves import range
 import os
 import seaborn as sns
@@ -18,7 +19,7 @@ from keras.preprocessing.image import (Iterator,
                                        NumpyArrayIterator,
                                        random_channel_shift)
 
-from tools.save_images import my_label2rgb, my_label2rgboverlay
+from tools.save_images import save_img2
 
 
 # Pad image
@@ -117,10 +118,23 @@ def apply_warp(x, warp_field, fill_mode='reflect',
 
 
 # Load image
-def load_img(path, grayscale=False, target_size=None, crop=False):
+def load_img(path, grayscale=False, target_size=None):
     import skimage.io as io
+    from skimage.color import rgb2gray
+
+    # Load image
     img = io.imread(path)
-    # TODO: Add grayscale
+
+    # # Resize
+    # print('target_size: ' + str(target_size))
+    # if target_size[0] is not None:
+    #     raise ValueError('Not implemented')
+
+    # Convert to grayscale
+    if grayscale:
+        img = rgb2gray(img)
+
+    # Return image
     return img
 
 
@@ -162,6 +176,7 @@ class ImageDataGenerator(object):
                  samplewise_center=False,
                  featurewise_std_normalization=False,
                  samplewise_std_normalization=False,
+                 gcn=False,
                  zca_whitening=False,
                  rotation_range=0.,
                  width_shift_range=0.,
@@ -171,7 +186,7 @@ class ImageDataGenerator(object):
                  channel_shift_range=0.,
                  fill_mode='nearest',
                  cval=0.,
-                 cvalMask=0.,
+                 void_label=0.,
                  horizontal_flip=False,
                  vertical_flip=False,
                  rescale=None,
@@ -179,6 +194,8 @@ class ImageDataGenerator(object):
                  warp_sigma=0.1,
                  warp_grid_size=3,
                  dim_ordering='default',
+                 rgb_mean=None,
+                 rgb_std=None,
                  crop_size=None):
         if dim_ordering == 'default':
             dim_ordering = K.image_dim_ordering()
@@ -237,11 +254,44 @@ class ImageDataGenerator(object):
             save_to_dir=save_to_dir, save_prefix=save_prefix,
             save_format=save_format)
 
-    def standardize(self, x):
+    def standardize(self, x, y=None):
         if self.rescale:
             x *= self.rescale
         # x is a single image, so it doesn't have image number at index 0
         img_channel_index = self.channel_index - 1
+
+        if self.gcn:
+            x_before = x.copy()
+            # Compute the void mask
+            mask = np.ones_like(y).astype('int32')
+            mask[y == self.void_label] = 0.
+            mask = np.repeat(mask, 3, axis=0)
+
+            # Mask image
+            x_masked = ma.masked_array(x, mask=~mask.astype(bool))
+
+            # Compute mean and std masked
+            mean_masked = np.mean(x_masked)
+            std_masked = np.std(x_masked)
+            # print ('Mean   : ' + str(mean))
+            # print ('Std   : ' + str(std))
+
+            # Normalize
+            s = 1
+            eps = 1e-8
+            x = s * (x - mean_masked) / max(eps, std_masked)
+
+            # Set void pixels to 0
+            x = x*mask
+
+            # max_v = np.max(x)
+            # min_v = np.min(x)
+            # x_after = (x-min_v)/(max_v-min_v)
+            # combined_image = np.concatenate((x_before, x_after), axis=1)
+            # import scipy.misc
+            # scipy.misc.toimage(combined_image).save('./gcn.png')
+            # exit()
+
         if self.samplewise_center:
             x -= np.mean(x, axis=img_channel_index, keepdims=True)
         if self.samplewise_std_normalization:
@@ -251,6 +301,11 @@ class ImageDataGenerator(object):
             x -= self.mean
         if self.featurewise_std_normalization:
             x /= (self.std + 1e-7)
+
+        if self.rgb_mean is not None:
+            x -= np.reshape(self.rgb_mean, (3, 1, 1))
+        if self.rgb_std is not None:
+            x /= np.reshape(self.rgb_std, (3, 1, 1))
 
         if self.zca_whitening:
             flatx = np.reshape(x, (x.size))
@@ -317,7 +372,7 @@ class ImageDataGenerator(object):
                             fill_mode=self.fill_mode, cval=self.cval)
         if y is not None:
             y = apply_transform(y, transform_matrix, img_channel_index,
-                                fill_mode=self.fill_mode, cval=self.cvalMask)
+                                fill_mode=self.fill_mode, cval=self.void_label)
 
         if self.channel_shift_range != 0:
             x = random_channel_shift(x, self.channel_shift_range,
@@ -340,14 +395,14 @@ class ImageDataGenerator(object):
                                         sigma=self.warp_sigma,
                                         grid_size=self.warp_grid_size)
             x = apply_warp(x, warp_field,
-                           interpolator=sitk.sitkNearestNeighbor,
+                           interpolator=sitk.sitkLinear,
                            fill_mode=self.fill_mode, fill_constant=self.cval)
 
             if y is not None:
                 y = np.round(apply_warp(y, warp_field,
                                         interpolator=sitk.sitkNearestNeighbor,
                                         fill_mode=self.fill_mode,
-                                        fill_constant=self.cvalMask))
+                                        fill_constant=self.void_label))
 
         # Crop
         # TODO: tf compatible???
@@ -361,12 +416,12 @@ class ImageDataGenerator(object):
             if crop[0] < h:
                 top = np.random.randint(h - crop[0])
             else:
-                print('Data augmentation: Crop height >= image size')
+                #print('Data augmentation: Crop height >= image size')
                 top, crop[0] = 0, h
             if crop[1] < w:
                 left = np.random.randint(w - crop[1])
             else:
-                print('Data augmentation: Crop width >= image size')
+                #print('Data augmentation: Crop width >= image size')
                 left, crop[1] = 0, w
 
             if self.dim_ordering == 'th':
@@ -388,6 +443,38 @@ class ImageDataGenerator(object):
             return x
         else:
             return x, y
+
+    def fit(self, X, augment=False, rounds=1, seed=None):
+        '''Required for featurewise_center, featurewise_std_normalization
+        and zca_whitening.
+        # Arguments
+            X: Numpy array, the data to fit on.
+            augment: whether to fit on randomly augmented samples
+            rounds: if `augment`, how many augmentation passes to do over
+            the data
+            seed: random seed.
+        '''
+        X = np.copy(X)
+        if augment:
+            aX = np.zeros(tuple([rounds * X.shape[0]] + list(X.shape)[1:]))
+            for r in range(rounds):
+                for i in range(X.shape[0]):
+                    aX[i + r * X.shape[0]] = self.random_transform(X[i])
+            X = aX
+
+        if self.featurewise_center:
+            self.mean = np.mean(X, axis=0)
+            X -= self.mean
+
+        if self.featurewise_std_normalization:
+            self.std = np.std(X, axis=0)
+            X /= (self.std + 1e-7)
+
+        if self.zca_whitening:
+            flatX = np.reshape(X, (X.shape[0], X.shape[1] * X.shape[2] * X.shape[3]))
+            sigma = np.dot(flatX.T, flatX) / flatX.shape[1]
+            U, S, V = linalg.svd(sigma)
+            self.principal_components = np.dot(np.dot(U, np.diag(1. / np.sqrt(S + 10e-7))), U.T)
 
 
 class DirectoryIterator(Iterator):
@@ -528,19 +615,19 @@ class DirectoryIterator(Iterator):
                            grayscale=grayscale,
                            target_size=self.target_size)
             x = img_to_array(img, dim_ordering=self.dim_ordering)
-            x = self.image_data_generator.standardize(x)
-            if self.class_mode == 'seg_map':
-                GT = load_img(os.path.join(self.gt_directory, gtname),
-                              grayscale=True,
-                              target_size=self.target_size)
-                y = img_to_array(GT, dim_ordering=self.dim_ordering)
             if not self.class_mode == 'seg_map':
+                x = self.image_data_generator.standardize(x)
                 x = self.image_data_generator.random_transform(x)
                 if current_batch_size > 1:
                     batch_x[i] = x
                 else:
                     batch_x = np.expand_dims(x, axis=0)
             else:
+                GT = load_img(os.path.join(self.gt_directory, gtname),
+                              grayscale=False,
+                              target_size=self.target_size)
+                y = img_to_array(GT, dim_ordering=self.dim_ordering)
+		x = self.image_data_generator.standardize(x, y)
                 x, y = self.image_data_generator.random_transform(x, y)
                 if current_batch_size > 1:
                     batch_x[i] = x
@@ -558,25 +645,12 @@ class DirectoryIterator(Iterator):
                                                                   format=self.save_format)
 
                 if self.class_mode == 'seg_map':
-                    # Save images
-                    def save_img(img, mask, fname, color_map, void_label):
-                        img = img.transpose((1, 2, 0)) / 255.
-                        mask = mask.reshape(mask.shape[1:3])
-                        label_mask = my_label2rgboverlay(mask,
-                                                         colors=color_map,
-                                                         image=img,
-                                                         bglabel=void_label,
-                                                         alpha=0.2)
-                        combined_image = np.concatenate((img, label_mask),
-                                                        axis=1)
-                        scipy.misc.toimage(combined_image).save(fname)
-
                     nclasses = self.classes  # TODO: Change
                     color_map = sns.hls_palette(nclasses+1)
                     void_label = nclasses
-                    save_img(batch_x[i], batch_y[i],
-                             os.path.join(self.save_to_dir, fname), color_map,
-                             void_label)
+                    save_img2(batch_x[i], batch_y[i],
+                              os.path.join(self.save_to_dir, fname), color_map,
+                              void_label)
 
                 else:
                     img = array_to_img(batch_x[i], self.dim_ordering,

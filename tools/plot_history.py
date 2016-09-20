@@ -15,7 +15,7 @@ def plot_history(hist, save_path):
     b_va_acc = np.max(hist.history['val_acc'])
     b_va_acc2 = hist.history['val_acc'][best_index]
 
-    print ('Best epoch: {}. Train loss: {}. Val loss: {}. Val accuracy:{}. Val Jaccard: {}.'.format(best_index, b_tr_loss2, b_va_loss2, b_va_jaccard, b_va_acc2))
+    print ('Best epoch: {}. Train loss: {}. Val loss: {}. Val accuracy:{}. Val Jaccard: {}.'.format(best_index, b_tr_loss2, b_va_loss2, b_va_acc2, b_va_jaccard))
 
     # Plot the metrics
     plt.plot(hist.history['loss'],

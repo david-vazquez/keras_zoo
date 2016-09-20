@@ -5,6 +5,7 @@ import sys
 import seaborn as sns
 from getpass import getuser
 import shutil
+import numpy as np
 
 # Import keras libraries
 from keras.callbacks import EarlyStopping, ModelCheckpoint
@@ -20,6 +21,7 @@ from tools.logger import Logger
 from tools.plot_history import plot_history
 from models.model import assemble_model
 sys.setrecursionlimit(99999)
+from tools.compute_mean_std import compute_mean_std
 
 
 # Train the network
@@ -27,7 +29,8 @@ def train(dataset, model_name, learning_rate, weight_decay,
           num_epochs, max_patience, batch_size, optimizer,
           savepath, train_path, valid_path, test_path,
           crop_size=(224, 224), in_shape=(3, None, None), n_classes=5,
-          weights_file=False, void_class=[4], show_model=False, plot_hist=True):
+          weights_file=False, void_class=[4], show_model=False,
+          plot_hist=True):
 
     # Remove void classes from number of classes
     n_classes = n_classes - len(void_class)
@@ -37,11 +40,21 @@ def train(dataset, model_name, learning_rate, weight_decay,
     n_images_val = 183  # 183
     n_images_test = 182  # 182
 
+    # Normalization mean and std computed on training set for RGB pixel values
+    print '\n > Computing mean and std for normalization...'
+    # rgb_mean, rgb_std = compute_mean_std(train_path, n_classes)
+    #rgb_mean = np.asarray([136.802149374816, 89.027507875758, 60.95704395601])
+    #rgb_std = np.asarray([61.557424951802, 49.3161791144930, 38.3622394873712])
+    rgb_mean = None
+    rgb_std = None
+    print ('Mean: ' + str(rgb_mean))
+    print ('Std: ' + str(rgb_std))
+
     # Build model
     print '\n > Building model (' + model_name + ')...'
     if model_name == 'fcn8':
-        model = build_fcn8(in_shape, regularize_weights=weight_decay,
-                           nclasses=n_classes, weights_file=weights_file)
+        model = build_fcn8(in_shape, l2_reg=weight_decay, nclasses=n_classes,
+                           weights_file=weights_file, deconv='deconv')
         model.output
     elif model_name == 'resunet':
         model_kwargs = {
@@ -62,11 +75,17 @@ def train(dataset, model_name, learning_rate, weight_decay,
     else:
         raise ValueError('Unknown model')
 
+    # Create the optimizer
+    print '\n > Creating optimizer ({}) with lr ({})...'.format(optimizer,
+                                                                learning_rate)
+    if optimizer == 'rmsprop':
+        opt = RMSprop(lr=learning_rate, rho=0.9, epsilon=1e-8, clipnorm=10)
+    else:
+        raise ValueError('Unknown optimizer')
+
     # Compile model
     print '\n > Compiling model...'
-    optimizer = RMSprop(lr=0.0001, rho=0.9, epsilon=1e-8, clipnorm=10)
-    model.compile(loss=cce_flatt(void_class), optimizer=optimizer)
-    # TODO: Add metrics: DICE
+    model.compile(loss=cce_flatt(void_class), optimizer=opt)
 
     # Show model structure
     if show_model:
@@ -76,26 +95,29 @@ def train(dataset, model_name, learning_rate, weight_decay,
     # Create the data generators
     print ('\n > Reading training set...')
     dg_tr = ImageDataGenerator(crop_size=crop_size,  # Crop the image to a fixed size
-                               featurewise_center=False,  # Set input mean to 0 over the dataset
-                               samplewise_center=False,  # Set each sample mean to 0
-                               featurewise_std_normalization=False,  # Divide inputs by std of the dataset
-                               samplewise_std_normalization=False,  # Divide each input by its std
+                               featurewise_center=False,  # Substract mean - dataset
+                               samplewise_center=False,  # Substract mean - sample
+                               featurewise_std_normalization=False,  # Divide std - dataset
+                               samplewise_std_normalization=False,  # Divide std - sample
+                               rgb_mean=rgb_mean,
+                               rgb_std=rgb_std,
+                               gcn=False,  # Global contrast normalization
                                zca_whitening=False,  # Apply ZCA whitening
-                               rotation_range=0,  # Randomly rotate images in the range (degrees, 0 to 180)
-                               width_shift_range=0.0,  # Randomly shift images horizontally (fraction of total width)
-                               height_shift_range=0.0,  # Randomly shift images vertically (fraction of total height)
-                               shear_range=0.5,  # 0.5,  # Shear Intensity (Shear angle in counter-clockwise direction as radians)
-                               zoom_range=0.0,  # Float or [lower, upper]. Range for random zoom. If a float, [lower, upper] = [1-zoom_range, 1+zoom_range]
-                               channel_shift_range=0.,  # Range for random channel shifts.
-                               fill_mode='constant',  # One of {"constant", "nearest", "reflect" or "wrap"}. Points outside the boundaries of the input are filled according to the given mode.
-                               cval=0.,  # Value used for points outside the boundaries when fill_mode = "constant".
-                               cvalMask=n_classes,  # Void class value
-                               horizontal_flip=False,  # Randomly flip images horizontally
-                               vertical_flip=False, # Randomly flip images vertically
-                               rescale=None,  # Rescaling factor. Defaults to None. If None or 0, no rescaling is applied, otherwise we multiply the data by the value provided (before applying any other transformation).
-                               spline_warp=False,
-                               warp_sigma=0.1,
-                               warp_grid_size=3
+                               rotation_range=0,  # Rnd rotation degrees 0-180
+                               width_shift_range=0.0,  # Rnd horizontal shift
+                               height_shift_range=0.0,  # Rnd vertical shift
+                               shear_range=0.4,  # 0.5,  # Shear in radians
+                               zoom_range=0.,  # Zoom
+                               channel_shift_range=0.,  # Channel shifts
+                               fill_mode='constant',  # Fill mode
+                               cval=0.,  # Void image value
+                               void_label=void_class[0],  # Void class value
+                               horizontal_flip=False,  # Rnd horizontal flip
+                               vertical_flip=False,  # Rnd vertical flip
+                               rescale=None,  # Rescaling factor
+                               spline_warp=False,  # Enable elastic deformation
+                               warp_sigma=10,  # Elastic deformation sigma
+                               warp_grid_size=3  # Elastic deformation gridSize
                                )
     train_gen = dg_tr.flow_from_directory(train_path + 'images',
                                           batch_size=batch_size,
@@ -103,12 +125,12 @@ def train(dataset, model_name, learning_rate, weight_decay,
                                           target_size=crop_size,
                                           class_mode='seg_map',
                                           classes=n_classes,
-                                          # save_to_dir=savepath,
+                                          #save_to_dir=savepath,  # Save DA
                                           save_prefix='data_augmentation',
                                           save_format='png')
 
     print ('\n > Reading validation set...')
-    dg_va = ImageDataGenerator()
+    dg_va = ImageDataGenerator(rgb_mean=rgb_mean, rgb_std=rgb_std)
     valid_gen = dg_va.flow_from_directory(valid_path + 'images',
                                           batch_size=1,
                                           gt_directory=valid_path + 'masks',
@@ -117,7 +139,7 @@ def train(dataset, model_name, learning_rate, weight_decay,
                                           classes=n_classes)
 
     print ('\n > Reading testing set...')
-    dg_ts = ImageDataGenerator()
+    dg_ts = ImageDataGenerator(rgb_mean=rgb_mean, rgb_std=rgb_std)
     test_gen = dg_ts.flow_from_directory(test_path + 'images',
                                          batch_size=1,
                                          gt_directory=test_path + 'masks',
@@ -134,8 +156,7 @@ def train(dataset, model_name, learning_rate, weight_decay,
                                     valid_metrics=['val_loss',
                                                    'val_jaccard',
                                                    'val_acc',
-                                                   'val_jaccard_perclass']
-                                    )
+                                                   'val_jaccard_perclass'])
 
     # Define early stopping callback
     early_stopping = EarlyStopping(monitor='val_jaccard', mode='max',
@@ -144,15 +165,14 @@ def train(dataset, model_name, learning_rate, weight_decay,
     # Define model saving callback
     checkpointer = ModelCheckpoint(filepath=savepath+"weights.hdf5", verbose=0,
                                    monitor='val_jaccard', mode='max',
-                                   save_best_only=True,
-                                   save_weights_only=True)
+                                   save_best_only=True, save_weights_only=True)
 
     # Train the model
     print('\n > Training the model...')
     hist = model.fit_generator(train_gen, samples_per_epoch=n_images_train,
-                               nb_epoch=num_epochs,
-                               callbacks=[evaluate_model, early_stopping,
-                                          checkpointer])
+                               nb_epoch=num_epochs, callbacks=[evaluate_model,
+                                                               early_stopping,
+                                                               checkpointer])
 
     # Compute test metrics
     print('\n > Testing the model...')
@@ -168,7 +188,7 @@ def train(dataset, model_name, learning_rate, weight_decay,
                                    out_images_folder=savepath,
                                    epoch=0,
                                    save_all_images=True)
-    
+
     for k in sorted(test_metrics.keys()):
         print('{}: {}'.format(k, test_metrics[k]))
 
@@ -186,8 +206,10 @@ def main():
     parser.add_argument('-model_name', default='fcn8', help='Model')
     parser.add_argument('-model_file', default='weights.hdf5',
                         help='Model file')
+    parser.add_argument('-load_pretrained', default=False,
+                        help='Load pretrained model from model file')
     parser.add_argument('-learning_rate', default=0.0001, help='Learning Rate')
-    parser.add_argument('-weight_decay', default=0.0,
+    parser.add_argument('-weight_decay', default=0.,
                         help='regularization constant')
     parser.add_argument('--num_epochs', '-ne', type=int, default=1000,
                         help='Optional. Int to indicate the max'
@@ -199,11 +221,14 @@ def main():
                         help='Optimizer')
     args = parser.parse_args()
 
+    # Experiment name
+    experiment_name = "DataAugmShear04"    
+
     # Define paths according to user
     usr = getuser()
-    if usr == 'michal':
+    if usr == "michal":
         # Michal paths
-        savepath = '/home/michal/tmp'
+        savepath = '/home/michal/' + experiment_name + '/'
         dataset_path = '/home/michal/polyps/polyps_split2/CVC-912/'
         train_path = dataset_path + 'train/'
         valid_path = dataset_path + 'valid/'
@@ -218,7 +243,7 @@ def main():
             shutil.copytree(shared_dataset_path, dataset_path)
             print('Done.')
 
-        savepath = '/Tmp/'+usr+'/results/deepPolyp/fcn8/DataAugmShear05/'
+        savepath = '/Tmp/'+usr+'/results/deepPolyp/fcn8/'+experiment_name+'/'
         train_path = dataset_path + 'train/'
         valid_path = dataset_path + 'valid/'
         test_path = dataset_path + 'test/'
@@ -232,6 +257,7 @@ def main():
 
     # Enable log file
     sys.stdout = Logger(savepath + "logfile.log")
+    print ' ---> Experiment: ' + experiment_name + ' <---'
 
     # Train the network
     train(dataset=args.dataset,
@@ -243,10 +269,12 @@ def main():
           batch_size=int(args.batch_size),
           optimizer=args.optimizer,
           savepath=savepath,
+          show_model=False,
           train_path=train_path, valid_path=valid_path, test_path=test_path,
           crop_size=(224, 224), in_shape=(3, None, None), n_classes=5,
-          weights_file=False,  # savepath+args.model_file,
+          weights_file=savepath+args.model_file if bool(args.load_pretrained) else False,
           void_class=[4])
+    print ' ---> Experiment: ' + experiment_name + ' <---'
 
 # Entry point of the script
 if __name__ == "__main__":

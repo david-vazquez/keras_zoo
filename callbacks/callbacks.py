@@ -4,7 +4,7 @@
 # import scipy.misc
 from keras.callbacks import Callback, Progbar, ProgbarLogger
 from keras.engine.training import generator_queue
-from tools.save_images import save_img
+from tools.save_images import save_img3
 import numpy as np
 import seaborn as sns
 
@@ -21,6 +21,7 @@ def progbar_on_epoch_begin(self, epoch, logs={}):
         self.progbar = Progbar(target=self.params['nb_sample'],
                                verbose=self.verbose)
     self.seen = 0
+
 
 # Compute the masked categorical crossentropy
 def cat_cross_entropy_voids(y_pred, y_true, void_label, _EPS=10e-8,
@@ -67,7 +68,6 @@ def compute_metrics(model, val_gen, epoch_length, nclasses, metrics,
         for i in range(nclasses):
             metrics.append(str(i) + '_test_jacc_percl')
 
-
     # Create a data generator
     data_gen_queue, _stop = generator_queue(val_gen, max_q_size=10)
 
@@ -98,8 +98,8 @@ def compute_metrics(model, val_gen, epoch_length, nclasses, metrics,
         if save_all_images or not save_all_images and _ == 0:
             y_true = np.reshape(y_true, (y_true.shape[0], y_true.shape[2],
                                          y_true.shape[3]))
-            save_img(x_true, y_true, y_pred, out_images_folder, epoch,
-                     color_map, tag+str(_), void_label)
+            save_img3(x_true, y_true, y_pred, out_images_folder, epoch,
+                      color_map, tag+str(_), void_label)
 
         # Make y_true and y_pred flatten
         y_true = y_true.flatten()
@@ -145,7 +145,7 @@ class Evaluate_model(Callback):
     def __init__(self, n_classes, void_label, save_path,
                  valid_gen, valid_epoch_length, valid_metrics,
                  test_gen=None, test_epoch_length=None, test_metrics=None,
-                  *args):
+                 *args):
         super(Callback, self).__init__()
         # Save input parameters
         self.n_classes = n_classes

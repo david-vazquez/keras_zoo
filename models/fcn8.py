@@ -2,26 +2,30 @@ import time
 import h5py
 
 import theano
-
+import numpy as np
 import keras.backend as K
 from keras.layers import Input, merge
 from keras.layers.convolutional import (Convolution2D, MaxPooling2D,
                                         ZeroPadding2D)
+
 from keras.layers.core import Dropout
 from keras.models import Model, load_model
 from keras.regularizers import l2
 
-from layers.ourlayers import CropLayer2D, MergeSequences, NdSoftmax
+from layers.ourlayers import (CropLayer2D, MergeSequences, NdSoftmax, DePool2D,
+                              bilinear4D, UpSampling2D)
 from layers.deconv import Deconvolution2D
 
 
 def build_fcn8(img_shape,
                x_shape=None,
                dim_ordering='th',
-               regularize_weights=False,
+               l2_reg=0.,
                nclasses=8,
                x_test_val=None,
                weights_file=False,
+               # 'deconv' | 'deconv_init' | 'unpool' | 'rep+conv' | 'bil+conv'
+               deconv='deconv',
                **kwargs):
 
     # For Theano debug prouposes
@@ -30,20 +34,39 @@ def build_fcn8(img_shape,
         theano.config.compute_test_value = "warn"
 
     do = dim_ordering
-    inputs = Input(img_shape)
-    sh = inputs._keras_shape
 
-    if regularize_weights:
+    # Regularization warning
+    if l2_reg > 0.:
         print "regularizing the weights"
-        l2_reg = 0.001
-    else:
-        l2_reg = 0.
+
+    # Deconvolution bilinear initial weights
+    def init_bil2(shape, name=None):
+        value = bilinear4D(2, nclasses, nclasses)
+        #value = np.random.random(shape)
+        if value.shape != shape:
+            print ('Required shape: ' + str(shape))
+            print ('Computed shape: ' + str(value.shape))
+            raise ValueError('Incorrect shape')
+        print ('Required shape: ' + str(shape))
+        print ('Filter: ' + str(value))
+        return K.variable(value, name=name)
+
+    def init_bil8(shape, name=None):
+        value = bilinear4D(8, nclasses, nclasses)
+        #value = np.random.random(shape)
+        if value.shape != shape:
+            print ('Required shape: ' + str(shape))
+            print ('Computed shape: ' + str(value.shape))
+            raise ValueError('Incorrect shape')
+        print ('Required shape: ' + str(shape))
+        print ('Filter: ' + str(value))
+        return K.variable(value, name=name)
 
     # Build network
-
     # CONTRACTING PATH
-    # flat = MergeSequences(merge=True, batch_size=batch_size,
-    #                       name='flat')(inputs)
+    # Input layer
+    inputs = Input(img_shape)
+    sh = inputs._keras_shape
     padded = ZeroPadding2D(padding=(100, 100), dim_ordering=do,
                            name='pad100')(inputs)
 
@@ -111,13 +134,12 @@ def build_fcn8(img_shape,
     fc6 = Convolution2D(
           4096, 7, 7, activation='relu', border_mode='valid', dim_ordering=do,
           name='fc6', W_regularizer=l2(l2_reg), trainable=True)(pool5)
-
     fc6 = Dropout(0.5)(fc6)
 
+    # Block 7 (fully conv)
     fc7 = Convolution2D(
           4096, 1, 1, activation='relu', border_mode='valid', dim_ordering=do,
           name='fc7', W_regularizer=l2(l2_reg), trainable=True)(fc6)
-
     fc7 = Dropout(0.5)(fc7)
 
     score_fr = Convolution2D(
@@ -133,12 +155,34 @@ def build_fcn8(img_shape,
           trainable=True)(pool4)
     # print("score_pool4", score_pool4._keras_shape)
     # print("score_fr", score_fr._keras_shape)
-    score2 = Deconvolution2D(
-        nb_filter=nclasses, nb_row=4, nb_col=4,
-        input_shape=score_fr._keras_shape, subsample=(2, 2),
-        border_mode='valid', activation='linear', W_regularizer=l2(l2_reg),
-        dim_ordering=do, trainable=True, name='score2')(score_fr)
-    # print ("score2 ", score2._keras_shape)
+    if deconv == 'deconv':
+        score2 = Deconvolution2D(
+            nb_filter=nclasses, nb_row=4, nb_col=4,
+            input_shape=score_fr._keras_shape, subsample=(2, 2),
+            border_mode='valid', activation='linear', W_regularizer=l2(l2_reg),
+            dim_ordering=do, trainable=True, name='score2')(score_fr)
+        # print ("score2 ", score2._keras_shape)
+    elif deconv == 'deconv_init':
+        score2 = Deconvolution2D(
+            nb_filter=nclasses, nb_row=4, nb_col=4,
+            input_shape=score_fr._keras_shape, subsample=(2, 2),
+            border_mode='valid', activation='linear', W_regularizer=l2(l2_reg),
+            dim_ordering=do, trainable=True, name='score2',
+            init=init_bil2)(score_fr)
+        # print ("score2 ", score2._keras_shape)
+    elif deconv == 'unpool':
+        score2 = DePool2D(pool5, size=(2, 2))(score_fr)
+    elif deconv == 'rep+conv':
+        score_fr_up = UpSampling2D(size=(2, 2), dim_ordering=do, name='score_fr_up')(score_fr)
+        score_fr_up_padded = ZeroPadding2D(padding=(1, 1), dim_ordering=do,
+                               name='score_fr_up_padded')(score_fr_up)
+        score2 = Convolution2D(
+            nclasses, 4, 4, activation='linear', border_mode='same',
+            dim_ordering=do, name='score2', W_regularizer=l2(l2_reg),
+            trainable=True)(score_fr_up_padded)
+    else:
+        raise ValueError('Unknown deconvolution type')
+
     score_pool4_crop = CropLayer2D(score2, dim_ordering=do,
                                    name='score_pool4_crop')(score_pool4)
     # print("score_pool4_crop ", score_pool4_crop._keras_shape)
@@ -151,12 +195,32 @@ def build_fcn8(img_shape,
         dim_ordering=do, W_regularizer=l2(l2_reg),
         trainable=True, name='score_pool3')(pool3)
 
-    score4 = Deconvolution2D(
-        nb_filter=nclasses, nb_row=4, nb_col=4,
-        input_shape=score_fused._keras_shape, subsample=(2, 2),
-        border_mode='valid', activation='linear', W_regularizer=l2(l2_reg),
-        dim_ordering=do, trainable=True, name='score4',
-        bias=False)(score_fused)    # TODO: No bias??
+    if deconv == 'deconv':
+        score4 = Deconvolution2D(
+            nb_filter=nclasses, nb_row=4, nb_col=4,
+            input_shape=score_fused._keras_shape, subsample=(2, 2),
+            border_mode='valid', activation='linear', W_regularizer=l2(l2_reg),
+            dim_ordering=do, trainable=True, name='score4',
+            bias=False)(score_fused)    # TODO: No bias??
+    elif deconv == 'deconv_init':
+        score4 = Deconvolution2D(
+            nb_filter=nclasses, nb_row=4, nb_col=4,
+            input_shape=score_fused._keras_shape, subsample=(2, 2),
+            border_mode='valid', activation='linear', W_regularizer=l2(l2_reg),
+            dim_ordering=do, trainable=True, name='score4',
+            bias=False, init=init_bil2)(score_fused)    # TODO: No bias??
+    elif deconv == 'unpool':
+        score4 = DePool2D(size=(2, 2), dim_ordering=do, pool2d_layer=pool5)(score_fused)
+    elif deconv == 'rep+conv':
+        score4_up = UpSampling2D(size=(2, 2), dim_ordering=do, name='score4_up')(score_fused)
+        score4_up_padded = ZeroPadding2D(padding=(1, 1), dim_ordering=do,
+                               name='score4_up_padded')(score4_up)
+        score4 = Convolution2D(
+            nclasses, 4, 4, activation='linear', border_mode='same',
+            dim_ordering=do, name='score4', W_regularizer=l2(l2_reg),
+            trainable=True)(score4_up_padded)
+    else:
+        raise ValueError('Unknown deconvolution type')
 
     score_pool3_crop = CropLayer2D(score4, dim_ordering=do,
                                    name='score_pool3_crop')(score_pool3)
@@ -164,12 +228,33 @@ def build_fcn8(img_shape,
                         output_shape=custom_sum_shape, name='score_final')
 
     # Unpool 3
-    upsample = Deconvolution2D(
-        nb_filter=nclasses, nb_row=16, nb_col=16,
-        input_shape=score_final._keras_shape, subsample=(8, 8),
-        border_mode='valid', activation='linear', W_regularizer=l2(l2_reg),
-        dim_ordering=do, trainable=True, name='upsample',
-        bias=False)(score_final)  # TODO: No bias??
+    if deconv == 'deconv':
+        upsample = Deconvolution2D(
+            nb_filter=nclasses, nb_row=16, nb_col=16,
+            input_shape=score_final._keras_shape, subsample=(8, 8),
+            border_mode='valid', activation='linear', W_regularizer=l2(l2_reg),
+            dim_ordering=do, trainable=True, name='upsample',
+            bias=False)(score_final)  # TODO: No bias??
+    elif deconv == 'deconv_init':
+        upsample = Deconvolution2D(
+            nb_filter=nclasses, nb_row=16, nb_col=16,
+            input_shape=score_final._keras_shape, subsample=(8, 8),
+            border_mode='valid', activation='linear', W_regularizer=l2(l2_reg),
+            dim_ordering=do, trainable=True, name='upsample',
+            bias=False, init=init_bil8)(score_final)  # TODO: No bias??
+    elif deconv == 'unpool':
+        upsample = DePool2D(size=(8, 8), dim_ordering=do, pool2d_layer=pool5)(score_final)
+    elif deconv == 'rep+conv':
+        upsample_up = UpSampling2D(size=(8, 8), dim_ordering=do, name='upsample_up')(score_final)
+        upsample_up_padded = ZeroPadding2D(padding=(4, 4), dim_ordering=do,
+                               name='upsample_up_padded')(upsample_up)
+        upsample = Convolution2D(
+            nclasses, 8, 8, activation='linear', border_mode='same',
+            dim_ordering=do, name='upsample', W_regularizer=l2(l2_reg),
+            trainable=True)(upsample_up_padded)
+    else:
+        raise ValueError('Unknown deconvolution type')
+
     score = CropLayer2D(inputs, dim_ordering=do, name='score')(upsample)
 
     # Softmax

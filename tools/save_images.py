@@ -5,6 +5,25 @@ import numpy as np
 import scipy.misc
 
 
+# Normalizes image to 0-1 range
+def norm_01(img, y, void_label):
+    # Normalize image
+    max_v = np.max(img)
+    min_v = np.min(img)
+    img = (img-min_v)/(max_v-min_v)
+
+    # Compute the void mask
+    y = y.reshape((y.shape[0], y.shape[1], 1))
+    mask = np.ones_like(y).astype('int32')
+    mask[y == void_label] = 0.
+    mask = np.repeat(mask, 3, axis=2)
+
+    # Set void values to 0
+    img = img*mask
+
+    return img
+
+
 # Converts a label mask to RGB to be shown
 def my_label2rgb(labels, colors, bglabel=None, bg_color=(0., 0., 0.)):
     output = np.zeros(labels.shape + (3,), dtype=np.float64)
@@ -26,13 +45,16 @@ def my_label2rgboverlay(labels, colors, image, bglabel=None,
     return output
 
 
-# Save images
-def save_img(image_batch, mask_batch, output, out_images_folder, epoch,
+# Save 3 images (Image, mask and result)
+def save_img3(image_batch, mask_batch, output, out_images_folder, epoch,
              color_map, tag, void_label):
     output[(mask_batch == void_label).nonzero()] = void_label
     images = []
     for j in xrange(output.shape[0]):
-        img = image_batch[j].transpose((1, 2, 0)) / 255.
+        img = image_batch[j].transpose((1, 2, 0))
+        img = norm_01(img, mask_batch[j], void_label)
+
+        #img = image_batch[j].transpose((1, 2, 0))
         label_out = my_label2rgb(output[j], bglabel=void_label,
                                  colors=color_map)
         label_mask = my_label2rgboverlay(mask_batch[j], colors=color_map,
@@ -50,9 +72,12 @@ def save_img(image_batch, mask_batch, output, out_images_folder, epoch,
     return images
 
 
+# Save 2 images (Image and mask)
 def save_img2(img, mask, fname, color_map, void_label):
-    img = img.transpose((1, 2, 0)) / 255.
+    img = img.transpose((1, 2, 0))
     mask = mask.reshape(mask.shape[1:3])
+    img = norm_01(img, mask, void_label)
+
     label_mask = my_label2rgboverlay(mask,
                                      colors=color_map,
                                      image=img,
