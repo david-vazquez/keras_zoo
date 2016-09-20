@@ -25,6 +25,14 @@
 | 18 | FCN8 | Deconv, lr=1e-4, l2=0, Data Augm(Zoom(0.2), Crop) | CVC-912 (Tr)  | CVC-912 (Val)       | CVC-912 (Ts)  | 0.248  | 0.426    | 86.44% | 48.38%  | 85.45% | 42.32%  | 230  | [0.848, 0.271, 0.315, 0.257] |
 | 19 | FCN8 | Deconv, lr=1e-4, l2=0, no Data Augm(Crop 288x385) | CVC-912 (Tr)  | CVC-912 (Val)       | CVC-912 (Ts)  | 0.174  | 0.391    | 89.50% | 53.06%  | 89.78% | 49.60%  | 101  | [0.893, 0.364, 0.340, 0.385] |
 
+## Code to modify
+- [ ] Add checkpoint to save best model according to Jaccard per polyp class
+- [ ] Save both models (best Jaccard in polyps, best mean Jaccard)
+- [ ] Consider class 2 (brillos) as void class
+- [ ] CRF
+- [ ] Dropout at test time (ensembles)
+- [ ] With the best model, train only on polyp vs background (is lumen really that important?). In this setting, try training with dice as well and report Jaccard on class polyp only.
+
 **Observations:** 
 - The best mean jaccard does not seem to be the best in terms of polyp detection. Validation loss seems to be a better proxy, however, early stopping on the polyp-class jaccard would most likely be the most beneficial option. Or we could early stop different models on different per class metrics and do model averaging at test time.
 
