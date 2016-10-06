@@ -27,7 +27,8 @@ def cce_flatt(void_class, weights_class):
 
         # Class balancing
         if weights_class is not None:
-            class_balance_w = weights_class[y_true].astype(K.floatx())
+            weights_class_var = K.variable(value=weights_class)
+            class_balance_w = weights_class_var[y_true].astype(K.floatx())
             out = out * class_balance_w
 
         return K.mean(out)  # b01 -> b,01

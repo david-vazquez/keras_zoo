@@ -282,7 +282,7 @@ def main():
                         help='Model file')
     parser.add_argument('-load_pretrained', default=False,
                         help='Load pretrained model from model file')
-    parser.add_argument('-learning_rate', default=0.0001, help='Learning Rate')
+    parser.add_argument('-learning_rate', default=0.001, help='Learning Rate')
     parser.add_argument('-weight_decay', default=0.,
                         help='regularization constant')
     parser.add_argument('--num_epochs', '-ne', type=int, default=1000,
@@ -345,7 +345,7 @@ def main():
           savepath=savepath,
           show_model=False,
           train_path=train_path, valid_path=valid_path, test_path=test_path,
-          crop_size=(288, 384), in_shape=(3, None, None),
+          crop_size=(224, 224), in_shape=(3, None, None),
           n_classes=3,  #### Pay attention ####
           gtSet=5,  #### Pay attention ####
           weights_file=savepath+args.model_file if bool(args.load_pretrained) else False,

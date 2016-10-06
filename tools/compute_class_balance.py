@@ -30,16 +30,21 @@ def compute_class_balance(masks_path, n_classes=4, method='median_freq_cost', vo
         # Count elements
         unique_labels, counts_label = np.unique(mask, return_counts=True)
         count_per_label[unique_labels] += counts_label
-        total_count_per_label[unique_labels] += np.sum(counts_label[0:n_classes])
+        total_count_per_label[unique_labels] += np.sum(counts_label[:n_classes])
+
+    # Remove void class
+    count_per_label = count_per_label[:n_classes]
+    total_count_per_label = total_count_per_label[:n_classes]
 
     # Compute the priors
     priors = count_per_label/total_count_per_label
 
     # Compute the weights
-    weights_median_freq_cost = np.median(priors[0:n_classes]) / priors
+    weights_median_freq_cost = np.median(priors) / priors
     weights_rare_freq_cost = 1 / (n_classes * priors)
 
-    print 'Count: ' + str(count_per_label)
+    print 'Count per label: ' + str(count_per_label)
+    print 'Total count per label: ' + str(total_count_per_label)
     print 'Prior: ' + str(priors)
     print 'Weights median_freq_cost: ' + str(weights_median_freq_cost)
     print 'Weights rare_freq_cost: ' + str(weights_rare_freq_cost)
