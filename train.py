@@ -20,15 +20,16 @@ from tools.loader_sem_seg import ImageDataGenerator
 from tools.logger import Logger
 from tools.plot_history import plot_history
 from models.model import assemble_model
-sys.setrecursionlimit(99999)
 from tools.compute_mean_std import compute_mean_std
+from tools.compute_class_balance import compute_class_balance
+sys.setrecursionlimit(99999)
 
 
 # Train the network
 def train(dataset, model_name, learning_rate, weight_decay,
           num_epochs, max_patience, batch_size, optimizer,
           savepath, train_path, valid_path, test_path,
-          crop_size=(224, 224), in_shape=(3, None, None), n_classes=5,
+          crop_size=(224, 224), in_shape=(3, None, None), n_classes=5, gtSet=1,
           weights_file=False, void_class=[4], show_model=False,
           plot_hist=True):
 
@@ -43,8 +44,8 @@ def train(dataset, model_name, learning_rate, weight_decay,
     # Normalization mean and std computed on training set for RGB pixel values
     print '\n > Computing mean and std for normalization...'
     # rgb_mean, rgb_std = compute_mean_std(train_path, n_classes)
-    #rgb_mean = np.asarray([136.802149374816, 89.027507875758, 60.95704395601])
-    #rgb_std = np.asarray([61.557424951802, 49.3161791144930, 38.3622394873712])
+    # rgb_mean = np.asarray([136.80214937481, 89.02750787575, 60.9570439560])
+    # rgb_std = np.asarray([61.55742495180, 49.316179114493, 38.362239487371])
     rgb_mean = None
     rgb_std = None
     print ('Mean: ' + str(rgb_mean))
@@ -106,7 +107,7 @@ def train(dataset, model_name, learning_rate, weight_decay,
                                rotation_range=0,  # Rnd rotation degrees 0-180
                                width_shift_range=0.0,  # Rnd horizontal shift
                                height_shift_range=0.0,  # Rnd vertical shift
-                               shear_range=0.4,  # 0.5,  # Shear in radians
+                               shear_range=0.,  # 0.5,  # Shear in radians
                                zoom_range=0.,  # Zoom
                                channel_shift_range=0.,  # Channel shifts
                                fill_mode='constant',  # Fill mode
@@ -121,11 +122,11 @@ def train(dataset, model_name, learning_rate, weight_decay,
                                )
     train_gen = dg_tr.flow_from_directory(train_path + 'images',
                                           batch_size=batch_size,
-                                          gt_directory=train_path + 'masks',
+                                          gt_directory=train_path + 'masks' + str(gtSet),
                                           target_size=crop_size,
                                           class_mode='seg_map',
                                           classes=n_classes,
-                                          #save_to_dir=savepath,  # Save DA
+                                          # save_to_dir=savepath,  # Save DA
                                           save_prefix='data_augmentation',
                                           save_format='png')
 
@@ -133,7 +134,7 @@ def train(dataset, model_name, learning_rate, weight_decay,
     dg_va = ImageDataGenerator(rgb_mean=rgb_mean, rgb_std=rgb_std)
     valid_gen = dg_va.flow_from_directory(valid_path + 'images',
                                           batch_size=1,
-                                          gt_directory=valid_path + 'masks',
+                                          gt_directory=valid_path + 'masks' + str(gtSet),
                                           target_size=None,
                                           class_mode='seg_map',
                                           classes=n_classes)
@@ -142,7 +143,7 @@ def train(dataset, model_name, learning_rate, weight_decay,
     dg_ts = ImageDataGenerator(rgb_mean=rgb_mean, rgb_std=rgb_std)
     test_gen = dg_ts.flow_from_directory(test_path + 'images',
                                          batch_size=1,
-                                         gt_directory=test_path + 'masks',
+                                         gt_directory=test_path + 'masks' + str(gtSet),
                                          target_size=None,
                                          class_mode='seg_map',
                                          classes=n_classes)
@@ -159,20 +160,75 @@ def train(dataset, model_name, learning_rate, weight_decay,
                                                    'val_jaccard_perclass'])
 
     # Define early stopping callback
-    early_stopping = EarlyStopping(monitor='val_jaccard', mode='max',
-                                   patience=max_patience, verbose=0)
+    early_stopping_jaccard = EarlyStopping(monitor='val_jaccard', mode='max',
+                                           patience=max_patience, verbose=0)
+    early_stopping_jaccard_0 = EarlyStopping(monitor='0_val_jacc_percl',
+                                             mode='max', patience=max_patience,
+                                             verbose=0)
+    early_stopping_jaccard_1 = EarlyStopping(monitor='1_val_jacc_percl',
+                                             mode='max', patience=max_patience,
+                                             verbose=0)
+    early_stopping_jaccard_2 = EarlyStopping(monitor='2_val_jacc_percl',
+                                             mode='max', patience=max_patience,
+                                             verbose=0)
+    early_stopping_jaccard_3 = EarlyStopping(monitor='3_val_jacc_percl',
+                                             mode='max', patience=max_patience,
+                                             verbose=0)
+    early_stopping_jaccard_4 = EarlyStopping(monitor='4_val_jacc_percl',
+                                             mode='max', patience=max_patience,
+                                             verbose=0)
 
     # Define model saving callback
-    checkpointer = ModelCheckpoint(filepath=savepath+"weights.hdf5", verbose=0,
-                                   monitor='val_jaccard', mode='max',
-                                   save_best_only=True, save_weights_only=True)
+    checkpointer_jaccard = ModelCheckpoint(filepath=savepath+"weights.hdf5",
+                                           verbose=0, monitor='val_jaccard',
+                                           mode='max', save_best_only=True,
+                                           save_weights_only=True)
+    checkpointer_jaccard_0 = ModelCheckpoint(filepath=savepath+"weights0.hdf5",
+                                             verbose=0,
+                                             monitor='0_val_jacc_percl',
+                                             mode='max', save_best_only=True,
+                                             save_weights_only=True)
+    checkpointer_jaccard_1 = ModelCheckpoint(filepath=savepath+"weights1.hdf5",
+                                             verbose=0,
+                                             monitor='1_val_jacc_percl',
+                                             mode='max', save_best_only=True,
+                                             save_weights_only=True)
+    checkpointer_jaccard_2 = ModelCheckpoint(filepath=savepath+"weights2.hdf5",
+                                             verbose=0,
+                                             monitor='2_val_jacc_percl',
+                                             mode='max', save_best_only=True,
+                                             save_weights_only=True)
+    checkpointer_jaccard_3 = ModelCheckpoint(filepath=savepath+"weights3.hdf5",
+                                             verbose=0,
+                                             monitor='3_val_jacc_percl',
+                                             mode='max', save_best_only=True,
+                                             save_weights_only=True)
+    checkpointer_jaccard_4 = ModelCheckpoint(filepath=savepath+"weights4.hdf5",
+                                             verbose=0,
+                                             monitor='4_val_jacc_percl',
+                                             mode='max', save_best_only=True,
+                                             save_weights_only=True)
 
     # Train the model
     print('\n > Training the model...')
+    if n_classes == 5:
+        cb = [evaluate_model, early_stopping_jaccard, checkpointer_jaccard, checkpointer_jaccard_0,
+              checkpointer_jaccard_1, checkpointer_jaccard_2, checkpointer_jaccard_3, checkpointer_jaccard_4]
+    elif n_classes == 4:
+        cb = [evaluate_model, early_stopping_jaccard, checkpointer_jaccard, checkpointer_jaccard_0,
+              checkpointer_jaccard_1, checkpointer_jaccard_2, checkpointer_jaccard_3]
+    elif n_classes == 3:
+        cb = [evaluate_model, early_stopping_jaccard, checkpointer_jaccard, checkpointer_jaccard_0,
+              checkpointer_jaccard_1, checkpointer_jaccard_2]
+    elif n_classes == 2:
+        cb = [evaluate_model, early_stopping_jaccard, checkpointer_jaccard, checkpointer_jaccard_0,
+              checkpointer_jaccard_1]
+    else:
+        raise ValueError('Incorrect number of classes')
+
     hist = model.fit_generator(train_gen, samples_per_epoch=n_images_train,
-                               nb_epoch=num_epochs, callbacks=[evaluate_model,
-                                                               early_stopping,
-                                                               checkpointer])
+                               nb_epoch=num_epochs,
+                               callbacks=cb)
 
     # Compute test metrics
     print('\n > Testing the model...')
@@ -187,7 +243,8 @@ def train(dataset, model_name, learning_rate, weight_decay,
                                    void_label=void_class[0],
                                    out_images_folder=savepath,
                                    epoch=0,
-                                   save_all_images=True)
+                                   save_all_images=True,
+                                   useCRF=False)
 
     for k in sorted(test_metrics.keys()):
         print('{}: {}'.format(k, test_metrics[k]))
@@ -222,7 +279,7 @@ def main():
     args = parser.parse_args()
 
     # Experiment name
-    experiment_name = "DataAugmShear04"    
+    experiment_name = "noDAnewGT5"  #### Pay attention ####
 
     # Define paths according to user
     usr = getuser()
@@ -234,8 +291,8 @@ def main():
         valid_path = dataset_path + 'valid/'
         test_path = dataset_path + 'test/'
     elif usr == 'vazquezd' or usr == 'romerosa':
-        shared_dataset_path = '/data/lisa/exp/vazquezd/datasets/polyps_split2/CVC-912/'
-        dataset_path = '/Tmp/'+usr+'/datasets/polyps_split2/CVC-912/'
+        shared_dataset_path = '/data/lisa/exp/vazquezd/datasets/polyps_split5/CVC-912/'
+        dataset_path = '/Tmp/'+usr+'/datasets/polyps_split5/CVC-912/'
         # Copy the data to the local path if not existing
         if not os.path.exists(dataset_path):
             print('The local path {} does not exist. Copying '
@@ -271,9 +328,11 @@ def main():
           savepath=savepath,
           show_model=False,
           train_path=train_path, valid_path=valid_path, test_path=test_path,
-          crop_size=(224, 224), in_shape=(3, None, None), n_classes=5,
+          crop_size=(288, 384), in_shape=(3, None, None),
+          n_classes=3,  #### Pay attention ####
+          gtSet=5,  #### Pay attention ####
           weights_file=savepath+args.model_file if bool(args.load_pretrained) else False,
-          void_class=[4])
+          void_class=[2])  #### Pay attention ####
     print ' ---> Experiment: ' + experiment_name + ' <---'
 
 # Entry point of the script

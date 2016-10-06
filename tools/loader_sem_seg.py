@@ -413,6 +413,25 @@ class ImageDataGenerator(object):
             # print ('Crop_size: ' + str(self.crop_size))
             h, w = x.shape[img_row_index], x.shape[img_col_index]
 
+            # Padd image if it is smaller than the crop size
+            if h < crop[0]:
+                total_pad = crop[0] - h
+                pad_h1 = total_pad/2
+                pad_h2 = total_pad-pad_h1
+            if w < crop[1]:
+                total_pad = crop[1] - w
+                pad_w1 = total_pad/2
+                pad_w2 = total_pad - pad_w1
+            if h < crop[0] or w < crop[1]:
+                x = np.lib.pad(x, ((0, 0), (pad_h1, pad_h2), (pad_w1, pad_w2)),
+                               'constant')
+                y = np.lib.pad(y, ((0, 0), (pad_h1, pad_h2), (pad_w1, pad_w2)),
+                               'constant', constant_values=self.void_label)
+                h, w = x.shape[img_row_index], x.shape[img_col_index]
+                # print ('New size X: ' + str(x.shape))
+                # print ('New size Y: ' + str(y.shape))
+                # exit()
+
             if crop[0] < h:
                 top = np.random.randint(h - crop[0])
             else:

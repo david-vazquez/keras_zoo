@@ -114,25 +114,25 @@ def inference(dataset, layer_name=None, learn_step=0.005, num_iter=5, Bilateral=
         img = (255 * img).astype('uint8')
         img2 = np.zeros(img.shape).astype('uint8')
         img2 = img2 + img
-        # set unary potentials (neg log probability)
+        # set unary potentials (neg log probability).
         U = unary_from_softmax(sm)
         d.setUnaryEnergy(U)
         # This adds the color-independent term, features are the
         # locations only. Smoothness kernel.
         # sxy: gaussian x, y std
-        # compat: ways to weight contributions, a number for potts compatibility, 
+        # compat: ways to weight contributions, a number for potts compatibility,
         #     vector for diagonal compatibility, an array for matrix compatibility
         # kernel: kernel used, CONST_KERNEL, FULL_KERNEL, DIAG_KERNEL
         # normalization: NORMALIZE_AFTER, NORMALIZE_BEFORE,
         #     NO_NORMALIZAITION, NORMALIZE_SYMMETRIC
         d.addPairwiseGaussian(sxy=(3, 3), compat=3, kernel=dcrf.DIAG_KERNEL,
                               normalization=dcrf.NORMALIZE_SYMMETRIC)
-        # Appearance kernel. This adds the color-dependent term, i.e. features 
+        # Appearance kernel. This adds the color-dependent term, i.e. features
         # are (x,y,r,g,b).
         # im is an image-array, e.g. im.dtype == np.uint8 and im.shape == (640,480,3)
         # to set sxy and srgb perform grid search on validation set
         if Bilateral:
-            d.addPairwiseBilateral(sxy=(3, 3), srgb=(13, 13, 13), 
+            d.addPairwiseBilateral(sxy=(3, 3), srgb=(13, 13, 13),
                                    rgbim=img2, compat=10, kernel=dcrf.DIAG_KERNEL,
                                    normalization=dcrf.NORMALIZE_SYMMETRIC)
         Q = d.inference(num_iter)

@@ -72,6 +72,36 @@ def save_img3(image_batch, mask_batch, output, out_images_folder, epoch,
     return images
 
 
+# Save 4 images (Image, mask and result)
+def save_img4(image_batch, mask_batch, output, output2, out_images_folder,
+              epoch, color_map, tag, void_label):
+    output[(mask_batch == void_label).nonzero()] = void_label
+    images = []
+    for j in xrange(output.shape[0]):
+        img = image_batch[j].transpose((1, 2, 0))
+        img = norm_01(img, mask_batch[j], void_label)
+
+        label_out = my_label2rgb(output[j], bglabel=void_label,
+                                 colors=color_map)
+
+        label_out2 = my_label2rgb(output2[j], bglabel=void_label,
+                                  colors=color_map)
+
+        label_mask = my_label2rgboverlay(mask_batch[j], colors=color_map,
+                                         image=img, bglabel=void_label,
+                                         alpha=0.2)
+        label_overlay = my_label2rgboverlay(output[j], colors=color_map,
+                                            image=img, bglabel=void_label,
+                                            alpha=0.5)
+
+        combined_image = np.concatenate((img, label_mask, label_out, label_out2,
+                                         label_overlay), axis=1)
+        out_name = out_images_folder + tag + '_epoch' + str(epoch) + '_img' + str(j) + '.png'
+        scipy.misc.toimage(combined_image).save(out_name)
+        images.append(combined_image)
+    return images
+
+
 # Save 2 images (Image and mask)
 def save_img2(img, mask, fname, color_map, void_label):
     img = img.transpose((1, 2, 0))
