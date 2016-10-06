@@ -43,13 +43,26 @@ def train(dataset, model_name, learning_rate, weight_decay,
 
     # Normalization mean and std computed on training set for RGB pixel values
     print '\n > Computing mean and std for normalization...'
-    # rgb_mean, rgb_std = compute_mean_std(train_path, n_classes)
-    # rgb_mean = np.asarray([136.80214937481, 89.02750787575, 60.9570439560])
-    # rgb_std = np.asarray([61.55742495180, 49.316179114493, 38.362239487371])
-    rgb_mean = None
-    rgb_std = None
+    if False:
+        rgb_mean, rgb_std = compute_mean_std(train_path, n_classes)
+        # rgb_mean = np.asarray([136.80214937481, 89.02750787575, 60.9570439560])
+        # rgb_std = np.asarray([61.55742495180, 49.316179114493, 38.362239487371])
+    else:
+        rgb_mean = None
+        rgb_std = None
     print ('Mean: ' + str(rgb_mean))
     print ('Std: ' + str(rgb_std))
+
+    # Compute class balance weights
+    if True:
+        class_balance_weights = compute_class_balance(masks_path=train_path + 'masks' + str(gtSet),
+                                                      n_classes=n_classes,
+                                                      method='median_freq_cost',
+                                                      void_labels=void_class
+                                                      )
+    else:
+        class_balance_weights = None
+    print ('Class balance weights: ' + str(class_balance_weights))
 
     # Build model
     print '\n > Building model (' + model_name + ')...'
@@ -86,7 +99,8 @@ def train(dataset, model_name, learning_rate, weight_decay,
 
     # Compile model
     print '\n > Compiling model...'
-    model.compile(loss=cce_flatt(void_class), optimizer=opt)
+    model.compile(loss=cce_flatt(void_class, class_balance_weights),
+                  optimizer=opt)
 
     # Show model structure
     if show_model:
@@ -160,6 +174,7 @@ def train(dataset, model_name, learning_rate, weight_decay,
                                                    'val_jaccard_perclass'])
 
     # Define early stopping callback
+    # TODO: Make a for
     early_stopping_jaccard = EarlyStopping(monitor='val_jaccard', mode='max',
                                            patience=max_patience, verbose=0)
     early_stopping_jaccard_0 = EarlyStopping(monitor='0_val_jacc_percl',
@@ -179,6 +194,7 @@ def train(dataset, model_name, learning_rate, weight_decay,
                                              verbose=0)
 
     # Define model saving callback
+    # TODO: Make a for
     checkpointer_jaccard = ModelCheckpoint(filepath=savepath+"weights.hdf5",
                                            verbose=0, monitor='val_jaccard',
                                            mode='max', save_best_only=True,
@@ -211,6 +227,7 @@ def train(dataset, model_name, learning_rate, weight_decay,
 
     # Train the model
     print('\n > Training the model...')
+    # TODO: Make a for
     if n_classes == 5:
         cb = [evaluate_model, early_stopping_jaccard, checkpointer_jaccard, checkpointer_jaccard_0,
               checkpointer_jaccard_1, checkpointer_jaccard_2, checkpointer_jaccard_3, checkpointer_jaccard_4]
@@ -279,7 +296,7 @@ def main():
     args = parser.parse_args()
 
     # Experiment name
-    experiment_name = "noDAnewGT5"  #### Pay attention ####
+    experiment_name = "tmpWeightBalance"  #### Pay attention ####
 
     # Define paths according to user
     usr = getuser()

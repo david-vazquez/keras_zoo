@@ -23,7 +23,8 @@ def compute_class_balance(masks_path, n_classes=4, method='median_freq_cost', vo
     # Process each file
     for name in file_names:
         # Load image and mask
-        mask = io.imread(masks_path + name[:-4] + '.tif')
+        file_name = os.path.join(masks_path, name[:-4] + '.tif')
+        mask = io.imread(file_name)
         mask = mask.astype('int32')
 
         # Count elements
