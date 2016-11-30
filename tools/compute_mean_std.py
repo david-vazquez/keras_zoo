@@ -16,26 +16,27 @@ from mpl_toolkits.mplot3d import Axes3D
 
 
 # Main function
-def compute(dataset_path, n_classes=4, method='mean', pre_computed_mean=None,
+def compute(images_path, masks_path, n_classes, method='mean', pre_computed_mean=None,
             pre_computed_std=None):
-    # Get paths
-    images_path = dataset_path + 'images/'
-    masks_path = dataset_path + 'masks/'
 
     # Get testing files
     file_names = os.listdir(images_path)
 
     total_sum = 0
     total_n = 0
+    # min_mask = 999
+    # max_mask = 0
     # Process each file
     for name in file_names:
         # Load image and mask
-        x = io.imread(images_path + name)
-        y = io.imread(masks_path + name[:-4] + '.tif')
+        x = io.imread(os.path.join(images_path, name))
+        y = io.imread(os.path.join(masks_path, name[:-4] + '.tif'))
 
         # Reshape as vectors
         x = x.reshape((x.shape[0]*x.shape[1], x.shape[2]))
         y = y.reshape((y.shape[0]*y.shape[1], 1))
+        # min_mask = min (min_mask, np.min(y))
+        # max_mask = max (max_mask, np.max(y))
 
         # Substract mean
         if method == 'var':
@@ -87,6 +88,8 @@ def compute(dataset_path, n_classes=4, method='mean', pre_computed_mean=None,
         # print ('N         : ' + str(n))
         # print ('Total Sum : ' + str(total_sum))
         # print ('Total N   : ' + str(total_n))
+    # print ('Min mask   : ' + str(min_mask))
+    # print ('Max mask   : ' + str(max_mask))
 
     if method != 'plot':
         result = total_sum/total_n
@@ -94,19 +97,19 @@ def compute(dataset_path, n_classes=4, method='mean', pre_computed_mean=None,
 
 
 # Compute mean and std
-def compute_mean_std(dataset_path, n_classes=4):
-    mean = compute(dataset_path, n_classes=4, method='mean',
+def compute_mean_std(images_path, masks_path, n_classes):
+    mean = compute(images_path, masks_path, n_classes, method='mean',
                    pre_computed_mean=None)
-    var = compute(dataset_path, n_classes=4, method='var',
+    var = compute(images_path, masks_path, n_classes, method='var',
                   pre_computed_mean=mean)
     std = np.sqrt(var)
     return mean, std
 
 
 # Main function
-def main(dataset_path, n_classes=4):
+def main(images_path, masks_path, n_classes):
     # Compute mean and std
-    mean, std = compute_mean_std(dataset_path, n_classes=4)
+    mean, std = compute_mean_std(images_path, masks_path, n_classes)
     print ('Mean   : ' + str(mean))
     print ('Std   : ' + str(std))
 
@@ -123,4 +126,6 @@ def main(dataset_path, n_classes=4):
 
 # Entry point of the script
 if __name__ == '__main__':
-    main(dataset_path='/data/lisa/exp/vazquezd/datasets/polyps_split2/CVC-912/train/')
+    main('/data/lisa/exp/vazquezd/datasets/polyps_split5/CVC-912/train/images/',
+         '/data/lisa/exp/vazquezd/datasets/polyps_split5/CVC-912/train/masks2/',
+         2)

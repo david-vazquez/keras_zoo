@@ -289,7 +289,16 @@ class Evaluate_model(Callback):
         self.test_metrics = test_metrics
 
         # Create the colormaping for showing labels
-        self.color_map = sns.hls_palette(n_classes+1)
+        #self.color_map = sns.hls_palette(n_classes+1)
+        self.color_map = [
+            (255/255., 0, 0),                   # Background
+            (192/255., 192/255., 128/255.),     # Polyp
+            (128/255., 64/255., 128/255.),      # Lumen
+            (0, 0, 255/255.),                   # Specularity
+            (0, 255/255., 0),         #
+            (192/255., 128/255., 128/255.),     #
+            (64/255., 64/255., 128/255.),       #
+        ]
         self.last_epoch = 0
         if 'val_jaccard_perclass' in self.valid_metrics:
             self.valid_metrics.remove('val_jaccard_perclass')
