@@ -99,11 +99,13 @@ def main(dataset_path, dataset_path2, new_dataset_path, n_classes=4):
         # Get input image and mask names
         img_name = images_path + name
         if dataset == 'CVC-300':
-            mask_name_3 = masks_path2_cvc300 + 'labelled4/' + str(file_int) + '.tif'
-            mask_name_4 = masks_path2_cvc300 + 'labelled3/' + str(file_int) + '.tif'
+            mask_name_2 = masks_path2_cvc300 + 'labelled2classes/' + str(file_int) + '.tif'
+            mask_name_3 = masks_path2_cvc300 + 'labelled3classes/' + str(file_int) + '.tif'
+            mask_name_4 = masks_path2_cvc300 + 'labelled4classes/' + str(file_int) + '.tif'
         else:
-            mask_name_3 = masks_path2_cvc612 + 'labelled4/' + str(file_int) + '.tif'
-            mask_name_4 = masks_path2_cvc612 + 'labelled3/' + str(file_int) + '.tif'
+            mask_name_2 = masks_path2_cvc612 + 'labelled2classes/' + str(file_int) + '.tif'
+            mask_name_3 = masks_path2_cvc612 + 'labelled3classes/' + str(file_int) + '.tif'
+            mask_name_4 = masks_path2_cvc612 + 'labelled4classes/' + str(file_int) + '.tif'
         # print ('Image name: ' + str(img_name))
         # print ('Mask name 3: ' + str(mask_name_3))
         # print ('Mask name 4: ' + str(mask_name_4))
@@ -114,21 +116,14 @@ def main(dataset_path, dataset_path2, new_dataset_path, n_classes=4):
         # 4 Classes
         mask_4 = io.imread(mask_name_4)
         mask_4 = mask_4.astype('int32')
-        # Change order of specularity and lumen
-        mask_4[mask_4 == 2] = 100
-        mask_4[mask_4 == 3] = 2
-        mask_4[mask_4 == 100] = 3
 
         # 3 Classes
         mask_3 = io.imread(mask_name_3)
         mask_3 = mask_3.astype('int32')
-        # Remove the hole of the specularity class
-        mask_3[mask_3 > 1] = mask_3[mask_3 > 1] - 1
 
         # 2 Classes
-        mask_2 = mask_3.copy()
-        mask_2[mask_2==2] = 0  # Change lumen to background
-        mask_2[mask_2==3] = 2  # Set the new void class
+        mask_2 = io.imread(mask_name_2)
+        mask_2 = mask_2.astype('int32')
 
         unique_2 = np.unique(mask_2)
         unique_3 = np.unique(mask_3)
@@ -142,33 +137,29 @@ def main(dataset_path, dataset_path2, new_dataset_path, n_classes=4):
         # print ('Mask 2 unique final: ' + str(unique_mask_2))
         # print ('Mask 3 unique final: ' + str(unique_mask_3))
         # print ('Mask 4 unique final: ' + str(unique_mask_4))
-        # print ('Image shape: ' + str(image.shape))
-        # print ('Mask shape: ' + str(mask.shape))
-        # exit()
 
         # Get input image and mask names
-        out_img_name = new_images_path + file_raw + '.png'
-        out_mask_name_2 = new_masks_path + '2/' + file_raw + '.png'
-        out_mask_name_3 = new_masks_path + '3/' + file_raw + '.png'
-        out_mask_name_4 = new_masks_path + '4/' + file_raw + '.png'
+        out_img_name = new_images_path + file_raw + '.bmp'
+        out_mask_name_2 = new_masks_path + '2/' + file_raw + '.tif'
+        out_mask_name_3 = new_masks_path + '3/' + file_raw + '.tif'
+        out_mask_name_4 = new_masks_path + '4/' + file_raw + '.tif'
         # print ('Out Image name: ' + str(out_img_name))
         # print ('Out Mask name 2: ' + str(out_mask_name_2))
         # print ('Out Mask name 3: ' + str(out_mask_name_3))
         # print ('Out Mask name 4: ' + str(out_mask_name_4))
-        # exit()
+
+        # Copy the files
+        shutil.copy(img_name, out_img_name)
+        shutil.copy(mask_name_2, out_mask_name_2)
+        shutil.copy(mask_name_3, out_mask_name_3)
+        shutil.copy(mask_name_4, out_mask_name_4)
 
         # Copy the files
         # shutil.copy(img_name, out_img_name)
-        # shutil.copy(mask_name_2, out_mask_name_2)
-        # shutil.copy(mask_name_3, out_mask_name_3)
-        # shutil.copy(mask_name_4, out_mask_name_4)
-
-        # Copy the files
-        # shutil.copy(img_name, out_img_name)
-        io.imsave(out_img_name, image)
-        io.imsave(out_mask_name_2, mask_2)
-        io.imsave(out_mask_name_3, mask_3)
-        io.imsave(out_mask_name_4, mask_4)
+        # io.imsave(out_img_name, image)
+        # io.imsave(out_mask_name_2, mask_2)
+        # io.imsave(out_mask_name_3, mask_3)
+        # io.imsave(out_mask_name_4, mask_4)
         # exit()
 
         # # Show result
@@ -190,9 +181,7 @@ def main(dataset_path, dataset_path2, new_dataset_path, n_classes=4):
         # save_img(image, mask_2, out_res_2, color_map, 2)
         # save_img(image, mask_3, out_res_3, color_map, 3)
         # save_img(image, mask_4, out_res_4, color_map, 4)
-
-        # Exit
-        # exit()
+        # # exit()
 
 
 # Entry point of the script
@@ -200,9 +189,9 @@ if __name__ == '__main__':
 
     # Create the folders
     print ('> Creating output folders...')
-    out_path = '/data/lisa/exp/vazquezd/datasets/polyps_split6/'
+    out_path = '/data/lisa/exp/vazquezd/datasets/polyps_split7/'
     path1 = '/data/lisa/exp/vazquezd/datasets/polyps_split2/CVC-912/'
-    path2 = '/data/lisa/exp/vazquezd/datasets/polyps_NewGT2/'
+    path2 = '/data/lisa/exp/vazquezd/datasets/polyps_NewGT4/'
     path_train, path_train_images, path_train_gt = create_paths(out_path, "train")
     path_valid, path_valid_images, path_valid_gt = create_paths(out_path, "valid")
     path_test, path_test_images, path_test_gt = create_paths(out_path, "test")

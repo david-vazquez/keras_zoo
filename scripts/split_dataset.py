@@ -179,9 +179,9 @@ def split_dataset(in_path='/Tmp/vazquezd/datasets/polyps/CVC-300/',
     print ('> Creating random split...')
     train_filenames, valid_filenames, test_filenames = find_best_split(n, data, split_type=split_type,
                                                                        split_prob=split_prob)
-    # print (' > Images train: \n' + str(train_filenames))
-    # print (' > Images valid: \n' + str(valid_filenames))
-    # print (' > Images test:  \n' + str(test_filenames))
+    print (' > Images train: \n' + str(train_filenames))
+    print (' > Images valid: \n' + str(valid_filenames))
+    print (' > Images test:  \n' + str(test_filenames))
 
     # Create the folders
     print ('> Creating output folders...')
@@ -192,15 +192,15 @@ def split_dataset(in_path='/Tmp/vazquezd/datasets/polyps/CVC-300/',
     path_test, path_test_images, path_test_gt = create_paths(out_path, "test")
 
     # Copy images in the folders
-    print ('> Copying the files...')
-    copy_files_change_void(train_filenames, image_path, mask_path,
-               path_train_images, path_train_gt, prefix)
-    copy_files_change_void(valid_filenames, image_path, mask_path,
-               path_valid_images, path_valid_gt, prefix)
-    copy_files_change_void(test_filenames, image_path, mask_path,
-               path_test_images, path_test_gt, prefix)
+    #print ('> Copying the files...')
+    #copy_files_change_void(train_filenames, image_path, mask_path,
+    #           path_train_images, path_train_gt, prefix)
+    #copy_files_change_void(valid_filenames, image_path, mask_path,
+    #           path_valid_images, path_valid_gt, prefix)
+    #copy_files_change_void(test_filenames, image_path, mask_path,
+    #           path_test_images, path_test_gt, prefix)
 
-    print ('> Done!')
+    #print ('> Done!')
 
 
 # Entry point of the script
@@ -209,10 +209,10 @@ if __name__ == '__main__':
     # Pareameters
     in_datasets_path = '/data/lisa/exp/vazquezd/datasets/polyps/'
     #in_datasets_path = '/Tmp/vazquezd/datasets/polyps/'
-    out_datasets_path = '/data/lisa/exp/vazquezd/datasets/polyps_split2/'
+    out_datasets_path = '/data/lisa/exp/vazquezd/datasets/tmpPolyps_split2/'
     #out_datasets_path = '/Tmp/vazquezd/datasets/polyps_split2/'
     split_prob = (0.6, 0.2, 0.2)  # (training, validation, test)
-    split_type = 'patience'  # [frames | sequences | patience]
+    split_type = 'sequences'  # [frames | sequences | patience]
 
     # Split the datasets
     print('\n\n ---> Spliting CVC-300 <---')

@@ -1,11 +1,17 @@
+#!/usr/bin/env python
 # Import python libraries
 import argparse
 import os
 import sys
+from distutils.dir_util import copy_tree
+import imp
 import seaborn as sns
 from getpass import getuser
 import shutil
 import numpy as np
+import pickle
+import time
+# import signal
 
 # Import keras libraries
 from keras.callbacks import EarlyStopping, ModelCheckpoint
@@ -25,16 +31,61 @@ from tools.compute_class_balance import compute_class_balance
 sys.setrecursionlimit(99999)
 
 
+# class GracefulDeath(object):
+#     """Catch signals to allow graceful shutdown."""
+#
+#     def __init__(self, save_path, final_save_path):
+#         self.save_path = save_path
+#         self.final_save_path = final_save_path
+#         self.receivedSignal = self.receivedTermSignal = False
+#         catchSignals = [
+#             1,
+#             2,
+#             3,
+#             10,
+#             12,
+#             15,
+#         ]
+#         for signum in catchSignals:
+#             signal.signal(signum, self.handler)
+#
+#     def handler(self, signum, frame):
+#         self.lastSignal = signum
+#         self.receivedSignal = True
+#         if signum in [2, 3, 15]:
+#             self.receivedTermSignal = True
+#         # Copy and exit at anywhere you are
+#         copy_to_final(self)
+#         sys.exit(-1)
+#
+#     def copy_to_final(self):
+#         print ('Killed!')
+#         print('Copying model and other training files to {}'.format(self.final_savepath))
+#         start = time.time()
+#         copy_tree(self.savepath, self.final_savepath)
+#         open(os.path.join(self.final_savepath, 'lock'), 'w').close()
+#         print ('Copy time: ' + str(time.time()-start))
+#
+#
+# killer = GracefulDeath()
+
 # Train the network
 def train(dataset, model_name, learning_rate, weight_decay,
           num_epochs, max_patience, batch_size, optimizer,
           savepath, train_path, valid_path, test_path,
-          crop_size=(224, 224), in_shape=(3, None, None), n_classes=5, gtSet=1,
-          weights_file=False, void_class=[4], show_model=False,
-          plot_hist=True):
+          crop_size=(224, 224), in_shape=(3, None, None),
+          n_classes=5, gtSet=None, void_class=[4], w_balance=None,
+          weights_file=False, show_model=False,
+          plot_hist=True, train_model=True):
 
     # Remove void classes from number of classes
     n_classes = n_classes - len(void_class)
+
+    # Mask folder (For different polyp groundtruths)
+    if gtSet is not None:
+        mask_floder = 'masks' + str(gtSet)
+    else:
+        mask_floder = 'masks'
 
     # TODO: Get the number of images directly from data loader
     n_images_train = 547  # 547
@@ -44,25 +95,29 @@ def train(dataset, model_name, learning_rate, weight_decay,
     # Normalization mean and std computed on training set for RGB pixel values
     print '\n > Computing mean and std for normalization...'
     if False:
-        rgb_mean, rgb_std = compute_mean_std(train_path, n_classes)
+        rgb_mean, rgb_std = compute_mean_std(os.path.join(train_path, 'images'),
+                                             os.path.join(train_path, mask_floder),
+                                             n_classes)
+        rescale = None
         # rgb_mean = np.asarray([136.80214937481, 89.02750787575, 60.9570439560])
         # rgb_std = np.asarray([61.55742495180, 49.316179114493, 38.362239487371])
     else:
         rgb_mean = None
         rgb_std = None
+        rescale = 1/255.
     print ('Mean: ' + str(rgb_mean))
     print ('Std: ' + str(rgb_std))
 
     # Compute class balance weights
-    if True:
-        class_balance_weights = compute_class_balance(masks_path=train_path + 'masks' + str(gtSet),
+    if w_balance is not None:
+        class_balance_weights = compute_class_balance(masks_path=train_path + mask_floder,
                                                       n_classes=n_classes,
-                                                      method='median_freq_cost',
+                                                      method=w_balance,
                                                       void_labels=void_class
                                                       )
+        print ('Class balance weights: ' + str(class_balance_weights))
     else:
         class_balance_weights = None
-    print ('Class balance weights: ' + str(class_balance_weights))
 
     # Build model
     print '\n > Building model (' + model_name + ')...'
@@ -118,25 +173,25 @@ def train(dataset, model_name, learning_rate, weight_decay,
                                rgb_std=rgb_std,
                                gcn=False,  # Global contrast normalization
                                zca_whitening=False,  # Apply ZCA whitening
-                               rotation_range=0,  # Rnd rotation degrees 0-180
+                               rotation_range=180,  # Rnd rotation degrees 0-180
                                width_shift_range=0.0,  # Rnd horizontal shift
                                height_shift_range=0.0,  # Rnd vertical shift
-                               shear_range=0.,  # 0.5,  # Shear in radians
-                               zoom_range=0.,  # Zoom
+                               shear_range=0.5,  # 0.5,  # Shear in radians
+                               zoom_range=0.1,  # Zoom
                                channel_shift_range=0.,  # Channel shifts
                                fill_mode='constant',  # Fill mode
                                cval=0.,  # Void image value
                                void_label=void_class[0],  # Void class value
-                               horizontal_flip=False,  # Rnd horizontal flip
-                               vertical_flip=False,  # Rnd vertical flip
-                               rescale=None,  # Rescaling factor
+                               horizontal_flip=True,  # Rnd horizontal flip
+                               vertical_flip=True,  # Rnd vertical flip
+                               rescale=rescale,  # Rescaling factor
                                spline_warp=False,  # Enable elastic deformation
                                warp_sigma=10,  # Elastic deformation sigma
                                warp_grid_size=3  # Elastic deformation gridSize
                                )
     train_gen = dg_tr.flow_from_directory(train_path + 'images',
                                           batch_size=batch_size,
-                                          gt_directory=train_path + 'masks' + str(gtSet),
+                                          gt_directory=train_path + mask_floder,
                                           target_size=crop_size,
                                           class_mode='seg_map',
                                           classes=n_classes,
@@ -145,112 +200,78 @@ def train(dataset, model_name, learning_rate, weight_decay,
                                           save_format='png')
 
     print ('\n > Reading validation set...')
-    dg_va = ImageDataGenerator(rgb_mean=rgb_mean, rgb_std=rgb_std)
+    dg_va = ImageDataGenerator(rgb_mean=rgb_mean, rgb_std=rgb_std, rescale=rescale)
     valid_gen = dg_va.flow_from_directory(valid_path + 'images',
                                           batch_size=1,
-                                          gt_directory=valid_path + 'masks' + str(gtSet),
+                                          gt_directory=valid_path + mask_floder,
                                           target_size=None,
                                           class_mode='seg_map',
                                           classes=n_classes)
 
     print ('\n > Reading testing set...')
-    dg_ts = ImageDataGenerator(rgb_mean=rgb_mean, rgb_std=rgb_std)
+    dg_ts = ImageDataGenerator(rgb_mean=rgb_mean, rgb_std=rgb_std, rescale=rescale)
     test_gen = dg_ts.flow_from_directory(test_path + 'images',
                                          batch_size=1,
-                                         gt_directory=test_path + 'masks' + str(gtSet),
+                                         gt_directory=test_path + mask_floder,
                                          target_size=None,
                                          class_mode='seg_map',
-                                         classes=n_classes)
+                                         classes=n_classes,
+                                         shuffle=False)
 
     # Define the jaccard validation callback
-    evaluate_model = Evaluate_model(n_classes=n_classes,
-                                    void_label=void_class[0],
-                                    save_path=savepath,
-                                    valid_gen=valid_gen,
-                                    valid_epoch_length=n_images_val,
-                                    valid_metrics=['val_loss',
-                                                   'val_jaccard',
-                                                   'val_acc',
-                                                   'val_jaccard_perclass'])
+    eval_model = Evaluate_model(n_classes=n_classes,
+                                void_label=void_class[0],
+                                save_path=savepath,
+                                valid_gen=valid_gen,
+                                valid_epoch_length=n_images_val,
+                                valid_metrics=['val_loss',
+                                               'val_jaccard',
+                                               'val_acc',
+                                               'val_jaccard_perclass'])
 
-    # Define early stopping callback
-    # TODO: Make a for
-    early_stopping_jaccard = EarlyStopping(monitor='val_jaccard', mode='max',
-                                           patience=max_patience, verbose=0)
-    early_stopping_jaccard_0 = EarlyStopping(monitor='0_val_jacc_percl',
-                                             mode='max', patience=max_patience,
-                                             verbose=0)
-    early_stopping_jaccard_1 = EarlyStopping(monitor='1_val_jacc_percl',
-                                             mode='max', patience=max_patience,
-                                             verbose=0)
-    early_stopping_jaccard_2 = EarlyStopping(monitor='2_val_jacc_percl',
-                                             mode='max', patience=max_patience,
-                                             verbose=0)
-    early_stopping_jaccard_3 = EarlyStopping(monitor='3_val_jacc_percl',
-                                             mode='max', patience=max_patience,
-                                             verbose=0)
-    early_stopping_jaccard_4 = EarlyStopping(monitor='4_val_jacc_percl',
-                                             mode='max', patience=max_patience,
-                                             verbose=0)
+    # Define early stopping callbacks
+    early_stop_jac = EarlyStopping(monitor='val_jaccard', mode='max',
+                                   patience=max_patience, verbose=0)
+    early_stop_jac_class = []
+    for i in range(n_classes):
+        early_stop_jac_class += [EarlyStopping(monitor=str(i)+'_val_jacc_percl',
+                                               mode='max', patience=max_patience,
+                                               verbose=0)]
 
-    # Define model saving callback
-    # TODO: Make a for
-    checkpointer_jaccard = ModelCheckpoint(filepath=savepath+"weights.hdf5",
-                                           verbose=0, monitor='val_jaccard',
-                                           mode='max', save_best_only=True,
-                                           save_weights_only=True)
-    checkpointer_jaccard_0 = ModelCheckpoint(filepath=savepath+"weights0.hdf5",
+    # Define model saving callbacks
+    checkp_jac = ModelCheckpoint(filepath=savepath+"weights.hdf5",
+                                 verbose=0, monitor='val_jaccard',
+                                 mode='max', save_best_only=True,
+                                 save_weights_only=True)
+    checkp_jac_class = []
+    for i in range(n_classes):
+        checkp_jac_class += [ModelCheckpoint(filepath=savepath+"weights"+str(i)+".hdf5",
                                              verbose=0,
-                                             monitor='0_val_jacc_percl',
+                                             monitor=str(i)+'_val_jacc_percl',
                                              mode='max', save_best_only=True,
-                                             save_weights_only=True)
-    checkpointer_jaccard_1 = ModelCheckpoint(filepath=savepath+"weights1.hdf5",
-                                             verbose=0,
-                                             monitor='1_val_jacc_percl',
-                                             mode='max', save_best_only=True,
-                                             save_weights_only=True)
-    checkpointer_jaccard_2 = ModelCheckpoint(filepath=savepath+"weights2.hdf5",
-                                             verbose=0,
-                                             monitor='2_val_jacc_percl',
-                                             mode='max', save_best_only=True,
-                                             save_weights_only=True)
-    checkpointer_jaccard_3 = ModelCheckpoint(filepath=savepath+"weights3.hdf5",
-                                             verbose=0,
-                                             monitor='3_val_jacc_percl',
-                                             mode='max', save_best_only=True,
-                                             save_weights_only=True)
-    checkpointer_jaccard_4 = ModelCheckpoint(filepath=savepath+"weights4.hdf5",
-                                             verbose=0,
-                                             monitor='4_val_jacc_percl',
-                                             mode='max', save_best_only=True,
-                                             save_weights_only=True)
+                                             save_weights_only=True)]
 
-    # Train the model
-    print('\n > Training the model...')
-    # TODO: Make a for
-    if n_classes == 5:
-        cb = [evaluate_model, early_stopping_jaccard, checkpointer_jaccard, checkpointer_jaccard_0,
-              checkpointer_jaccard_1, checkpointer_jaccard_2, checkpointer_jaccard_3, checkpointer_jaccard_4]
-    elif n_classes == 4:
-        cb = [evaluate_model, early_stopping_jaccard, checkpointer_jaccard, checkpointer_jaccard_0,
-              checkpointer_jaccard_1, checkpointer_jaccard_2, checkpointer_jaccard_3]
-    elif n_classes == 3:
-        cb = [evaluate_model, early_stopping_jaccard, checkpointer_jaccard, checkpointer_jaccard_0,
-              checkpointer_jaccard_1, checkpointer_jaccard_2]
-    elif n_classes == 2:
-        cb = [evaluate_model, early_stopping_jaccard, checkpointer_jaccard, checkpointer_jaccard_0,
-              checkpointer_jaccard_1]
-    else:
-        raise ValueError('Incorrect number of classes')
-
-    hist = model.fit_generator(train_gen, samples_per_epoch=n_images_train,
-                               nb_epoch=num_epochs,
-                               callbacks=cb)
+    # # Train the model
+    if (train_model):
+        print('\n > Training the model...')
+        cb = [eval_model, early_stop_jac, checkp_jac] + checkp_jac_class
+        hist = model.fit_generator(train_gen, samples_per_epoch=n_images_train,
+                                nb_epoch=num_epochs,
+                                callbacks=cb)
 
     # Compute test metrics
     print('\n > Testing the model...')
     model.load_weights(savepath + "weights.hdf5")
-    color_map = sns.hls_palette(n_classes+1)
+    # color_map = sns.hls_palette(n_classes+1)
+    color_map = [
+        (255/255., 0, 0),                   # Background
+        (192/255., 192/255., 128/255.),     # Polyp
+        (128/255., 64/255., 128/255.),      # Lumen
+        (0, 0, 255/255.),                   # Specularity
+        (0, 255/255., 0),         #
+        (192/255., 128/255., 128/255.),     #
+        (64/255., 64/255., 128/255.),       #
+    ]
     test_metrics = compute_metrics(model, test_gen, n_images_test, n_classes,
                                    metrics=['test_loss',
                                             'test_jaccard',
@@ -262,14 +283,25 @@ def train(dataset, model_name, learning_rate, weight_decay,
                                    epoch=0,
                                    save_all_images=True,
                                    useCRF=False)
-
     for k in sorted(test_metrics.keys()):
         print('{}: {}'.format(k, test_metrics[k]))
 
-    # Show the trained model history
-    if plot_hist:
-        print('\n > Show the trained model history...')
-        plot_history(hist, savepath)
+    if (train_model):
+        # Save the results
+        print ("\n > Saving history...")
+        with open(savepath + "history.pickle", 'w') as f:
+            pickle.dump([hist.history, test_metrics], f)
+
+        # Load the results
+        print ("\n > Loading history...")
+        with open(savepath + "history.pickle") as f:
+            history, test_metrics = pickle.load(f)
+            # print (str(test_metrics))
+
+        # Show the trained model history
+        if plot_hist:
+            print('\n > Show the trained model history...')
+            plot_history(history, savepath, n_classes)
 
 
 # Main function
@@ -282,21 +314,26 @@ def main():
                         help='Model file')
     parser.add_argument('-load_pretrained', default=False,
                         help='Load pretrained model from model file')
-    parser.add_argument('-learning_rate', default=0.001, help='Learning Rate')
+    parser.add_argument('-learning_rate', default=0.0001, help='Learning Rate')
     parser.add_argument('-weight_decay', default=0.,
                         help='regularization constant')
     parser.add_argument('--num_epochs', '-ne', type=int, default=1000,
                         help='Optional. Int to indicate the max'
                         'number of epochs.')
-    parser.add_argument('-max_patience', type=int, default=50,
+    parser.add_argument('-max_patience', type=int, default=100,
                         help='Max patience (early stopping)')
     parser.add_argument('-batch_size', type=int, default=10, help='Batch size')
     parser.add_argument('--optimizer', '-opt', default='rmsprop',
                         help='Optimizer')
     args = parser.parse_args()
 
+    # Parameters
+    nClasses = 3
+    w_balance = None  # 'median_freq_cost'
+    crop_size = (224, 224)  # (288, 384)
+
     # Experiment name
-    experiment_name = "tmpWeightBalance"  #### Pay attention ####
+    experiment_name = "GT4_DAComb_3cl_224x224_rescale_lr10-4_noCWB"
 
     # Define paths according to user
     usr = getuser()
@@ -308,8 +345,8 @@ def main():
         valid_path = dataset_path + 'valid/'
         test_path = dataset_path + 'test/'
     elif usr == 'vazquezd' or usr == 'romerosa':
-        shared_dataset_path = '/data/lisa/exp/vazquezd/datasets/polyps_split5/CVC-912/'
-        dataset_path = '/Tmp/'+usr+'/datasets/polyps_split5/CVC-912/'
+        shared_dataset_path = '/data/lisa/exp/vazquezd/datasets/polyps_split7/'
+        dataset_path = '/Tmp/'+usr+'/datasets/polyps_split7/'
         # Copy the data to the local path if not existing
         if not os.path.exists(dataset_path):
             print('The local path {} does not exist. Copying '
@@ -317,7 +354,8 @@ def main():
             shutil.copytree(shared_dataset_path, dataset_path)
             print('Done.')
 
-        savepath = '/Tmp/'+usr+'/results/deepPolyp/fcn8/'+experiment_name+'/'
+        savepath = '/Tmp/'+usr+'/results/deepPolyp/fcn8/paper/'+experiment_name+'/'
+        final_savepath = '/data/lisatmp4/' + usr + '/results/deepPolyp/fcn8/' + experiment_name + '/'
         train_path = dataset_path + 'train/'
         valid_path = dataset_path + 'valid/'
         test_path = dataset_path + 'test/'
@@ -360,12 +398,23 @@ def main():
           savepath=savepath,
           show_model=False,
           train_path=train_path, valid_path=valid_path, test_path=test_path,
-          crop_size=(224, 224), in_shape=(3, None, None),
-          n_classes=3,  #### Pay attention ####
-          gtSet=5,  #### Pay attention ####
+          crop_size=crop_size,
+          in_shape=(3, None, None),
+          n_classes=nClasses+1,
+          gtSet=nClasses,
+          void_class=[nClasses],
+          w_balance=w_balance,
           weights_file=savepath+args.model_file if bool(args.load_pretrained) else False,
-          void_class=[2])  #### Pay attention ####
+          train_model=True,
+          plot_hist=False
+          )
     print ' ---> Experiment: ' + experiment_name + ' <---'
+
+    print('Copying model and other training files to {}'.format(final_savepath))
+    start = time.time()
+    copy_tree(savepath, final_savepath)
+    open(os.path.join(final_savepath, 'lock'), 'w').close()
+    print ('Copy time: ' + str(time.time()-start))
 
 # Entry point of the script
 if __name__ == "__main__":
