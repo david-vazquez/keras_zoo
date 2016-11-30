@@ -322,6 +322,21 @@ def main():
         valid_path = dataset_path + 'valid/'
         test_path = dataset_path + 'test/'
 
+    elif usr == 'dvazquez':
+        shared_dataset_path = '/home/'+usr+'/Datasets/Polyps/'
+        dataset_path = '/home/'+usr+'/Datasets/Polyps/'
+        # Copy the data to the local path if not existing
+        if not os.path.exists(dataset_path):
+            print('The local path {} does not exist. Copying '
+                  'dataset...'.format(dataset_path))
+            shutil.copytree(shared_dataset_path, dataset_path)
+            print('Done.')
+
+        savepath = '/home/'+usr+'/Experiments/deepPolyp/'+experiment_name+'/'
+        train_path = dataset_path + 'train/'
+        valid_path = dataset_path + 'valid/'
+        test_path = dataset_path + 'test/'
+
     else:
         raise ValueError('User unknown, please add your own paths!')
 
