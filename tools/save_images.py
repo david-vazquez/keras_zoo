@@ -50,7 +50,7 @@ def save_img3(image_batch, mask_batch, output, out_images_folder, epoch,
              color_map, tag, void_label):
     output[(mask_batch == void_label).nonzero()] = void_label
     images = []
-    for j in xrange(output.shape[0]):
+    for j in range(output.shape[0]):
         img = image_batch[j].transpose((1, 2, 0))
         img = norm_01(img, mask_batch[j], void_label)
 
@@ -77,7 +77,7 @@ def save_img4(image_batch, mask_batch, output, output2, out_images_folder,
               epoch, color_map, tag, void_label):
     output[(mask_batch == void_label).nonzero()] = void_label
     images = []
-    for j in xrange(output.shape[0]):
+    for j in range(output.shape[0]):
         img = image_batch[j].transpose((1, 2, 0))
         img = norm_01(img, mask_batch[j], void_label)
 

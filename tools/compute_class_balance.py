@@ -43,18 +43,18 @@ def compute_class_balance(masks_path, n_classes=4, method='median_freq_cost', vo
     weights_median_freq_cost = np.median(priors) / priors
     weights_rare_freq_cost = 1 / (n_classes * priors)
 
-    print 'Count per label: ' + str(count_per_label)
-    print 'Total count per label: ' + str(total_count_per_label)
-    print 'Prior: ' + str(priors)
-    print 'Weights median_freq_cost: ' + str(weights_median_freq_cost)
-    print 'Weights rare_freq_cost: ' + str(weights_rare_freq_cost)
+    print ('Count per label: ' + str(count_per_label))
+    print ('Total count per label: ' + str(total_count_per_label))
+    print ('Prior: ' + str(priors))
+    print ('Weights median_freq_cost: ' + str(weights_median_freq_cost))
+    print ('Weights rare_freq_cost: ' + str(weights_rare_freq_cost))
 
     if method == 'median_freq_cost':
         return weights_median_freq_cost
     elif method == 'rare_freq_cost':
         return weights_rare_freq_cost
     else:
-        print 'ERROR: Unknown class balancing method: ' + method
+        print ('ERROR: Unknown class balancing method: ' + method)
         exit()
 
 

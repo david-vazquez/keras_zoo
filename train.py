@@ -1,17 +1,10 @@
 #!/usr/bin/env python
 # Import python libraries
-import argparse
-import os
-import sys
+import argparse, os, sys, shutil, time, pickle
 from distutils.dir_util import copy_tree
-import imp
-import seaborn as sns
+# import seaborn as sns
 from getpass import getuser
-import shutil
 import numpy as np
-import pickle
-import time
-# import signal
 
 # Import keras libraries
 from keras.callbacks import EarlyStopping, ModelCheckpoint
@@ -25,49 +18,10 @@ from callbacks.callbacks import Evaluate_model, compute_metrics
 from tools.loader_sem_seg import ImageDataGenerator
 from tools.logger import Logger
 from tools.plot_history import plot_history
-from models.model import assemble_model
 from tools.compute_mean_std import compute_mean_std
 from tools.compute_class_balance import compute_class_balance
 sys.setrecursionlimit(99999)
 
-
-# class GracefulDeath(object):
-#     """Catch signals to allow graceful shutdown."""
-#
-#     def __init__(self, save_path, final_save_path):
-#         self.save_path = save_path
-#         self.final_save_path = final_save_path
-#         self.receivedSignal = self.receivedTermSignal = False
-#         catchSignals = [
-#             1,
-#             2,
-#             3,
-#             10,
-#             12,
-#             15,
-#         ]
-#         for signum in catchSignals:
-#             signal.signal(signum, self.handler)
-#
-#     def handler(self, signum, frame):
-#         self.lastSignal = signum
-#         self.receivedSignal = True
-#         if signum in [2, 3, 15]:
-#             self.receivedTermSignal = True
-#         # Copy and exit at anywhere you are
-#         copy_to_final(self)
-#         sys.exit(-1)
-#
-#     def copy_to_final(self):
-#         print ('Killed!')
-#         print('Copying model and other training files to {}'.format(self.final_savepath))
-#         start = time.time()
-#         copy_tree(self.savepath, self.final_savepath)
-#         open(os.path.join(self.final_savepath, 'lock'), 'w').close()
-#         print ('Copy time: ' + str(time.time()-start))
-#
-#
-# killer = GracefulDeath()
 
 # Train the network
 def train(dataset, model_name, learning_rate, weight_decay,
@@ -88,19 +42,17 @@ def train(dataset, model_name, learning_rate, weight_decay,
         mask_floder = 'masks'
 
     # TODO: Get the number of images directly from data loader
-    n_images_train = 547  # 547
-    n_images_val = 183  # 183
-    n_images_test = 182  # 182
+    n_images_train = 30  # 547
+    n_images_val = 20  # 183
+    n_images_test = 20  # 182
 
     # Normalization mean and std computed on training set for RGB pixel values
-    print '\n > Computing mean and std for normalization...'
+    print ('\n > Computing mean and std for normalization...')
     if False:
         rgb_mean, rgb_std = compute_mean_std(os.path.join(train_path, 'images'),
                                              os.path.join(train_path, mask_floder),
                                              n_classes)
         rescale = None
-        # rgb_mean = np.asarray([136.80214937481, 89.02750787575, 60.9570439560])
-        # rgb_std = np.asarray([61.55742495180, 49.316179114493, 38.362239487371])
     else:
         rgb_mean = None
         rgb_std = None
@@ -120,40 +72,24 @@ def train(dataset, model_name, learning_rate, weight_decay,
         class_balance_weights = None
 
     # Build model
-    print '\n > Building model (' + model_name + ')...'
+    print ('\n > Building model (' + model_name + ')...')
     if model_name == 'fcn8':
         model = build_fcn8(in_shape, l2_reg=weight_decay, nclasses=n_classes,
                            weights_file=weights_file, deconv='deconv')
         model.output
-    elif model_name == 'resunet':
-        model_kwargs = {
-            'input_shape': in_shape,
-            'num_classes': n_classes,
-            'input_num_filters': 32,
-            'main_block_depth': [3, 8, 10, 3],
-            'num_main_blocks': 3,
-            'num_init_blocks': 1,
-            'W_regularizer': weight_decay,
-            'dropout': 0.2,
-            'short_skip': True,
-            'long_skip': True,
-            'use_skip_blocks': False,
-            'relative_num_across_filters': 1,
-            'long_skip_merge_mode': 'sum'}
-        model = assemble_model(**model_kwargs)
     else:
         raise ValueError('Unknown model')
 
     # Create the optimizer
-    print '\n > Creating optimizer ({}) with lr ({})...'.format(optimizer,
-                                                                learning_rate)
+    print ('\n > Creating optimizer ({}) with lr ({})...'.format(optimizer,
+                                                                learning_rate))
     if optimizer == 'rmsprop':
         opt = RMSprop(lr=learning_rate, rho=0.9, epsilon=1e-8, clipnorm=10)
     else:
         raise ValueError('Unknown optimizer')
 
     # Compile model
-    print '\n > Compiling model...'
+    print ('\n > Compiling model...')
     model.compile(loss=cce_flatt(void_class, class_balance_weights),
                   optimizer=opt)
 
@@ -251,7 +187,7 @@ def train(dataset, model_name, learning_rate, weight_decay,
                                              mode='max', save_best_only=True,
                                              save_weights_only=True)]
 
-    # # Train the model
+    # Train the model
     if (train_model):
         print('\n > Training the model...')
         cb = [eval_model, early_stop_jac, checkp_jac] + checkp_jac_class
@@ -262,7 +198,6 @@ def train(dataset, model_name, learning_rate, weight_decay,
     # Compute test metrics
     print('\n > Testing the model...')
     model.load_weights(savepath + "weights.hdf5")
-    # color_map = sns.hls_palette(n_classes+1)
     color_map = [
         (255/255., 0, 0),                   # Background
         (192/255., 192/255., 128/255.),     # Polyp
@@ -333,7 +268,7 @@ def main():
     crop_size = (224, 224)  # (288, 384)
 
     # Experiment name
-    experiment_name = "GT4_DAComb_3cl_224x224_rescale_lr10-4_noCWB"
+    experiment_name = "tmp"
 
     # Define paths according to user
     usr = getuser()
@@ -371,6 +306,7 @@ def main():
             print('Done.')
 
         savepath = '/home/'+usr+'/Experiments/deepPolyp/'+experiment_name+'/'
+        final_savepath = '/home/'+usr+'/Experiments/deepPolyp/'+experiment_name+'/'
         train_path = dataset_path + 'train/'
         valid_path = dataset_path + 'valid/'
         test_path = dataset_path + 'test/'
@@ -384,7 +320,7 @@ def main():
 
     # Enable log file
     sys.stdout = Logger(savepath + "logfile.log")
-    print ' ---> Experiment: ' + experiment_name + ' <---'
+    print (' ---> Experiment: ' + experiment_name + ' <---')
 
     # Train the network
     train(dataset=args.dataset,
@@ -408,7 +344,7 @@ def main():
           train_model=True,
           plot_hist=False
           )
-    print ' ---> Experiment: ' + experiment_name + ' <---'
+    print (' ---> Experiment: ' + experiment_name + ' <---')
 
     print('Copying model and other training files to {}'.format(final_savepath))
     start = time.time()

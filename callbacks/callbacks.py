@@ -3,13 +3,6 @@ from keras.callbacks import Callback, Progbar, ProgbarLogger
 from keras.engine.training import generator_queue
 from tools.save_images import save_img3, save_img4
 import numpy as np
-import seaborn as sns
-
-# Install pydensecrf: https://github.com/lucasb-eyer/pydensecrf
-# pip install git+https://github.com/lucasb-eyer/pydensecrf.git
-import pydensecrf.densecrf as dcrf
-from pydensecrf.utils import compute_unary, create_pairwise_bilateral,\
-                             create_pairwise_gaussian, unary_from_softmax
 
 
 # PROGBAR replacements
@@ -50,7 +43,7 @@ def cat_cross_entropy_voids(y_pred, y_true, void_label, _EPS=10e-8,
 
     # Compute the negative log likelihood for each pixel
     cost = np.zeros_like(y_pred[:, 0])
-    for i in xrange(len(cost)):
+    for i in range(len(cost)):
         cost[i] = -np.log(y_pred[i, y_true[i]])
 
     # Compute the average cost
@@ -60,88 +53,6 @@ def cat_cross_entropy_voids(y_pred, y_true, void_label, _EPS=10e-8,
     # Return the cost
     return cost
 
-
-# Conditional Random Field (CRF) iterative inference
-def crf_inference(x, y, num_iter=5, bilateral=True, is01=False):
-    # print ('X shape: ' + str(x.shape))
-    # print ('Y shape: ' + str(y.shape))
-
-    # Get shapes
-    n_batches = y.shape[0]
-    n_classes = y.shape[1]
-    height = y.shape[2]
-    width = y.shape[3]
-
-    # Only implemented for mini batches of size 1
-    if n_batches != 1:
-        raise ValueError('Not implemented')
-
-    # Create the DenseCRF2D object with the input size
-    # width, height, nlabels TODO: Invert??
-    d = dcrf.DenseCRF2D(height, width, n_classes)
-
-    # Set the prediction as one row for each channel
-    pred = y[0]
-    pred = pred.reshape((n_classes, -1))
-    # print ('Pred shape: ' + str(pred.shape))
-
-    # Set the image as rows x columns x channels
-    img = x[0]
-    img = np.transpose(img, (1, 2, 0))
-    # print ('Img shape: ' + str(img.shape))
-
-    # Convert to numpy array
-    img = np.array(img)
-    # print ('Img shape: ' + str(img.shape))
-
-    # Set to 0-255 range
-    if is01:
-        img = (255 * img).astype('uint8')
-    else:
-        img = img.astype('uint8')
-        # print ('Max img: ' + str(np.max(img)))
-        # print ('Min img: ' + str(np.min(img)))
-
-    # Needed transformation
-    img2 = np.zeros(img.shape).astype('uint8')
-    img2 = img2 + img
-
-    # set unary potentials (neg log probability)
-    U = unary_from_softmax(pred)
-    d.setUnaryEnergy(U)
-
-    # This adds the color-independent term, features are the
-    # locations only. Smoothness kernel.
-    # sxy: gaussian x, y std
-    # compat: ways to weight contributions, a number for potts compatibility,
-    #     vector for diagonal compatibility, an array for matrix compatibility
-    # kernel: kernel used, CONST_KERNEL, FULL_KERNEL, DIAG_KERNEL
-    # normalization: NORMALIZE_AFTER, NORMALIZE_BEFORE,
-    #     NO_NORMALIZAITION, NORMALIZE_SYMMETRIC
-    d.addPairwiseGaussian(sxy=(3, 3), compat=3, kernel=dcrf.DIAG_KERNEL,
-                          normalization=dcrf.NORMALIZE_SYMMETRIC)
-
-    # Appearance kernel. This adds the color-dependent term, i.e. features
-    # are (x,y,r,g,b). im is an image-array, e.g. im.dtype == np.uint8
-    # and im.shape == (640,480,3) to set sxy and srgb perform grid search
-    # on validation set
-    if bilateral:
-        d.addPairwiseBilateral(sxy=(3, 3), srgb=(13, 13, 13),
-                               rgbim=img2, compat=10, kernel=dcrf.DIAG_KERNEL,
-                               normalization=dcrf.NORMALIZE_SYMMETRIC)
-
-    # Perform the inference
-    Q = d.inference(num_iter)
-
-    # Reshape output to n_classes x height x width
-    Q = np.reshape(Q, (n_classes, height, width))
-    # print ('Out shape: ' + str(Q.shape))
-
-    # Add batch dimension
-    output = np.expand_dims(Q, axis=0)
-    # print ('Out shape: ' + str(output.shape))
-
-    return output
 
 
 # Computes the desired metrics (And saves images)
@@ -155,7 +66,7 @@ def compute_metrics(model, val_gen, epoch_length, nclasses, metrics,
             metrics.append(str(i) + '_test_jacc_percl')
 
     # Create a data generator
-    data_gen_queue, _stop = generator_queue(val_gen, max_q_size=10)
+    data_gen_queue, _stop, _generator_threads = generator_queue(val_gen, max_q_size=10)
 
     # Create the metrics output dictionary
     metrics_out = {}
@@ -166,8 +77,8 @@ def compute_metrics(model, val_gen, epoch_length, nclasses, metrics,
 
     # Process the dataset
     for _ in range(epoch_length):
-        if useCRF:
-            print(str(_) + ' from ' + str(epoch_length))
+        # if useCRF:
+        #     print(str(_) + ' from ' + str(epoch_length))
 
         # Get data for this minibatch
         data = data_gen_queue.get()
@@ -177,38 +88,12 @@ def compute_metrics(model, val_gen, epoch_length, nclasses, metrics,
         # Get prediction for this minibatch
         y_pred = model.predict(x_true)
 
-        # CRF
-        if useCRF:
-            # Add void channel
-            void_channel = np.zeros((1, 1, y_pred.shape[2], y_pred.shape[3]))
-            void_channel[(y_true == void_label).nonzero()] = 1
-            y_pred = np.concatenate((y_pred, void_channel), axis=1)
+        # Compute the loss
+        hist_loss.append(cat_cross_entropy_voids(y_pred, y_true,
+                                                 void_label))
 
-            # Adjust probabilities of void pixels (1 for void and 0 other)
-            mask = np.ones((1, 1, y_pred.shape[2], y_pred.shape[3]))
-            mask[(y_true == void_label).nonzero()] = 0
-            for i in xrange(nclasses):
-                y_pred[0, i, :, :] = y_pred[0, i, :, :]*mask[0]
-            # print ('Y_pred shape: ' + str(y_pred.shape))
-
-            # Make CRF inference
-            y_pred_crf = crf_inference(x_true, y_pred, num_iter=5,
-                                       bilateral=False)
-
-            # Compute the loss
-            hist_loss.append(cat_cross_entropy_voids(y_pred_crf, y_true,
-                                                     void_label))
-
-            # Compute the argmax
-            y_pred = np.argmax(y_pred, axis=1)
-            y_pred_crf = np.argmax(y_pred_crf, axis=1)
-        else:
-            # Compute the loss
-            hist_loss.append(cat_cross_entropy_voids(y_pred, y_true,
-                                                     void_label))
-
-            # Compute the argmax
-            y_pred = np.argmax(y_pred, axis=1)
+        # Compute the argmax
+        y_pred = np.argmax(y_pred, axis=1)
 
         # Reshape y_true
         y_true = np.reshape(y_true, (y_true.shape[0], y_true.shape[2],
@@ -216,22 +101,12 @@ def compute_metrics(model, val_gen, epoch_length, nclasses, metrics,
 
         # Save output images (Only first minibatch)
         if save_all_images or not save_all_images and _ == 0:
-
-            if useCRF:
-                save_img4(x_true, y_true, y_pred, y_pred_crf,
-                          out_images_folder, epoch,
-                          color_map, tag+str(_), void_label)
-            else:
-                save_img3(x_true, y_true, y_pred, out_images_folder, epoch,
-                          color_map, tag+str(_), void_label)
+            save_img3(x_true, y_true, y_pred, out_images_folder, epoch,
+                      color_map, tag+str(_), void_label)
 
         # Make y_true and y_pred flatten
-        if useCRF:
-            y_pred = y_pred_crf.flatten()
-            y_true = y_true.flatten()
-        else:
-            y_pred = y_pred.flatten()
-            y_true = y_true.flatten()
+        y_pred = y_pred.flatten()
+        y_true = y_true.flatten()
 
         # Fill the confusion matrix
         for i in range(nclasses):
@@ -289,7 +164,6 @@ class Evaluate_model(Callback):
         self.test_metrics = test_metrics
 
         # Create the colormaping for showing labels
-        #self.color_map = sns.hls_palette(n_classes+1)
         self.color_map = [
             (255/255., 0, 0),                   # Background
             (192/255., 192/255., 128/255.),     # Polyp
@@ -322,5 +196,5 @@ class Evaluate_model(Callback):
         self.last_epoch = epoch
 
         # Save the metrics in the logs
-        for k, v in metrics_out.iteritems():
+        for k, v in metrics_out.items():
             logs[k] = v

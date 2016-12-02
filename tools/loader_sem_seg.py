@@ -139,7 +139,7 @@ def load_img(path, grayscale=False, target_size=None):
 
 
 class ImageDataGenerator(object):
-    '''Generate minibatches with
+    '''Generate minibatches withGT4_DAComb_3cl_224x224_rescale_lr10-4_noCWB
     real-time data augmentation.
     # Arguments
         featurewise_center: set input mean to 0 over the dataset.
@@ -646,7 +646,7 @@ class DirectoryIterator(Iterator):
                               grayscale=False,
                               target_size=self.target_size)
                 y = img_to_array(GT, dim_ordering=self.dim_ordering)
-		x = self.image_data_generator.standardize(x, y)
+                x = self.image_data_generator.standardize(x, y)
                 x, y = self.image_data_generator.random_transform(x, y)
                 if current_batch_size > 1:
                     batch_x[i] = x

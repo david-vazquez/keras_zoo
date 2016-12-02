@@ -34,7 +34,7 @@ def plot_history(hist, save_path, n_classes):
         plot1(hist, save_path)
         plot2(hist, save_path, n_classes)
     except IOError:
-        print "No X forwarding"
+        print ("No X forwarding")
 
 
 # Plot training average metrics
