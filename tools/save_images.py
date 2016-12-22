@@ -1,9 +1,9 @@
 # Imports
-from skimage.color import label2rgb, rgb2gray, gray2rgb
+from skimage.color import rgb2gray, gray2rgb
 from skimage import img_as_float
 import numpy as np
 import scipy.misc
-
+import os
 
 # Normalizes image to 0-1 range
 def norm_01(img, y, void_label):
@@ -52,7 +52,7 @@ def save_img3(image_batch, mask_batch, output, out_images_folder, epoch,
     images = []
     for j in range(output.shape[0]):
         img = image_batch[j].transpose((1, 2, 0))
-        img = norm_01(img, mask_batch[j], void_label)
+        img = norm_01(img, mask_batch[j], void_label)*255
 
         #img = image_batch[j].transpose((1, 2, 0))
         label_out = my_label2rgb(output[j], bglabel=void_label,
@@ -66,7 +66,7 @@ def save_img3(image_batch, mask_batch, output, out_images_folder, epoch,
 
         combined_image = np.concatenate((img, label_mask, label_out,
                                          label_overlay), axis=1)
-        out_name = out_images_folder + tag + '_epoch' + str(epoch) + '_img' + str(j) + '.png'
+        out_name = os.path.join(out_images_folder, tag + '_epoch' + str(epoch) + '_img' + str(j) + '.png')
         scipy.misc.toimage(combined_image).save(out_name)
         images.append(combined_image)
     return images
@@ -96,7 +96,7 @@ def save_img4(image_batch, mask_batch, output, output2, out_images_folder,
 
         combined_image = np.concatenate((img, label_mask, label_out, label_out2,
                                          label_overlay), axis=1)
-        out_name = out_images_folder + tag + '_epoch' + str(epoch) + '_img' + str(j) + '.png'
+        out_name = os.path.join(out_images_folder, tag + '_epoch' + str(epoch) + '_img' + str(j) + '.png')
         scipy.misc.toimage(combined_image).save(out_name)
         images.append(combined_image)
     return images

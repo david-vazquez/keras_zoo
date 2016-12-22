@@ -6,7 +6,7 @@ from numpy import ma
 from six.moves import range
 import os
 import seaborn as sns
-import scipy.misc
+# import scipy.misc
 import SimpleITK as sitk
 
 from keras import backend as K
@@ -118,17 +118,20 @@ def apply_warp(x, warp_field, fill_mode='reflect',
 
 
 # Load image
-def load_img(path, grayscale=False, target_size=None):
+def load_img(path, grayscale=False, resize=None, order=1):
     import skimage.io as io
     from skimage.color import rgb2gray
+    import skimage.transform
 
     # Load image
     img = io.imread(path)
 
-    # # Resize
-    # print('target_size: ' + str(target_size))
-    # if target_size[0] is not None:
-    #     raise ValueError('Not implemented')
+    # Resize
+    # print('Desired resize: ' + str(resize))
+    if resize is not None:
+        img = skimage.transform.resize(img, resize, order=order,
+                                       preserve_range=True)
+        # print('Final resize: ' + str(img.shape))
 
     # Convert to grayscale
     if grayscale:
@@ -238,14 +241,15 @@ class ImageDataGenerator(object):
             save_format=save_format)
 
     def flow_from_directory(self, directory,
-                            target_size=(256, 256), color_mode='rgb',
+                            resize=None, target_size=(256, 256),
+                            color_mode='rgb',
                             classes=None, class_mode='categorical',
                             batch_size=32, shuffle=True, seed=None,
                             gt_directory=None,
                             save_to_dir=None, save_prefix='',
                             save_format='jpeg'):
         return DirectoryIterator(
-            directory, self,
+            directory, self, resize=resize,
             target_size=target_size, color_mode=color_mode,
             classes=classes, class_mode=class_mode,
             dim_ordering=self.dim_ordering,
@@ -499,7 +503,7 @@ class ImageDataGenerator(object):
 class DirectoryIterator(Iterator):
 
     def __init__(self, directory, image_data_generator,
-                 target_size=None, color_mode='rgb',
+                 resize=None, target_size=None, color_mode='rgb',
                  dim_ordering='default',
                  classes=None, class_mode='categorical',
                  batch_size=32, shuffle=True, seed=None, gt_directory=None,
@@ -508,6 +512,7 @@ class DirectoryIterator(Iterator):
             dim_ordering = K.image_dim_ordering()
         self.directory = directory
         self.gt_directory = gt_directory
+        self.resize = resize
         self.image_data_generator = image_data_generator
         if target_size is None and batch_size > 1:
             raise ValueError('Target_size None works only with batch_size=1')
@@ -529,10 +534,10 @@ class DirectoryIterator(Iterator):
                 self.image_shape = (1,) + self.target_size
         self.classes = classes
         if class_mode not in {'categorical', 'binary', 'sparse',
-                              'seg_map', None}:
+                              'segmentation', None}:
             raise ValueError('Invalid class_mode:', class_mode,
                              '; expected one of "categorical", '
-                             '"binary", "sparse", "seg_map" or None.')
+                             '"binary", "sparse", "segmentation" or None.')
         self.class_mode = class_mode
         self.save_to_dir = save_to_dir
         self.save_prefix = save_prefix
@@ -545,7 +550,7 @@ class DirectoryIterator(Iterator):
         self.nb_GT_sample = 0
         self.filenames = []
         self.gt_filenames = []
-        if not self.class_mode == 'seg_map':
+        if not self.class_mode == 'segmentation':
             if not classes:
                 classes = []
                 for subdir in sorted(os.listdir(directory)):
@@ -564,7 +569,7 @@ class DirectoryIterator(Iterator):
                             break
                     if is_valid:
                         self.nb_sample += 1
-            print('Found %d images belonging to %d classes.' % (self.nb_sample,
+            print('   Found %d images belonging to %d classes' % (self.nb_sample,
                                                                 self.nb_class))
         else:
             for fname in os.listdir(directory):
@@ -576,7 +581,7 @@ class DirectoryIterator(Iterator):
                 if is_valid:
                     self.filenames.append(fname)
                     self.nb_sample += 1
-            print('Found %d images.' % (self.nb_sample))
+            print('   Found %d images' % (self.nb_sample))
             self.filenames = np.sort(self.filenames)
             for fname in os.listdir(gt_directory):
                 is_valid = False
@@ -587,10 +592,10 @@ class DirectoryIterator(Iterator):
                 if is_valid:
                     self.gt_filenames.append(fname)
                     self.nb_GT_sample += 1
-            print('Found %d GT images.' % (self.nb_sample))
+            print('   Found %d GT images' % (self.nb_sample))
             self.gt_filenames = np.sort(self.gt_filenames)
 
-        if not self.class_mode == 'seg_map':
+        if not self.class_mode == 'segmentation':
             self.classes = np.zeros((self.nb_sample,), dtype='int32')
             i = 0
             for subdir in classes:
@@ -618,12 +623,11 @@ class DirectoryIterator(Iterator):
             batch_x = 0
         else:
             batch_x = np.zeros((current_batch_size,) + self.image_shape)
-        if self.class_mode == 'seg_map':
+        if self.class_mode == 'segmentation':
             if self.target_size[0] is None:
                 batch_y = 0
             else:
-                batch_y = np.zeros((current_batch_size,
-                                    1, self.image_shape[1],
+                batch_y = np.zeros((current_batch_size, 1, self.image_shape[1],
                                     self.image_shape[2]))
         grayscale = self.color_mode == 'grayscale'
         # build batch of image data
@@ -632,9 +636,9 @@ class DirectoryIterator(Iterator):
             gtname = self.gt_filenames[j]
             img = load_img(os.path.join(self.directory, fname),
                            grayscale=grayscale,
-                           target_size=self.target_size)
+                           resize=self.resize, order=1)
             x = img_to_array(img, dim_ordering=self.dim_ordering)
-            if not self.class_mode == 'seg_map':
+            if not self.class_mode == 'segmentation':
                 x = self.image_data_generator.standardize(x)
                 x = self.image_data_generator.random_transform(x)
                 if current_batch_size > 1:
@@ -644,8 +648,9 @@ class DirectoryIterator(Iterator):
             else:
                 GT = load_img(os.path.join(self.gt_directory, gtname),
                               grayscale=False,
-                              target_size=self.target_size)
+                              resize=self.resize, order=0)
                 y = img_to_array(GT, dim_ordering=self.dim_ordering)
+                # print ('Classes: ' + str(np.unique(y)))
                 x = self.image_data_generator.standardize(x, y)
                 x, y = self.image_data_generator.random_transform(x, y)
                 if current_batch_size > 1:
@@ -663,7 +668,7 @@ class DirectoryIterator(Iterator):
                                                                   hash=np.random.randint(1e4),
                                                                   format=self.save_format)
 
-                if self.class_mode == 'seg_map':
+                if self.class_mode == 'segmentation':
                     nclasses = self.classes  # TODO: Change
                     color_map = sns.hls_palette(nclasses+1)
                     void_label = nclasses
@@ -684,7 +689,7 @@ class DirectoryIterator(Iterator):
             batch_y = np.zeros((len(batch_x), self.nb_class), dtype='float32')
             for i, label in enumerate(self.classes[index_array]):
                 batch_y[i, label] = 1.
-        elif not self.class_mode == 'seg_map':
+        elif not self.class_mode == 'segmentation':
             return batch_x
         # print(self.directory, np.shape(batch_x), np.shape(batch_y))
         return batch_x, batch_y
