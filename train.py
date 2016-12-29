@@ -7,8 +7,11 @@ import shutil
 import time
 import imp
 import pickle
+import math
 from distutils.dir_util import copy_tree
 from getpass import getuser
+import matplotlib
+matplotlib.use('Agg')  # Faster plot
 
 # Import keras libraries
 from keras.callbacks import EarlyStopping, ModelCheckpoint
@@ -17,8 +20,8 @@ from keras.utils.visualize_util import plot
 
 # Import project libraries
 from models.fcn8 import build_fcn8
-from metrics.metrics import cce_flatt
-from callbacks.callbacks import Evaluate_model, compute_metrics
+from metrics.metrics import cce_flatt, IoU
+from callbacks.callbacks import Evaluate_model, compute_metrics, History_plot, Jacc_new, Save_results
 from tools.loader_sem_seg import ImageDataGenerator
 from tools.logger import Logger
 from tools.plot_history import plot_history
@@ -90,6 +93,7 @@ def build_model(cf, optimizer):
 
     # Compile
     model.compile(loss=cce_flatt(cf.dataset.void_class, cf.dataset.cb_weights),
+                  metrics=[IoU(cf.dataset.n_classes, cf.dataset.void_class)],
                   optimizer=optimizer)
 
     # Show model structure
@@ -182,60 +186,99 @@ def load_datasets(cf):
 
 # Create callbacks
 def create_callbacks(cf, valid_gen):
-    # Define the jaccard validation callback
-    eval_model = Evaluate_model(n_classes=cf.dataset.n_classes,
-                                void_label=cf.dataset.void_class[0],
-                                save_path=cf.savepath,
-                                valid_gen=valid_gen,
-                                valid_epoch_length=cf.n_images_valid,
-                                valid_metrics=cf.valid_metrics,
-                                color_map=cf.dataset.color_map)
-    print('   Jaccard validation callback')
 
-    # Define early stopping callbacks
-    early_stop_jac = EarlyStopping(monitor=cf.earlyStopping_monitor,
-                                   mode=cf.earlyStopping_mode,
-                                   patience=cf.earlyStopping_patience,
-                                   verbose=cf.earlyStopping_verbose)
-    early_stop_jac_class = []
-    for i in range(cf.dataset.n_classes):
-        early_stop_jac_class += [EarlyStopping(monitor=str(i)+'_val_jacc',
-                                               mode=cf.earlyStopping_mode,
-                                               patience=cf.earlyStopping_patience,
-                                               verbose=cf.earlyStopping_verbose)]
-    print('   Early stopping callbacks')
+    cb = []
+
+    # Jaccard callback
+    if True:
+        print('   Jaccard metric')
+        cb += [Jacc_new(cf.dataset.n_classes)]
+
+    # Save image results
+    if cf.save_results_enabled:
+        print('   Save image result')
+        cb += [Save_results(n_classes=cf.dataset.n_classes,
+                            void_label=cf.dataset.void_class,
+                            save_path=cf.dataset.savepath,
+                            generator=valid_gen,
+                            epoch_length=int(math.ceil(cf.save_results_nsamples/float(cf.save_results_batch_size))),
+                            color_map=cf.dataset.color_map,
+                            tag='valid')]
+
+    # Early stopping
+    if cf.earlyStopping_enabled:
+        print('   Early stopping')
+        cb += [EarlyStopping(monitor=cf.earlyStopping_monitor,
+                             mode=cf.earlyStopping_mode,
+                             patience=cf.earlyStopping_patience,
+                             verbose=cf.earlyStopping_verbose)]
 
     # Define model saving callbacks
-    checkp_jac = ModelCheckpoint(filepath=os.path.join(cf.savepath, "weights.hdf5"),
-                                 verbose=cf.checkpoint_verbose,
-                                 monitor=cf.checkpoint_monitor,
-                                 mode=cf.checkpoint_mode,
-                                 save_best_only=cf.checkpoint_save_best_only,
-                                 save_weights_only=cf.checkpoint_save_weights_only
-                                 )
-    checkp_jac_class = []
-    for i in range(cf.dataset.n_classes):
-        checkp_jac_class += [ModelCheckpoint(filepath=os.path.join(cf.savepath, "weights"+str(i)+".hdf5"),
-                                             verbose=cf.checkpoint_verbose,
-                                             monitor=str(i)+'_val_jacc',
-                                             mode=cf.checkpoint_mode,
-                                             save_best_only=cf.checkpoint_save_best_only,
-                                             save_weights_only=cf.checkpoint_save_weights_only)]
-    print('   Model Checkpoint callbacks')
+    if cf.checkpoint_enabled:
+        print('   Model Checkpoint')
+        cb += [ModelCheckpoint(filepath=os.path.join(cf.savepath, "weights.hdf5"),
+                               verbose=cf.checkpoint_verbose,
+                               monitor=cf.checkpoint_monitor,
+                               mode=cf.checkpoint_mode,
+                               save_best_only=cf.checkpoint_save_best_only,
+                               save_weights_only=cf.checkpoint_save_weights_only)]
+
+    # Plot the loss after every epoch.
+    if True:
+        print('   Plot per epoch')
+        cb += [History_plot(cf.dataset.n_classes, cf.savepath)]
+
+
+
+    # # Define the jaccard validation callback
+    # eval_model = Evaluate_model(n_classes=cf.dataset.n_classes,
+    #                             void_label=cf.dataset.void_class[0],
+    #                             save_path=cf.savepath,
+    #                             valid_gen=valid_gen,
+    #                             valid_epoch_length=cf.n_images_valid/cf.batch_size_valid,
+    #                             valid_metrics=cf.valid_metrics,
+    #                             color_map=cf.dataset.color_map)
+    # print('   Jaccard validation callback')
+    #
+    # early_stop_jac_class = []
+    # for i in range(cf.dataset.n_classes):
+    #     early_stop_jac_class += [EarlyStopping(monitor=str(i)+'_val_jacc',
+    #                                            mode=cf.earlyStopping_mode,
+    #                                            patience=cf.earlyStopping_patience,
+    #                                            verbose=cf.earlyStopping_verbose)]
+    #
+    #
+    # checkp_jac_class = []
+    # for i in range(cf.dataset.n_classes):
+    #     checkp_jac_class += [ModelCheckpoint(filepath=os.path.join(cf.savepath, "weights"+str(i)+".hdf5"),
+    #                                          verbose=cf.checkpoint_verbose,
+    #                                          monitor=str(i)+'_val_jacc',
+    #                                          mode=cf.checkpoint_mode,
+    #                                          save_best_only=cf.checkpoint_save_best_only,
+    #                                          save_weights_only=cf.checkpoint_save_weights_only)]
+    #
 
     # Output the list of callbacks
-    cb = [eval_model, early_stop_jac, checkp_jac] + checkp_jac_class
     return cb
 
 
 # Train the model
-def train_model(cf, model, train_gen, cb):
+def train_model(cf, model, train_gen, valid_gen, cb):
     if (cf.train_model):
         print('\n > Training the model...')
-        hist = model.fit_generator(train_gen,
+        hist = model.fit_generator(generator=train_gen,
                                    samples_per_epoch=cf.n_images_train,
                                    nb_epoch=cf.n_epochs,
-                                   callbacks=cb)
+                                   verbose=1,
+                                   callbacks=cb,
+                                   validation_data=valid_gen,
+                                   nb_val_samples=cf.n_images_valid,
+                                   class_weight=None,
+                                   max_q_size=10,
+                                   nb_worker=1,
+                                   pickle_safe=False)
+        print('   Training finished.')
+
         return hist
     else:
         return None
@@ -336,7 +379,7 @@ def train(cf):
     cb = create_callbacks(cf, valid_gen)
 
     # Train the model
-    hist = train_model(cf, model, train_gen, cb)
+    hist = train_model(cf, model, train_gen, valid_gen, cb)
 
     # Compute test metrics
     test_metrics = test_model(cf, model, test_gen)
@@ -394,10 +437,12 @@ def load_config_files(config_path, exp_name,
     cf.dataset.path_test_mask = os.path.join(cf.dataset.path, 'test', 'masks')
 
     # If in Debug mode use few images
-    if cf.debug:
-        cf.dataset.n_images_train = 300
-        cf.dataset.n_images_valid = 30
-        cf.dataset.n_images_test = 30
+    if cf.debug and cf.debug_images_train>0:
+        cf.dataset.n_images_train = cf.debug_images_train
+    if cf.debug and cf.debug_images_valid>0:
+        cf.dataset.n_images_valid = cf.debug_images_valid
+    if cf.debug and cf.debug_images_test>0:
+        cf.dataset.n_images_test = cf.debug_images_test
 
     # Define target sizes
     if cf.crop_size_train is not None: cf.target_size_train = cf.crop_size_train
@@ -420,10 +465,11 @@ def main():
 
     # Define the user paths
     usr_path = os.path.join('/home', getuser())
-    dataset_path = os.path.join(usr_path, 'Datasets')
-    shared_dataset_path = os.path.join(usr_path, 'Datasets')
-    experiments_path =  os.path.join(usr_path, 'Experiments')
-    shared_experiments_path =  os.path.join(usr_path, 'Experiments')
+    shared_path = '/datatmp'
+    dataset_path = os.path.join(shared_path, 'Datasets')
+    shared_dataset_path = os.path.join(shared_path, 'Datasets')
+    experiments_path = os.path.join(shared_path, 'Experiments')
+    shared_experiments_path = os.path.join(shared_path, 'Experiments')
 
     # Get parameters from arguments
     parser = argparse.ArgumentParser(description='FCN model training')
@@ -448,7 +494,6 @@ def main():
     cf = load_config_files(arguments.config_path, arguments.exp_name,
                            dataset_path, shared_dataset_path,
                            experiments_path, shared_experiments_path)
-
 
     # Train the network
     train(cf)

@@ -5,7 +5,7 @@ import numpy as np
 from numpy import ma
 from six.moves import range
 import os
-import seaborn as sns
+#import seaborn as sns
 # import scipy.misc
 import SimpleITK as sitk
 
@@ -646,6 +646,7 @@ class DirectoryIterator(Iterator):
                 else:
                     batch_x = np.expand_dims(x, axis=0)
             else:
+                # print(gtname)
                 GT = load_img(os.path.join(self.gt_directory, gtname),
                               grayscale=False,
                               resize=self.resize, order=0)

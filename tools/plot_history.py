@@ -2,32 +2,35 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import time
+
 
 # Plot training hisory
-def plot_history(hist, save_path, n_classes):
-    # Compute the best values to add to the legend
-    best_index = np.argmax(hist['val_jaccard'])
-    b_tr_loss = np.min(hist['loss'])
-    b_tr_loss2 = hist['loss'][best_index]
-    b_va_loss = np.min(hist['val_loss'])
-    b_va_loss2 = hist['val_loss'][best_index]
-    b_va_jaccard = np.max(hist['val_jaccard'])
-    b_va_acc = np.max(hist['val_acc'])
-    b_va_acc2 = hist['val_acc'][best_index]
+def plot_history(hist, save_path, n_classes, verbose=True):
+    if verbose:
+        # Compute the best values to add to the legend
+        best_index = np.argmax(hist['val_jaccard'])
+        b_tr_loss = np.min(hist['loss'])
+        b_tr_loss2 = hist['loss'][best_index]
+        b_va_loss = np.min(hist['val_loss'])
+        b_va_loss2 = hist['val_loss'][best_index]
+        b_va_jaccard = np.max(hist['val_jaccard'])
+        b_va_acc = np.max(hist['val_acc'])
+        b_va_acc2 = hist['val_acc'][best_index]
 
-    b_va_jaccard1 = []
-    b_va_jaccard2 = []
-    for i in range(n_classes):
-        b_va_jaccard1 += [np.max(hist[str(i)+'_val_jacc'])]
-        b_va_jaccard2 += [hist[str(i)+'_val_jacc'][best_index]]
+        b_va_jaccard1 = []
+        b_va_jaccard2 = []
+        for i in range(n_classes):
+            b_va_jaccard1 += [np.max(hist[str(i)+'_val_jacc'])]
+            b_va_jaccard2 += [hist[str(i)+'_val_jacc'][best_index]]
 
-    print ('   Best epoch: {}. Train loss: {}. Val loss: {}. Val accuracy:{}. Val Jaccard: {}.'.format(best_index,
-                                                                                                    b_tr_loss2,
-                                                                                                    b_va_loss2,
-                                                                                                    b_va_acc2,
-                                                                                                    b_va_jaccard))
-    print ('   Val Jaccard: ' + str(b_va_jaccard2))
-    print ('   Val Jaccard(best per class): ' + str(b_va_jaccard1))
+        print ('   Best epoch: {}. Train loss: {}. Val loss: {}. Val accuracy:{}. Val Jaccard: {}.'.format(best_index,
+                                                                                                        b_tr_loss2,
+                                                                                                        b_va_loss2,
+                                                                                                        b_va_acc2,
+                                                                                                        b_va_jaccard))
+        print ('   Val Jaccard: ' + str(b_va_jaccard2))
+        print ('   Val Jaccard(best per class): ' + str(b_va_jaccard1))
 
     # Plot the metrics
     try:

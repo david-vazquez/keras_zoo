@@ -19,3 +19,16 @@ To train a model, use the command : `THEANO_FLAGS='device=cuda0,floatX=float32' 
 David Vázquez, Jorge Bernal, F. Javier Sánchez, Gloria Fernández-Esparrach, Antonio M. López, Adriana Romero, Michal Drozdzal and Aaron Courville
 
 ## How to cite
+
+## TODO
+[ ] Plot online
+[ ] Relaunch: Remember the number of the last epoch
+[ ] Find max batch size val-test
+[ ] Split Synthia Train-Val
+[ ] Experiment Synthia vs Synthia
+[ ] Mix
+[ ] Copy all synthia samples
+[ ] Slurm
+[ ] TensorFlow
+[ ] Traffic sign Dataset
+[ ] AlexNet sign Dataset

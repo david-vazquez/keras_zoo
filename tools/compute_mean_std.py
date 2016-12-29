@@ -3,7 +3,7 @@ import numpy as np
 import os
 import shutil
 import skimage.io as io
-import seaborn as sns
+#import seaborn as sns
 
 # Imports
 from skimage.color import label2rgb, rgb2gray, gray2rgb
