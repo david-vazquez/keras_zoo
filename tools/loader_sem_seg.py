@@ -325,58 +325,77 @@ class ImageDataGenerator(object):
 
         # use composition of homographies to generate final transform that
         # needs to be applied
+        need_transform = False
+
+        # Rotation
         if self.rotation_range:
             theta = np.pi / 180 * np.random.uniform(-self.rotation_range,
                                                     self.rotation_range)
+            need_transform = True
         else:
             theta = 0
-        rotation_matrix = np.array([[np.cos(theta), -np.sin(theta), 0],
-                                    [np.sin(theta), np.cos(theta), 0],
-                                    [0, 0, 1]])
+
+        # Shift in height
         if self.height_shift_range:
             tx = np.random.uniform(-self.height_shift_range,
                                    self.height_shift_range) * x.shape[img_row_index]
+            need_transform = True
         else:
             tx = 0
 
+        # Shift in width
         if self.width_shift_range:
             ty = np.random.uniform(-self.width_shift_range,
                                    self.width_shift_range) * x.shape[img_col_index]
+            need_transform = True
         else:
             ty = 0
 
-        translation_matrix = np.array([[1, 0, tx],
-                                       [0, 1, ty],
-                                       [0, 0, 1]])
+        # Shear
         if self.shear_range:
             shear = np.random.uniform(-self.shear_range, self.shear_range)
+            need_transform = True
         else:
             shear = 0
-        shear_matrix = np.array([[1, -np.sin(shear), 0],
-                                 [0, np.cos(shear), 0],
-                                 [0, 0, 1]])
 
+        # Zoom
         if self.zoom_range[0] == 1 and self.zoom_range[1] == 1:
             zx, zy = 1, 1
         else:
             zx, zy = np.random.uniform(self.zoom_range[0],
                                        self.zoom_range[1], 2)
-        zoom_matrix = np.array([[zx, 0, 0],
-                                [0, zy, 0],
-                                [0, 0, 1]])
+            need_transform = True
 
-        transform_matrix = np.dot(np.dot(np.dot(rotation_matrix,
-                                                translation_matrix),
-                                         shear_matrix), zoom_matrix)
 
-        h, w = x.shape[img_row_index], x.shape[img_col_index]
-        transform_matrix = transform_matrix_offset_center(transform_matrix,
-                                                          h, w)
-        x = apply_transform(x, transform_matrix, img_channel_index,
-                            fill_mode=self.fill_mode, cval=self.cval)
-        if y is not None:
-            y = apply_transform(y, transform_matrix, img_channel_index,
-                                fill_mode=self.fill_mode, cval=self.void_label)
+        if need_transform:
+            rotation_matrix = np.array([[np.cos(theta), -np.sin(theta), 0],
+                                        [np.sin(theta), np.cos(theta), 0],
+                                        [0, 0, 1]])
+
+            translation_matrix = np.array([[1, 0, tx],
+                                           [0, 1, ty],
+                                           [0, 0, 1]])
+
+            shear_matrix = np.array([[1, -np.sin(shear), 0],
+                                     [0, np.cos(shear), 0],
+                                     [0, 0, 1]])
+
+            zoom_matrix = np.array([[zx, 0, 0],
+                                    [0, zy, 0],
+                                    [0, 0, 1]])
+
+            transform_matrix = np.dot(np.dot(np.dot(rotation_matrix,
+                                                    translation_matrix),
+                                             shear_matrix), zoom_matrix)
+
+            h, w = x.shape[img_row_index], x.shape[img_col_index]
+            transform_matrix = transform_matrix_offset_center(transform_matrix,
+                                                              h, w)
+            x = apply_transform(x, transform_matrix, img_channel_index,
+                                fill_mode=self.fill_mode, cval=self.cval)
+            if y is not None:
+                y = apply_transform(y, transform_matrix, img_channel_index,
+                                    fill_mode=self.fill_mode, cval=self.void_label)
 
         if self.channel_shift_range != 0:
             x = random_channel_shift(x, self.channel_shift_range,
@@ -462,10 +481,7 @@ class ImageDataGenerator(object):
         # TODO:
         # channel-wise normalization
         # barrel/fisheye
-        if y is None:
-            return x
-        else:
-            return x, y
+        return x, y
 
     def fit(self, X, augment=False, rounds=1, seed=None):
         '''Required for featurewise_center, featurewise_std_normalization
@@ -502,164 +518,159 @@ class ImageDataGenerator(object):
 
 class DirectoryIterator(Iterator):
 
+    white_list_formats = {'png', 'jpg', 'jpeg', 'bmp', 'tif'}
+
+    def has_valid_extension(self, fname):
+        for extension in self.white_list_formats:
+            if fname.lower().endswith('.' + extension):
+                return True
+        return False
+
     def __init__(self, directory, image_data_generator,
                  resize=None, target_size=None, color_mode='rgb',
                  dim_ordering='default',
                  classes=None, class_mode='categorical',
                  batch_size=32, shuffle=True, seed=None, gt_directory=None,
                  save_to_dir=None, save_prefix='', save_format='jpeg'):
+        # Check dim order
         if dim_ordering == 'default':
             dim_ordering = K.image_dim_ordering()
+        self.dim_ordering = dim_ordering
+
         self.directory = directory
         self.gt_directory = gt_directory
-        self.resize = resize
         self.image_data_generator = image_data_generator
+        self.resize = resize
+        self.save_to_dir = save_to_dir
+        self.save_prefix = save_prefix
+        self.save_format = save_format
+
+        # Check target size
         if target_size is None and batch_size > 1:
             raise ValueError('Target_size None works only with batch_size=1')
         self.target_size = (None, None) if target_size is None else tuple(target_size)
+
+        # Check color mode
         if color_mode not in {'rgb', 'grayscale'}:
             raise ValueError('Invalid color mode:', color_mode,
                              '; expected "rgb" or "grayscale".')
         self.color_mode = color_mode
-        self.dim_ordering = dim_ordering
         if self.color_mode == 'rgb':
+            self.grayscale = False
             if self.dim_ordering == 'tf':
                 self.image_shape = self.target_size + (3,)
+                self.gt_image_shape = self.target_size + (1,)
             else:
                 self.image_shape = (3,) + self.target_size
+                self.gt_image_shape = (1,) + self.target_size
         else:
+            self.grayscale = True
             if self.dim_ordering == 'tf':
                 self.image_shape = self.target_size + (1,)
+                self.gt_image_shape = self.image_shape
             else:
                 self.image_shape = (1,) + self.target_size
-        self.classes = classes
+                self.gt_image_shape = self.image_shape
+
+        # Check class mode
         if class_mode not in {'categorical', 'binary', 'sparse',
                               'segmentation', None}:
             raise ValueError('Invalid class_mode:', class_mode,
                              '; expected one of "categorical", '
                              '"binary", "sparse", "segmentation" or None.')
         self.class_mode = class_mode
-        self.save_to_dir = save_to_dir
-        self.save_prefix = save_prefix
-        self.save_format = save_format
+        self.has_gt_image = True if self.class_mode == 'segmentation' else False
 
-        white_list_formats = {'png', 'jpg', 'jpeg', 'bmp', 'tif'}
-
-        # first, count the number of samples and classes
-        self.nb_sample = 0
-        self.nb_GT_sample = 0
-        self.filenames = []
-        self.gt_filenames = []
-        if not self.class_mode == 'segmentation':
-            if not classes:
+        # Check class names
+        if not classes:
+            if self.class_mode == 'segmentation':
+                raise ValueError('You should input the class names')
+            else:
                 classes = []
                 for subdir in sorted(os.listdir(directory)):
                     if os.path.isdir(os.path.join(directory, subdir)):
                         classes.append(subdir)
-            self.nb_class = len(classes)
-            self.class_indices = dict(zip(classes, range(len(classes))))
+        self.nb_class = len(classes)
+        self.class_indices = dict(zip(classes, range(len(classes))))
 
+        self.nb_sample = 0
+        self.filenames = []
+        self.classes = []
+
+        # Get filenames
+        if not self.class_mode == 'segmentation':
             for subdir in classes:
                 subpath = os.path.join(directory, subdir)
                 for fname in os.listdir(subpath):
-                    is_valid = False
-                    for extension in white_list_formats:
-                        if fname.lower().endswith('.' + extension):
-                            is_valid = True
-                            break
-                    if is_valid:
-                        self.nb_sample += 1
-            print('   Found %d images belonging to %d classes' % (self.nb_sample,
-                                                                self.nb_class))
+                    if self.has_valid_extension(fname):
+                        self.classes.append(self.class_indices[subdir])
+                        self.filenames.append(os.path.join(subdir, fname))
+            self.classes = np.array(self.classes)
         else:
             for fname in os.listdir(directory):
-                is_valid = False
-                for extension in white_list_formats:
-                    if fname.lower().endswith('.' + extension):
-                        is_valid = True
-                        break
-                if is_valid:
+                if self.has_valid_extension(fname):
                     self.filenames.append(fname)
-                    self.nb_sample += 1
-            print('   Found %d images' % (self.nb_sample))
+                    # Look for the GT filename
+                    gt_fname = os.path.join(gt_directory,
+                                            os.path.split(fname)[1])
+                    if not os.path.isfile(gt_fname):
+                        raise ValueError('GT file not found: ' + gt_fname)
             self.filenames = np.sort(self.filenames)
-            for fname in os.listdir(gt_directory):
-                is_valid = False
-                for extension in white_list_formats:
-                    if fname.lower().endswith('.' + extension):
-                        is_valid = True
-                        break
-                if is_valid:
-                    self.gt_filenames.append(fname)
-                    self.nb_GT_sample += 1
-            print('   Found %d GT images' % (self.nb_sample))
-            self.gt_filenames = np.sort(self.gt_filenames)
 
-        if not self.class_mode == 'segmentation':
-            self.classes = np.zeros((self.nb_sample,), dtype='int32')
-            i = 0
-            for subdir in classes:
-                subpath = os.path.join(directory, subdir)
-                for fname in os.listdir(subpath):
-                    is_valid = False
-                    for extension in white_list_formats:
-                        if fname.lower().endswith('.' + extension):
-                            is_valid = True
-                            break
-                    if is_valid:
-                        self.classes[i] = self.class_indices[subdir]
-                        self.filenames.append(os.path.join(subdir, fname))
-                        i += 1
+        self.nb_sample = len(self.filenames)
+        print('   Found %d images belonging to %d classes' % (self.nb_sample,
+                                                            self.nb_class))
 
         super(DirectoryIterator, self).__init__(self.nb_sample, batch_size,
                                                 shuffle, seed)
 
     def next(self):
+        # Lock the generation of index only. The rest is not under thread
+        # lock so it can be done in parallel
         with self.lock:
             index_array, current_index, current_batch_size = next(self.index_generator)
-        # The transformation of images is not under thread lock so it can
-        # be done in parallel
-        if self.target_size[0] is None:
-            batch_x = 0
-        else:
+
+        # Create the batch_x and batch_y
+        if current_batch_size > 1:
             batch_x = np.zeros((current_batch_size,) + self.image_shape)
-        if self.class_mode == 'segmentation':
-            if self.target_size[0] is None:
-                batch_y = 0
-            else:
-                batch_y = np.zeros((current_batch_size, 1, self.image_shape[1],
-                                    self.image_shape[2]))
-        grayscale = self.color_mode == 'grayscale'
-        # build batch of image data
+            if self.has_gt_image:
+                batch_y = np.zeros((current_batch_size,) + self.gt_image_shape)
+
+        # Build batch of image data
         for i, j in enumerate(index_array):
+            # Load image
             fname = self.filenames[j]
-            gtname = self.gt_filenames[j]
             img = load_img(os.path.join(self.directory, fname),
-                           grayscale=grayscale,
+                           grayscale=self.grayscale,
                            resize=self.resize, order=1)
             x = img_to_array(img, dim_ordering=self.dim_ordering)
-            if not self.class_mode == 'segmentation':
-                x = self.image_data_generator.standardize(x)
-                x = self.image_data_generator.random_transform(x)
-                if current_batch_size > 1:
-                    batch_x[i] = x
-                else:
-                    batch_x = np.expand_dims(x, axis=0)
+
+            # Load GT image if segmentation
+            if self.has_gt_image:
+                # Load GT image
+                gt_img = load_img(os.path.join(self.gt_directory, fname),
+                                  grayscale=False,
+                                  resize=self.resize, order=0)
+                y = img_to_array(gt_img, dim_ordering=self.dim_ordering)
             else:
-                # print(gtname)
-                GT = load_img(os.path.join(self.gt_directory, gtname),
-                              grayscale=False,
-                              resize=self.resize, order=0)
-                y = img_to_array(GT, dim_ordering=self.dim_ordering)
-                # print ('Classes: ' + str(np.unique(y)))
-                x = self.image_data_generator.standardize(x, y)
-                x, y = self.image_data_generator.random_transform(x, y)
-                if current_batch_size > 1:
-                    batch_x[i] = x
+                y = None
+
+            # Standarize image
+            x = self.image_data_generator.standardize(x, y)
+
+            # Data augmentation
+            x, y = self.image_data_generator.random_transform(x, y)
+
+            # Add images to batches
+            if current_batch_size > 1:
+                batch_x[i] = x
+                if self.has_gt_image:
                     batch_y[i] = y
-                else:
-                    batch_x = np.expand_dims(x, axis=0)
+            else:
+                batch_x = np.expand_dims(x, axis=0)
+                if self.has_gt_image:
                     batch_y = np.expand_dims(y, axis=0)
+
         # optionally save augmented images to disk for debugging purposes
         if self.save_to_dir:
             for i in range(current_batch_size):
@@ -681,7 +692,8 @@ class DirectoryIterator(Iterator):
                     img = array_to_img(batch_x[i], self.dim_ordering,
                                        scale=True)
                     img.save(os.path.join(self.save_to_dir, fname))
-        # build batch of labels
+
+        # Build batch of labels
         if self.class_mode == 'sparse':
             batch_y = self.classes[index_array]
         elif self.class_mode == 'binary':
@@ -690,7 +702,7 @@ class DirectoryIterator(Iterator):
             batch_y = np.zeros((len(batch_x), self.nb_class), dtype='float32')
             for i, label in enumerate(self.classes[index_array]):
                 batch_y[i, label] = 1.
-        elif not self.class_mode == 'segmentation':
+        elif self.class_mode == None:
             return batch_x
-        # print(self.directory, np.shape(batch_x), np.shape(batch_y))
+
         return batch_x, batch_y

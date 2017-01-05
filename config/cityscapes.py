@@ -7,9 +7,9 @@ train_model       = True            # Train the model
 test_model        = False           # Test the model
 
 # Debug
-debug             = False            # Use only few images for debuging
-debug_images_train= 500             # N images for training in debug mode (-1 means all)
-debug_images_valid= -1              # N images for validation in debug mode (-1 means all)
+debug             = True            # Use only few images for debuging
+debug_images_train= 50              # N images for training in debug mode (-1 means all)
+debug_images_valid= 50              # N images for validation in debug mode (-1 means all)
 debug_images_test = 50              # N images for testing in debug mode (-1 means all)
 
 # Noralization constants
@@ -68,6 +68,10 @@ checkpoint_mode              = 'max'           # Mode ['max' | 'min']
 checkpoint_save_best_only    = True            # Save best or last model
 checkpoint_save_weights_only = True            # Save only weights or also model
 checkpoint_verbose           = 0              # Verbosity of the checkpoint
+
+# Callback plot
+plotHist_enabled             = False            # Enable the Callback
+plotHist_verbose             = 0               # Verbosity of the callback
 
 # Data augmentation for training
 da_save_to_dir                   = False  # Save the images for debuging

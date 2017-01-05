@@ -15,7 +15,6 @@ from layers.deconv import Deconvolution2D
 
 
 def build_fcn8(img_shape,
-               x_shape=None,
                dim_ordering='th',
                l2_reg=0.,
                nclasses=8,

@@ -249,12 +249,17 @@ class Evaluate_model(Callback):
 class History_plot(Callback):
 
     # Constructor
-    def __init__(self, n_classes, save_path, verbose=False, *args):
+    def __init__(self, n_classes, savepath, train_metrics, valid_metrics,
+                 best_metric, best_type, verbose=False, *args):
         super(Callback, self).__init__()
         # Save input parameters
         self.n_classes = n_classes
-        self.save_path = save_path
+        self.savepath = savepath
         self.verbose = verbose
+        self.train_metrics = train_metrics
+        self.valid_metrics = valid_metrics
+        self.best_metric = best_metric
+        self.best_type = best_type
 
     def on_train_begin(self, logs={}):
         self.epoch = []
@@ -265,8 +270,12 @@ class History_plot(Callback):
         for k, v in logs.items():
             self.history.setdefault(k, []).append(v)
 
-        plot_history(self.history, self.save_path, self.n_classes, self.verbose)
-
+        plot_history(self.history, self.savepath, self.n_classes,
+                     train_metrics=self.train_metrics,
+                     valid_metrics=self.valid_metrics,
+                     best_metric=self.best_metric,
+                     best_type=self.best_type,
+                     verbose=self.verbose)
 
 # Compute the jaccard value
 class Jacc_new(Callback):

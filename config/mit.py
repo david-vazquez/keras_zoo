@@ -1,6 +1,6 @@
 # Parameters
-dataset_name      = 'synthia_audi_full'  # Dataset name
-model_name        = 'fcn8'          # FCN model to use
+dataset_name      = 'mit'           # Dataset name
+model_name        = 'alexNet'       # FCN model to use [fcn8 | alexNet]
 show_model        = False            # Show the architecture layers
 plot_hist         = True            # Plot the training history after training
 train_model       = True            # Train the model
@@ -8,9 +8,9 @@ test_model        = False           # Test the model
 
 # Debug
 debug             = True            # Use only few images for debuging
-debug_images_train= -1              # N images for training in debug mode (-1 means all)
-debug_images_valid= 500             # N images for validation in debug mode (-1 means all)
-debug_images_test = 30              # N images for testing in debug mode (-1 means all)
+debug_images_train= 50             # N images for training in debug mode (-1 means all)
+debug_images_valid= 50              # N images for validation in debug mode (-1 means all)
+debug_images_test = 50              # N images for testing in debug mode (-1 means all)
 
 # Noralization constants
 input_norm        = 'rescale'       # Normalizations ['mean' | 'std' | 'meanAndStd' | 'rescale']
@@ -23,12 +23,12 @@ cb_weights_method = None            # Label weight balance [None | 'median_freq_
 batch_size_train  = 10              # Batch size during training
 batch_size_valid  = 30              # Batch size during validation
 batch_size_test   = 30              # Batch size during testing
-crop_size_train   = (224, 224)      # Crop size during training (Height, Width) or None
+crop_size_train   = None      # Crop size during training (Height, Width) or None
 crop_size_valid   = None            # Crop size during validation
 crop_size_test    = None            # Crop size during testing
-resize_train      = (270, 480)      # Resize the image during training (Height, Width) or None
-resize_valid      = (270, 480)      # Resize the image during validation
-resize_test       = (270, 480)      # Resize the image during testing
+resize_train      = (227, 227)      # Resize the image during training (Height, Width) or None
+resize_valid      = (227, 227)      # Resize the image during validation
+resize_test       = (227, 227)      # Resize the image during testing
 
 # Data shuffle
 shuffle_train     = True            # Whether to shuffle the training data
@@ -42,35 +42,32 @@ seed_test         = 1924            # Random seed for the testing shuffle
 optimizer         = 'rmsprop'       # Optimizer
 learning_rate     = 0.0001          # Training learning rate
 weight_decay      = 0.              # Weight decay or L2 parameter norm penalty
-n_epochs          = 1000            # Number of epochs during training
+n_epochs          = 3               # Number of epochs during training
 load_pretrained   = False           # Load a pretrained model for doing finetuning
 weights_file      = 'weights.hdf5'  # Training weight file name
 
-# Callback validation
-valid_metrics                = ['val_loss', 'val_jaccard', 'val_acc', 'val_jaccard_perclass']
-
 # Callback save results
-save_results_enabled         = True            # Enable the Callback
+save_results_enabled         = False           # Enable the Callback
 save_results_nsamples        = 5               # Number of samples to save
 save_results_batch_size      = 5               # Size of the batch
 
 # Callback early stoping
 earlyStopping_enabled        = True            # Enable the Callback
-earlyStopping_monitor        = 'val_jaccard'   # Metric to monitor
+earlyStopping_monitor        = 'acc'           # Metric to monitor
 earlyStopping_mode           = 'max'           # Mode ['max' | 'min']
 earlyStopping_patience       = 100             # Max patience for the early stopping
 earlyStopping_verbose        = 0               # Verbosity of the early stopping
 
 # Callback model check point
 checkpoint_enabled           = True            # Enable the Callback
-checkpoint_monitor           = 'val_jaccard'   # Metric to monitor
+checkpoint_monitor           = 'acc'           # Metric to monitor
 checkpoint_mode              = 'max'           # Mode ['max' | 'min']
 checkpoint_save_best_only    = True            # Save best or last model
 checkpoint_save_weights_only = True            # Save only weights or also model
 checkpoint_verbose           = 0               # Verbosity of the checkpoint
 
 # Callback plot
-plotHist_enabled             = True           # Enable the Callback
+plotHist_enabled             = False            # Enable the Callback
 plotHist_verbose             = 0               # Verbosity of the callback
 
 # Data augmentation for training

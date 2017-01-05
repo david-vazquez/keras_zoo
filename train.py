@@ -20,6 +20,7 @@ from keras.utils.visualize_util import plot
 
 # Import project libraries
 from models.fcn8 import build_fcn8
+from models.alexNet import build_alexNet
 from metrics.metrics import cce_flatt, IoU
 from callbacks.callbacks import Evaluate_model, compute_metrics, History_plot, Jacc_new, Save_results
 from tools.loader_sem_seg import ImageDataGenerator
@@ -82,19 +83,29 @@ def build_model(cf, optimizer):
     weights_file = os.path.join(cf.savepath, cf.weights_file) if cf.load_pretrained else False
 
     # Create the model
-    in_shape = (cf.dataset.n_channels, None, None)
+
     if cf.model_name == 'fcn8':
+        in_shape = (cf.dataset.n_channels, None, None)
         model = build_fcn8(in_shape,
                            l2_reg=cf.weight_decay,
                            nclasses=cf.dataset.n_classes,
                            weights_file=weights_file)
+        # Compile
+        model.compile(loss=cce_flatt(cf.dataset.void_class, cf.dataset.cb_weights),
+                      metrics=[IoU(cf.dataset.n_classes, cf.dataset.void_class)],
+                      optimizer=optimizer)
+    elif cf.model_name == 'alexNet':
+        in_shape = (cf.dataset.n_channels, cf.target_size_train[0], cf.target_size_train[1])
+        model = build_alexNet(in_shape,
+                              l2_reg=cf.weight_decay,
+                              n_classes=cf.dataset.n_classes,
+                              weights_file=weights_file)
+        # Compile
+        model.compile(loss='categorical_crossentropy',
+                      metrics=['accuracy'],
+                      optimizer=optimizer)
     else:
         raise ValueError('Unknown model')
-
-    # Compile
-    model.compile(loss=cce_flatt(cf.dataset.void_class, cf.dataset.cb_weights),
-                  metrics=[IoU(cf.dataset.n_classes, cf.dataset.void_class)],
-                  optimizer=optimizer)
 
     # Show model structure
     if cf.show_model:
@@ -128,7 +139,7 @@ def load_datasets(cf):
                                channel_shift_range=cf.da_channel_shift_range,
                                fill_mode=cf.da_fill_mode,
                                cval=cf.da_cval,
-                               void_label=cf.dataset.void_class[0],
+                               void_label=cf.dataset.void_class[0] if cf.dataset.void_class else None,
                                horizontal_flip=cf.da_horizontal_flip,
                                vertical_flip=cf.da_vertical_flip,
                                rescale=cf.dataset.rgb_rescale,
@@ -141,7 +152,7 @@ def load_datasets(cf):
                                           resize=cf.resize_train,
                                           target_size=cf.target_size_train,
                                           color_mode=cf.dataset.color_mode,
-                                          classes=cf.dataset.n_classes,
+                                          classes=cf.dataset.classes,
                                           class_mode=cf.dataset.class_mode,
                                           batch_size=cf.batch_size_train,
                                           shuffle=cf.shuffle_train,
@@ -159,7 +170,7 @@ def load_datasets(cf):
                                           resize=cf.resize_valid,
                                           target_size=cf.target_size_valid,
                                           color_mode=cf.dataset.color_mode,
-                                          classes=cf.dataset.n_classes,
+                                          classes=cf.dataset.classes,
                                           class_mode=cf.dataset.class_mode,
                                           batch_size=cf.batch_size_valid,
                                           shuffle=cf.shuffle_valid,
@@ -174,7 +185,7 @@ def load_datasets(cf):
                                          resize=cf.resize_test,
                                          target_size=cf.target_size_test,
                                          color_mode=cf.dataset.color_mode,
-                                         classes=cf.dataset.n_classes,
+                                         classes=cf.dataset.classes, #cf.dataset.n_classes,
                                          class_mode=cf.dataset.class_mode,
                                          batch_size=cf.batch_size_test,
                                          shuffle=cf.shuffle_test,
@@ -190,7 +201,7 @@ def create_callbacks(cf, valid_gen):
     cb = []
 
     # Jaccard callback
-    if True:
+    if cf.dataset.class_mode == 'segmentation':
         print('   Jaccard metric')
         cb += [Jacc_new(cf.dataset.n_classes)]
 
@@ -224,11 +235,11 @@ def create_callbacks(cf, valid_gen):
                                save_weights_only=cf.checkpoint_save_weights_only)]
 
     # Plot the loss after every epoch.
-    if True:
+    if cf.plotHist_enabled:
         print('   Plot per epoch')
-        cb += [History_plot(cf.dataset.n_classes, cf.savepath)]
-
-
+        cb += [History_plot(cf.dataset.n_classes, cf.savepath,
+                            cf.train_metrics, cf.valid_metrics,
+                            cf.best_metric, cf.best_type, cf.plotHist_verbose)]
 
     # # Define the jaccard validation callback
     # eval_model = Evaluate_model(n_classes=cf.dataset.n_classes,
@@ -331,8 +342,13 @@ def plot_training_history(cf, hist, test_metrics):
 
             # Plot history
             print('\n > Ploting the trained model history...')
-            plot_history(history, cf.savepath, cf.dataset.n_classes)
-
+            #plot_history(history, cf.savepath, cf.dataset.n_classes)
+            plot_history(history, cf.savepath, cf.dataset.n_classes,
+                         train_metrics=cf.train_metrics,
+                         valid_metrics=cf.valid_metrics,
+                         best_metric=cf.best_metric,
+                         best_type=cf.best_type,
+                         verbose=True)
 
 # Copy result to shared directory
 def copy_to_shared(cf):
@@ -429,12 +445,20 @@ def load_config_files(config_path, exp_name,
 
     # Compose dataset paths
     cf.dataset.path = dataset_path
-    cf.dataset.path_train_img = os.path.join(cf.dataset.path, 'train', 'images')
-    cf.dataset.path_train_mask = os.path.join(cf.dataset.path, 'train', 'masks')
-    cf.dataset.path_valid_img = os.path.join(cf.dataset.path, 'valid', 'images')
-    cf.dataset.path_valid_mask = os.path.join(cf.dataset.path, 'valid', 'masks')
-    cf.dataset.path_test_img = os.path.join(cf.dataset.path, 'test', 'images')
-    cf.dataset.path_test_mask = os.path.join(cf.dataset.path, 'test', 'masks')
+    if cf.dataset.class_mode == 'segmentation':
+        cf.dataset.path_train_img = os.path.join(cf.dataset.path, 'train', 'images')
+        cf.dataset.path_train_mask = os.path.join(cf.dataset.path, 'train', 'masks')
+        cf.dataset.path_valid_img = os.path.join(cf.dataset.path, 'valid', 'images')
+        cf.dataset.path_valid_mask = os.path.join(cf.dataset.path, 'valid', 'masks')
+        cf.dataset.path_test_img = os.path.join(cf.dataset.path, 'test', 'images')
+        cf.dataset.path_test_mask = os.path.join(cf.dataset.path, 'test', 'masks')
+    else:
+        cf.dataset.path_train_img = os.path.join(cf.dataset.path, 'train')
+        cf.dataset.path_train_mask = None
+        cf.dataset.path_valid_img = os.path.join(cf.dataset.path, 'valid')
+        cf.dataset.path_valid_mask = None
+        cf.dataset.path_test_img = os.path.join(cf.dataset.path, 'test')
+        cf.dataset.path_test_mask = None
 
     # If in Debug mode use few images
     if cf.debug and cf.debug_images_train>0:
@@ -456,6 +480,18 @@ def load_config_files(config_path, exp_name,
     if cf.crop_size_test is not None: cf.target_size_test = cf.crop_size_test
     elif cf.resize_test is not None: cf.target_size_test = cf.resize_test
     else: cf.target_size_test = cf.dataset.img_shape
+
+    # Plot metrics
+    if cf.dataset.class_mode == 'segmentation':
+        cf.train_metrics = ['loss', 'acc', 'jaccard']
+        cf.valid_metrics = ['val_loss', 'val_acc', 'val_jaccard']
+        cf.best_metric = 'val_jaccard'
+        cf.best_type = 'max'
+    else:
+        cf.train_metrics = ['loss', 'acc']
+        cf.valid_metrics = ['val_loss', 'val_acc']
+        cf.best_metric = 'val_acc'
+        cf.best_type = 'max'
 
     return cf
 
