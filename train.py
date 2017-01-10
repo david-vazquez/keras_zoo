@@ -20,7 +20,10 @@ from keras.utils.visualize_util import plot
 
 # Import project libraries
 from models.fcn8 import build_fcn8
+from models.lenet import build_lenet
 from models.alexNet import build_alexNet
+from models.vgg16 import build_vgg16
+from models.vgg19 import build_vgg19
 from metrics.metrics import cce_flatt, IoU
 from callbacks.callbacks import Evaluate_model, compute_metrics, History_plot, Jacc_new, Save_results
 from tools.loader_sem_seg import ImageDataGenerator
@@ -94,12 +97,42 @@ def build_model(cf, optimizer):
         model.compile(loss=cce_flatt(cf.dataset.void_class, cf.dataset.cb_weights),
                       metrics=[IoU(cf.dataset.n_classes, cf.dataset.void_class)],
                       optimizer=optimizer)
+    elif cf.model_name == 'lenet':
+        in_shape = (cf.dataset.n_channels, cf.target_size_train[0], cf.target_size_train[1])
+        model = build_lenet(in_shape,
+                              l2_reg=cf.weight_decay,
+                              n_classes=cf.dataset.n_classes,
+                              weights_file=weights_file)
+        # Compile
+        model.compile(loss='categorical_crossentropy',
+                      metrics=['accuracy'],
+                      optimizer=optimizer)
     elif cf.model_name == 'alexNet':
         in_shape = (cf.dataset.n_channels, cf.target_size_train[0], cf.target_size_train[1])
         model = build_alexNet(in_shape,
                               l2_reg=cf.weight_decay,
                               n_classes=cf.dataset.n_classes,
                               weights_file=weights_file)
+        # Compile
+        model.compile(loss='categorical_crossentropy',
+                      metrics=['accuracy'],
+                      optimizer=optimizer)
+    elif cf.model_name == 'vgg16':
+        in_shape = (cf.dataset.n_channels, cf.target_size_train[0], cf.target_size_train[1])
+        model = build_vgg16(in_shape,
+                            l2_reg=cf.weight_decay,
+                            n_classes=cf.dataset.n_classes,
+                            weights_file=weights_file)
+        # Compile
+        model.compile(loss='categorical_crossentropy',
+                      metrics=['accuracy'],
+                      optimizer=optimizer)
+    elif cf.model_name == 'vgg19':
+        in_shape = (cf.dataset.n_channels, cf.target_size_train[0], cf.target_size_train[1])
+        model = build_vgg19(in_shape,
+                            l2_reg=cf.weight_decay,
+                            n_classes=cf.dataset.n_classes,
+                            weights_file=weights_file)
         # Compile
         model.compile(loss='categorical_crossentropy',
                       metrics=['accuracy'],
@@ -295,34 +328,50 @@ def train_model(cf, model, train_gen, valid_gen, cb):
         return None
 
 
+# # Test the model
+# def test_model(cf, model, test_gen):
+#     if cf.test_model:
+#         print('\n > Testing the model...')
+#         # Load best trained model
+#         model.load_weights(os.path.join(cf.savepath, "weights.hdf5"))
+#         # Compute metrics
+#         test_metrics = compute_metrics(model, test_gen, cf.dataset.n_images_test,
+#                                        cf.dataset.n_classes,
+#                                        metrics=['test_loss',
+#                                                 'test_jaccard',
+#                                                 'test_acc',
+#                                                 'test_jaccard_perclass'],
+#                                        color_map=cf.color_map,
+#                                        tag="test",
+#                                        void_label=cf.dataset.void_class[0],
+#                                        out_images_folder=cf.savepath,
+#                                        epoch=0,
+#                                        save_all_images=True
+#                                        )
+#         # Show results
+#         for k in sorted(test_metrics.keys()):
+#             print('   {}: {}'.format(k, test_metrics[k]))
+#
+#         # return metrics
+#         return test_metrics
+#     else:
+#         return None
+
+
 # Test the model
 def test_model(cf, model, test_gen):
     if cf.test_model:
         print('\n > Testing the model...')
         # Load best trained model
         model.load_weights(os.path.join(cf.savepath, "weights.hdf5"))
-        # Compute metrics
-        test_metrics = compute_metrics(model, test_gen, cf.dataset.n_images_test,
-                                       cf.dataset.n_classes,
-                                       metrics=['test_loss',
-                                                'test_jaccard',
-                                                'test_acc',
-                                                'test_jaccard_perclass'],
-                                       color_map=cf.color_map,
-                                       tag="test",
-                                       void_label=cf.dataset.void_class[0],
-                                       out_images_folder=cf.savepath,
-                                       epoch=0,
-                                       save_all_images=True
-                                       )
-        # Show results
-        for k in sorted(test_metrics.keys()):
-            print('   {}: {}'.format(k, test_metrics[k]))
 
-        # return metrics
-        return test_metrics
-    else:
-        return None
+        start_time = time.time()
+        model.predict_generator(test_gen, cf.n_images_test,
+                                max_q_size=10, nb_worker=1, pickle_safe=False)
+        total_time = time.time() - start_time
+        fps = float(cf.n_images_test) / total_time
+        s_p_f =  total_time / float(cf.n_images_test)
+        print ('Testing time: {}. FPS: {}. Seconds per Frame: {}'.format(total_time, fps, s_p_f))
 
 
 # Plot training history

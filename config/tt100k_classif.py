@@ -1,5 +1,5 @@
 # Parameters
-dataset_name      = 'mit'           # Dataset name
+dataset_name      = 'TT100K_classif'           # Dataset name
 model_name        = 'lenet'       # FCN model to use [fcn8 | alexNet]
 show_model        = False            # Show the architecture layers
 plot_hist         = True            # Plot the training history after training

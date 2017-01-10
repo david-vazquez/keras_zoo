@@ -5,6 +5,7 @@ from keras.models import Model
 from keras.layers import Input, merge, Dense, Dropout, Activation, Flatten
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
 
+# Adapted from: https://github.com/heuritech/convnets-keras
 
 def crosschannelnormalization(alpha=1e-4, k=2, beta=0.75, n=5, **kwargs):
     """
