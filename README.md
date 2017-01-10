@@ -21,9 +21,9 @@ David Vázquez, Jorge Bernal, F. Javier Sánchez, Gloria Fernández-Esparrach, A
 ## How to cite
 
 ## TODO
-[ ] Plot online
-[ ] Relaunch: Remember the number of the last epoch
-[ ] Find max batch size val-test
+- [ ] Plot online
+- [ ] Relaunch: Remember the number of the last epoch
+- [ ] Find max batch size val-test
 [ ] Split Synthia Train-Val
 [ ] Experiment Synthia vs Synthia
 [ ] Mix
