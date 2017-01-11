@@ -1,7 +1,7 @@
 # Parameters
 dataset_name      = 'synthia_audi_full'  # Dataset name
-model_name        = 'fcn8'          # FCN model to use
-show_model        = False            # Show the architecture layers
+model_name        = 'fcn8'          # Model to use ['fcn8' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19']
+show_model        = False           # Show the architecture layers
 plot_hist         = True            # Plot the training history after training
 train_model       = True            # Train the model
 test_model        = False           # Test the model

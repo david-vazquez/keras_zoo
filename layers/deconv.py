@@ -1,7 +1,10 @@
+from keras import backend as K
+dim_ordering = K.image_dim_ordering()
+if dim_ordering == 'th':
+    from theano import tensor as T
+
 from keras.layers.convolutional import Convolution2D
-import keras.backend as K
 from keras.utils.np_utils import conv_output_length, conv_input_length
-import theano.tensor as T
 def _preprocess_conv2d_input(x, dim_ordering):
     if dim_ordering == 'tf':
         # TF uses the last dimension as channel dimension,
@@ -110,7 +113,7 @@ def deconv2d(x, kernel, output_shape, strides=(1, 1),
 
     for i in [-2, -1]:
         if output_shape[i] is None:
-            output_size[i] = conv_input_length(x.shape[i], filter_shape[i], 
+            output_size[i] = conv_input_length(x.shape[i], filter_shape[i],
                                                 border_mode, strides[i])
         else:
             output_size[i] = output_shape[i]
@@ -143,7 +146,7 @@ class Deconvolution2D(Convolution2D):
             raise Exception('Invalid border mode for DeConv2D:', border_mode)
 
         self.output_shape_ = self.get_output_shape_for_helper(input_shape, nb_filter,
-                                                              dim_ordering, nb_row, nb_col, 
+                                                              dim_ordering, nb_row, nb_col,
                                                               border_mode, subsample)
         super(Deconvolution2D, self).__init__(nb_filter, nb_row, nb_col,
                                               init=init, activation=activation,
@@ -154,8 +157,8 @@ class Deconvolution2D(Convolution2D):
                                               W_constraint=W_constraint, b_constraint=b_constraint,
                                               bias=bias, **kwargs)
 
-    def get_output_shape_for_helper(self, input_shape, 
-                                    nb_filter, dim_ordering, 
+    def get_output_shape_for_helper(self, input_shape,
+                                    nb_filter, dim_ordering,
                                     nb_row, nb_col,
                                     border_mode, subsample):
         if dim_ordering == 'th':
@@ -205,7 +208,7 @@ class Deconvolution2D(Convolution2D):
         # out_shape_tmp = self.output_shape_[:2] + (1, 1)
         # print(out_shape_tmp)
         out_shape_tmp = self.output_shape_
-        output = deconv2d(x, self.W, out_shape_tmp, 
+        output = deconv2d(x, self.W, out_shape_tmp,
                             strides=self.subsample,
                             border_mode=self.border_mode,
                             dim_ordering=self.dim_ordering,

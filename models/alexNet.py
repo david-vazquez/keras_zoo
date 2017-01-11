@@ -52,12 +52,7 @@ def splittensor(axis=1, ratio_split=1, id_split=0, **kwargs):
     return Lambda(f, output_shape=lambda input_shape: g(input_shape), **kwargs)
 
 
-def build_alexNet(img_shape=(3, 227, 227),
-                  dim_ordering='th',
-                  l2_reg=0.,
-                  weights_file=False,
-                  n_classes=1000,
-                  **kwargs):
+def build_alexNet(img_shape=(3, 227, 227), n_classes=1000, l2_reg=0.):
 
     inputs = Input(img_shape)
 
@@ -96,12 +91,14 @@ def build_alexNet(img_shape=(3, 227, 227),
     dense_2 = Dropout(0.5)(dense_1)
     dense_2 = Dense(4096, activation='relu', name='dense_2')(dense_2)
     dense_3 = Dropout(0.5)(dense_2)
-    dense_3 = Dense(n_classes, name='dense_3')(dense_3)
+    if n_classes == 1000:
+        dense_3 = Dense(n_classes, name='dense_3')(dense_3)
+    else:
+        # We change the name so when loading the weights_file from a
+        # Imagenet pretrained model does not crash
+        dense_3 = Dense(n_classes, name='dense_3_new')(dense_3)
     prediction = Activation("softmax", name="softmax")(dense_3)
 
     model = Model(input=inputs, output=prediction)
-
-    if weights_file:
-        model.load_weights(weights_file)
 
     return model

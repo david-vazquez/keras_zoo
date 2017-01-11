@@ -1,7 +1,7 @@
 # Parameters
 dataset_name      = 'mit'           # Dataset name
-model_name        = 'lenet'       # FCN model to use [fcn8 | alexNet]
-show_model        = False            # Show the architecture layers
+model_name        = 'alexNet'         # Model to use ['fcn8' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19']
+show_model        = False           # Show the architecture layers
 plot_hist         = True            # Plot the training history after training
 train_model       = True            # Train the model
 test_model        = False           # Test the model
@@ -44,7 +44,7 @@ learning_rate     = 0.0001          # Training learning rate
 weight_decay      = 0.              # Weight decay or L2 parameter norm penalty
 n_epochs          = 30               # Number of epochs during training
 load_pretrained   = False           # Load a pretrained model for doing finetuning
-weights_file      = 'weights.hdf5'  # Training weight file name
+weights_file      = './weights/alexnet_weights.h5'  # Training weight file name
 
 # Callback save results
 save_results_enabled         = False           # Enable the Callback

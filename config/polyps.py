@@ -1,10 +1,10 @@
 # Parameters
 dataset_name      = 'polyps'        # Dataset name
-model_name        = 'fcn8'          # FCN model to use
+model_name        = 'fcn8'          # Model to use ['fcn8' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19']
 show_model        = False           # Show the architecture layers
 plot_hist         = True            # Plot the training history after training
-train_model       = False            # Train the model
-test_model        = True           # Test the model
+train_model       = True            # Train the model
+test_model        = False           # Test the model
 
 # Debug
 debug             = True            # Use only few images for debuging
@@ -42,12 +42,9 @@ seed_test         = 1924            # Random seed for the testing shuffle
 optimizer         = 'rmsprop'       # Optimizer
 learning_rate     = 0.0001          # Training learning rate
 weight_decay      = 0.              # Weight decay or L2 parameter norm penalty
-n_epochs          = 2            # Number of epochs during training
+n_epochs          = 2               # Number of epochs during training
 load_pretrained   = False           # Load a pretrained model for doing finetuning
 weights_file      = 'weights.hdf5'  # Training weight file name
-
-# Callback validation
-valid_metrics                = ['val_loss', 'val_jaccard', 'val_acc', 'val_jaccard_perclass']
 
 # Callback save results
 save_results_enabled         = True            # Enable the Callback

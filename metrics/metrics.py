@@ -1,7 +1,8 @@
 from keras import backend as K
-import theano
-from theano import tensor as T
-# from __future__ import print_function
+dim_ordering = K.image_dim_ordering()
+if dim_ordering == 'th':
+    import theano
+    from theano import tensor as T
 
 
 def cce_flatt(void_class, weights_class):
@@ -63,6 +64,7 @@ def IoU(n_classes, void_labels):
             y_true_i = K.equal(y_true, i)
             y_pred_i = K.equal(y_pred, i)
             I = T.set_subtensor(I[i], K.sum(y_true_i * y_pred_i))
+
             U = T.set_subtensor(U[i], K.sum(T.or_(y_true_i, y_pred_i) * not_void))
             out['I'+str(i)] = I[i]
             out['U'+str(i)] = U[i]

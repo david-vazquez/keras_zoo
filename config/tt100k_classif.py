@@ -1,14 +1,14 @@
 # Parameters
-dataset_name      = 'TT100K_classif'           # Dataset name
-model_name        = 'lenet'       # FCN model to use [fcn8 | alexNet]
-show_model        = False            # Show the architecture layers
+dataset_name      = 'TT100K_classif'# Dataset name
+model_name        = 'lenet'         # Model to use ['fcn8' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19']
+show_model        = False           # Show the architecture layers
 plot_hist         = True            # Plot the training history after training
 train_model       = True            # Train the model
 test_model        = False           # Test the model
 
 # Debug
-debug             = False            # Use only few images for debuging
-debug_images_train= 50             # N images for training in debug mode (-1 means all)
+debug             = False           # Use only few images for debuging
+debug_images_train= 50              # N images for training in debug mode (-1 means all)
 debug_images_valid= 50              # N images for validation in debug mode (-1 means all)
 debug_images_test = 50              # N images for testing in debug mode (-1 means all)
 
@@ -23,7 +23,7 @@ cb_weights_method = None            # Label weight balance [None | 'median_freq_
 batch_size_train  = 10              # Batch size during training
 batch_size_valid  = 30              # Batch size during validation
 batch_size_test   = 30              # Batch size during testing
-crop_size_train   = None      # Crop size during training (Height, Width) or None
+crop_size_train   = None            # Crop size during training (Height, Width) or None
 crop_size_valid   = None            # Crop size during validation
 crop_size_test    = None            # Crop size during testing
 resize_train      = (227, 227)      # Resize the image during training (Height, Width) or None
@@ -42,7 +42,7 @@ seed_test         = 1924            # Random seed for the testing shuffle
 optimizer         = 'rmsprop'       # Optimizer
 learning_rate     = 0.0001          # Training learning rate
 weight_decay      = 0.              # Weight decay or L2 parameter norm penalty
-n_epochs          = 30               # Number of epochs during training
+n_epochs          = 30              # Number of epochs during training
 load_pretrained   = False           # Load a pretrained model for doing finetuning
 weights_file      = 'weights.hdf5'  # Training weight file name
 

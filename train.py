@@ -17,15 +17,24 @@ matplotlib.use('Agg')  # Faster plot
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.optimizers import RMSprop
 from keras.utils.visualize_util import plot
+from keras import backend as K
 
-# Import project libraries
+# Import models
 from models.fcn8 import build_fcn8
 from models.lenet import build_lenet
 from models.alexNet import build_alexNet
 from models.vgg16 import build_vgg16
 from models.vgg19 import build_vgg19
+
+# Import metrics and callbacks
 from metrics.metrics import cce_flatt, IoU
-from callbacks.callbacks import Evaluate_model, compute_metrics, History_plot, Jacc_new, Save_results
+from callbacks.callbacks import (Evaluate_model,
+                                 compute_metrics,
+                                 History_plot,
+                                 Jacc_new,
+                                 Save_results)
+
+# Import tools
 from tools.loader_sem_seg import ImageDataGenerator
 from tools.logger import Logger
 from tools.plot_history import plot_history
@@ -82,63 +91,59 @@ def create_optimizer(cf):
 
 # Build the model
 def build_model(cf, optimizer):
-    # Get pretrained weights if needed
-    weights_file = os.path.join(cf.savepath, cf.weights_file) if cf.load_pretrained else False
+
+    # Define the input size, loss and metrics
+    # TODO: TF
+    if cf.dataset.class_mode == 'categorical':
+        if K.image_dim_ordering() == 'th':
+            in_shape = (cf.dataset.n_channels,
+                        cf.target_size_train[0],
+                        cf.target_size_train[1])
+        else:
+            in_shape = (cf.target_size_train[0],
+                        cf.target_size_train[1],
+                        cf.dataset.n_channels)
+        loss = 'categorical_crossentropy'
+        metrics = ['accuracy']
+    elif cf.dataset.class_mode == 'segmentation':
+        if K.image_dim_ordering() == 'th':
+            in_shape = (cf.dataset.n_channels, None, None)
+        else:
+            in_shape = (None, None, cf.dataset.n_channels)
+        loss = cce_flatt(cf.dataset.void_class, cf.dataset.cb_weights)
+        metrics = [IoU(cf.dataset.n_classes, cf.dataset.void_class)]
+    else:
+        raise ValueError('Unknown problem type')
 
     # Create the model
-
     if cf.model_name == 'fcn8':
-        in_shape = (cf.dataset.n_channels, None, None)
-        model = build_fcn8(in_shape,
-                           l2_reg=cf.weight_decay,
-                           nclasses=cf.dataset.n_classes,
-                           weights_file=weights_file)
-        # Compile
-        model.compile(loss=cce_flatt(cf.dataset.void_class, cf.dataset.cb_weights),
-                      metrics=[IoU(cf.dataset.n_classes, cf.dataset.void_class)],
-                      optimizer=optimizer)
+        model = build_fcn8(in_shape, cf.dataset.n_classes, cf.weight_decay)
     elif cf.model_name == 'lenet':
-        in_shape = (cf.dataset.n_channels, cf.target_size_train[0], cf.target_size_train[1])
-        model = build_lenet(in_shape,
-                              l2_reg=cf.weight_decay,
-                              n_classes=cf.dataset.n_classes,
-                              weights_file=weights_file)
-        # Compile
-        model.compile(loss='categorical_crossentropy',
-                      metrics=['accuracy'],
-                      optimizer=optimizer)
+        model = build_lenet(in_shape, cf.dataset.n_classes, cf.weight_decay)
     elif cf.model_name == 'alexNet':
-        in_shape = (cf.dataset.n_channels, cf.target_size_train[0], cf.target_size_train[1])
-        model = build_alexNet(in_shape,
-                              l2_reg=cf.weight_decay,
-                              n_classes=cf.dataset.n_classes,
-                              weights_file=weights_file)
-        # Compile
-        model.compile(loss='categorical_crossentropy',
-                      metrics=['accuracy'],
-                      optimizer=optimizer)
+        model = build_alexNet(in_shape, cf.dataset.n_classes, cf.weight_decay)
     elif cf.model_name == 'vgg16':
-        in_shape = (cf.dataset.n_channels, cf.target_size_train[0], cf.target_size_train[1])
-        model = build_vgg16(in_shape,
-                            l2_reg=cf.weight_decay,
-                            n_classes=cf.dataset.n_classes,
-                            weights_file=weights_file)
-        # Compile
-        model.compile(loss='categorical_crossentropy',
-                      metrics=['accuracy'],
-                      optimizer=optimizer)
+        model = build_vgg16(in_shape, cf.dataset.n_classes, cf.weight_decay)
     elif cf.model_name == 'vgg19':
-        in_shape = (cf.dataset.n_channels, cf.target_size_train[0], cf.target_size_train[1])
-        model = build_vgg19(in_shape,
-                            l2_reg=cf.weight_decay,
-                            n_classes=cf.dataset.n_classes,
-                            weights_file=weights_file)
-        # Compile
-        model.compile(loss='categorical_crossentropy',
-                      metrics=['accuracy'],
-                      optimizer=optimizer)
+        model = build_vgg19(in_shape, cf.dataset.n_classes, cf.weight_decay)
     else:
         raise ValueError('Unknown model')
+
+    # Load pretrained weights
+    if cf.load_pretrained:
+        # Get weights file name
+        path, _ = os.path.split(cf.weights_file)
+        if path == '':
+            weights_file = os.path.join(cf.savepath, cf.weights_file)
+        else:
+            weights_file = cf.weights_file
+
+        # Load weights
+        print('   loading model weights from: ' + weights_file + '...')
+        model.load_weights(weights_file, by_name=True)
+
+    # Compile model
+    model.compile(loss=loss, metrics=metrics, optimizer=optimizer)
 
     # Show model structure
     if cf.show_model:
@@ -274,34 +279,6 @@ def create_callbacks(cf, valid_gen):
                             cf.train_metrics, cf.valid_metrics,
                             cf.best_metric, cf.best_type, cf.plotHist_verbose)]
 
-    # # Define the jaccard validation callback
-    # eval_model = Evaluate_model(n_classes=cf.dataset.n_classes,
-    #                             void_label=cf.dataset.void_class[0],
-    #                             save_path=cf.savepath,
-    #                             valid_gen=valid_gen,
-    #                             valid_epoch_length=cf.n_images_valid/cf.batch_size_valid,
-    #                             valid_metrics=cf.valid_metrics,
-    #                             color_map=cf.dataset.color_map)
-    # print('   Jaccard validation callback')
-    #
-    # early_stop_jac_class = []
-    # for i in range(cf.dataset.n_classes):
-    #     early_stop_jac_class += [EarlyStopping(monitor=str(i)+'_val_jacc',
-    #                                            mode=cf.earlyStopping_mode,
-    #                                            patience=cf.earlyStopping_patience,
-    #                                            verbose=cf.earlyStopping_verbose)]
-    #
-    #
-    # checkp_jac_class = []
-    # for i in range(cf.dataset.n_classes):
-    #     checkp_jac_class += [ModelCheckpoint(filepath=os.path.join(cf.savepath, "weights"+str(i)+".hdf5"),
-    #                                          verbose=cf.checkpoint_verbose,
-    #                                          monitor=str(i)+'_val_jacc',
-    #                                          mode=cf.checkpoint_mode,
-    #                                          save_best_only=cf.checkpoint_save_best_only,
-    #                                          save_weights_only=cf.checkpoint_save_weights_only)]
-    #
-
     # Output the list of callbacks
     return cb
 
@@ -326,36 +303,6 @@ def train_model(cf, model, train_gen, valid_gen, cb):
         return hist
     else:
         return None
-
-
-# # Test the model
-# def test_model(cf, model, test_gen):
-#     if cf.test_model:
-#         print('\n > Testing the model...')
-#         # Load best trained model
-#         model.load_weights(os.path.join(cf.savepath, "weights.hdf5"))
-#         # Compute metrics
-#         test_metrics = compute_metrics(model, test_gen, cf.dataset.n_images_test,
-#                                        cf.dataset.n_classes,
-#                                        metrics=['test_loss',
-#                                                 'test_jaccard',
-#                                                 'test_acc',
-#                                                 'test_jaccard_perclass'],
-#                                        color_map=cf.color_map,
-#                                        tag="test",
-#                                        void_label=cf.dataset.void_class[0],
-#                                        out_images_folder=cf.savepath,
-#                                        epoch=0,
-#                                        save_all_images=True
-#                                        )
-#         # Show results
-#         for k in sorted(test_metrics.keys()):
-#             print('   {}: {}'.format(k, test_metrics[k]))
-#
-#         # return metrics
-#         return test_metrics
-#     else:
-#         return None
 
 
 # Test the model

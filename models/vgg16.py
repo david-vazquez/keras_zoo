@@ -1,15 +1,13 @@
+# Keras imports
 from keras.models import Model, Sequential
 from keras.layers import Dense, Dropout, Activation, Flatten
-from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
+from keras.layers.convolutional import (Convolution2D, MaxPooling2D,
+                                        ZeroPadding2D)
 
 # Adapted from: https://github.com/heuritech/convnets-keras
 
-def build_vgg16(img_shape=(3, 224, 224),
-                dim_ordering='th',
-                l2_reg=0.,
-                weights_file=False,
-                n_classes=1000,
-                **kwargs):
+
+def build_vgg16(img_shape=(3, 224, 224), n_classes=1000, l2_reg=0.):
 
     model = Sequential()
     model.add(ZeroPadding2D((1, 1), input_shape=img_shape))
@@ -55,8 +53,5 @@ def build_vgg16(img_shape=(3, 224, 224),
     model.add(Dropout(0.5))
     model.add(Dense(n_classes, name='dense_3'))
     model.add(Activation("softmax", name="softmax"))
-
-    if weights_file:
-        model.load_weights(weights_file)
 
     return model

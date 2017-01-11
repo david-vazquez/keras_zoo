@@ -1,6 +1,9 @@
-import theano
-from theano import tensor as T
-from theano.scalar.basic import Inv
+from keras import backend as K
+dim_ordering = K.image_dim_ordering()
+if dim_ordering == 'th':
+    import theano
+    from theano import tensor as T
+    from theano.scalar.basic import Inv
 
 from keras import backend as K
 from keras.layers.core import Layer
@@ -149,15 +152,22 @@ class NdSoftmax(Layer):
     Will compute the Softmax on channel_idx and return a tensor of the
     same shape as the input
     '''
-    def __init__(self, channel_idx, *args, **kwargs):
-        self.channel_idx = channel_idx
+    def __init__(self, dim_ordering='default', *args, **kwargs):
+
+        if dim_ordering == 'default':
+            dim_ordering = K.image_dim_ordering()
+        if dim_ordering == 'th':
+            self.channel_index = 1
+        if dim_ordering == 'tf':
+            self.channel_index = 3
+
         super(NdSoftmax, self).__init__(*args, **kwargs)
 
     def get_output_shape_for(self, input_shape):
         return input_shape
 
     def call(self, x, mask=None):
-        ch_idx = self.channel_idx
+        ch_idx = self.channel_index
         l_idx = x.ndim - 1  # last index
         x = K.permute_dimensions(
             x, tuple(i for i in range(x.ndim) if i != ch_idx) + (ch_idx,))
