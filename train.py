@@ -23,8 +23,8 @@ from keras import backend as K
 from models.fcn8 import build_fcn8
 from models.lenet import build_lenet
 from models.alexNet import build_alexNet
-from models.vgg16 import build_vgg16
-from models.vgg19 import build_vgg19
+from models.vgg import build_vgg
+from models.inceptionV3 import build_inceptionV3
 
 # Import metrics and callbacks
 from metrics.metrics import cce_flatt, IoU
@@ -123,9 +123,21 @@ def build_model(cf, optimizer):
     elif cf.model_name == 'alexNet':
         model = build_alexNet(in_shape, cf.dataset.n_classes, cf.weight_decay)
     elif cf.model_name == 'vgg16':
-        model = build_vgg16(in_shape, cf.dataset.n_classes, cf.weight_decay)
+        model = build_vgg(in_shape, cf.dataset.n_classes, 16, cf.weight_decay,
+                          load_pretrained=cf.load_imageNet,
+                          freeze_layers_from=cf.freeze_layers_from)
     elif cf.model_name == 'vgg19':
-        model = build_vgg19(in_shape, cf.dataset.n_classes, cf.weight_decay)
+        model = build_vgg(in_shape, cf.dataset.n_classes, 16, cf.weight_decay,
+                          load_pretrained=cf.load_imageNet,
+                          freeze_layers_from=cf.freeze_layers_from)
+    elif cf.model_name == 'resnet50':
+        model = build_vgg(in_shape, cf.dataset.n_classes, 16, cf.weight_decay,
+                          load_pretrained=cf.load_imageNet,
+                          freeze_layers_from=cf.freeze_layers_from)
+    elif cf.model_name == 'InceptionV3':
+        model = build_inceptionV3(in_shape, cf.dataset.n_classes, cf.weight_decay,
+                          load_pretrained=cf.load_imageNet,
+                          freeze_layers_from=cf.freeze_layers_from)
     else:
         raise ValueError('Unknown model')
 
@@ -168,6 +180,7 @@ def load_datasets(cf):
                                rgb_mean=cf.dataset.rgb_mean,
                                rgb_std=cf.dataset.rgb_std,
                                gcn=cf.da_gcn,
+                               imageNet=cf.load_imageNet,
                                zca_whitening=cf.da_zca_whitening,
                                rotation_range=cf.da_rotation_range,
                                width_shift_range=cf.da_width_shift_range,
@@ -202,7 +215,7 @@ def load_datasets(cf):
     # Load validation set
     print ('\n > Reading validation set...')
     dg_va = ImageDataGenerator(rgb_mean=cf.rgb_mean, rgb_std=cf.rgb_std,
-                               rescale=cf.rgb_rescale)
+                               rescale=cf.rgb_rescale, imageNet=cf.load_imageNet)
     valid_gen = dg_va.flow_from_directory(directory=cf.dataset.path_valid_img,
                                           gt_directory=cf.dataset.path_valid_mask,
                                           resize=cf.resize_valid,
@@ -217,7 +230,7 @@ def load_datasets(cf):
     # Load testing set
     print ('\n > Reading testing set...')
     dg_ts = ImageDataGenerator(rgb_mean=cf.rgb_mean, rgb_std=cf.rgb_std,
-                               rescale=cf.rgb_rescale)
+                               rescale=cf.rgb_rescale, imageNet=cf.load_imageNet)
     test_gen = dg_ts.flow_from_directory(directory=cf.dataset.path_test_img,
                                          gt_directory=cf.dataset.path_test_mask,
                                          resize=cf.resize_test,

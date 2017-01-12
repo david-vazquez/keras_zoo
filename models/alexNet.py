@@ -12,15 +12,27 @@ def crosschannelnormalization(alpha=1e-4, k=2, beta=0.75, n=5, **kwargs):
     This is the function used for cross channel normalization in the original
     Alexnet
     """
+
+
     def f(X):
-        b, ch, r, c = X.shape
+        if K.image_dim_ordering()=='tf':
+            b, r, c, ch = X.get_shape()
+        else:
+            b, ch, r, c = X.shape
+
         half = n // 2
         square = K.square(X)
-        extra_channels = K.spatial_2d_padding(K.permute_dimensions(square, (0, 2, 3, 1)), (0, half))
-        extra_channels = K.permute_dimensions(extra_channels, (0, 3, 1, 2))
         scale = k
-        for i in range(n):
-            scale += alpha * extra_channels[:, i:i+ch, :, :]
+        if K.image_dim_ordering() == 'th':
+            extra_channels = K.spatial_2d_padding(K.permute_dimensions(square, (0, 2, 3, 1)), (0, half))
+            extra_channels = K.permute_dimensions(extra_channels, (0, 3, 1, 2))
+            for i in range(n):
+                scale += alpha * extra_channels[:, i:i+ch, :, :]
+        if K.image_dim_ordering() == 'tf':
+            extra_channels = K.spatial_2d_padding(K.permute_dimensions(square, (0, 3, 1, 2)), (half, 0))
+            extra_channels = K.permute_dimensions(extra_channels, (0, 2, 3, 1))
+            for i in range(n):
+                scale += alpha * extra_channels[:, :, :, i:i+int(ch)]
         scale = scale ** beta
         return X / scale
 
@@ -29,7 +41,7 @@ def crosschannelnormalization(alpha=1e-4, k=2, beta=0.75, n=5, **kwargs):
 
 def splittensor(axis=1, ratio_split=1, id_split=0, **kwargs):
     def f(X):
-        div = X.shape[axis] // ratio_split
+        div = K.shape(X)[axis] // ratio_split
 
         if axis == 0:
             output = X[id_split*div:(id_split+1)*div, :, :, :]
@@ -54,6 +66,18 @@ def splittensor(axis=1, ratio_split=1, id_split=0, **kwargs):
 
 def build_alexNet(img_shape=(3, 227, 227), n_classes=1000, l2_reg=0.):
 
+    dim_ordering = K.image_dim_ordering()
+    if dim_ordering == 'th':
+        batch_index = 0
+        channel_index = 1
+        row_index = 2
+        col_index = 3
+    if dim_ordering == 'tf':
+        batch_index = 0
+        channel_index = 3
+        row_index = 1
+        col_index = 2
+
     inputs = Input(img_shape)
 
     conv_1 = Convolution2D(96, 11, 11, subsample=(4, 4), activation='relu',
@@ -64,8 +88,8 @@ def build_alexNet(img_shape=(3, 227, 227), n_classes=1000, l2_reg=0.):
     conv_2 = ZeroPadding2D((2, 2))(conv_2)
     conv_2 = merge([
         Convolution2D(128, 5, 5, activation="relu", name='conv_2_'+str(i+1))(
-            splittensor(ratio_split=2, id_split=i)(conv_2)
-        ) for i in range(2)], mode='concat', concat_axis=1, name="conv_2")
+            splittensor(axis=channel_index, ratio_split=2, id_split=i)(conv_2)
+        ) for i in range(2)], mode='concat', concat_axis=channel_index, name="conv_2")
 
     conv_3 = MaxPooling2D((3, 3), strides=(2, 2))(conv_2)
     conv_3 = crosschannelnormalization()(conv_3)
@@ -75,14 +99,14 @@ def build_alexNet(img_shape=(3, 227, 227), n_classes=1000, l2_reg=0.):
     conv_4 = ZeroPadding2D((1, 1))(conv_3)
     conv_4 = merge([
         Convolution2D(192, 3, 3, activation="relu", name='conv_4_'+str(i+1))(
-            splittensor(ratio_split=2, id_split=i)(conv_4)
-        ) for i in range(2)], mode='concat', concat_axis=1, name="conv_4")
+            splittensor(axis=channel_index, ratio_split=2, id_split=i)(conv_4)
+        ) for i in range(2)], mode='concat', concat_axis=channel_index, name="conv_4")
 
     conv_5 = ZeroPadding2D((1, 1))(conv_4)
     conv_5 = merge([
         Convolution2D(128, 3, 3, activation="relu", name='conv_5_'+str(i+1))(
-            splittensor(ratio_split=2, id_split=i)(conv_5)
-        ) for i in range(2)], mode='concat', concat_axis=1, name="conv_5")
+            splittensor(axis=channel_index, ratio_split=2, id_split=i)(conv_5)
+        ) for i in range(2)], mode='concat', concat_axis=channel_index, name="conv_5")
 
     dense_1 = MaxPooling2D((3, 3), strides=(2, 2), name="convpool_5")(conv_5)
 

@@ -1,6 +1,8 @@
 # Parameters
 dataset_name      = 'mit'           # Dataset name
-model_name        = 'alexNet'         # Model to use ['fcn8' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19']
+model_name        = 'InceptionV3'         # Model to use ['fcn8' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19' | 'resnet50' | 'InceptionV3']
+load_imageNet     = True            # Load Imagenet weights and normalize following imagenet procedure
+freeze_layers_from= 195    # Freeze layers from 0 to this layer during training (Useful for finetunning) [None | 'base_model' | Layer_id]
 show_model        = False           # Show the architecture layers
 plot_hist         = True            # Plot the training history after training
 train_model       = True            # Train the model
@@ -26,9 +28,9 @@ batch_size_test   = 30              # Batch size during testing
 crop_size_train   = None      # Crop size during training (Height, Width) or None
 crop_size_valid   = None            # Crop size during validation
 crop_size_test    = None            # Crop size during testing
-resize_train      = (227, 227)      # Resize the image during training (Height, Width) or None
-resize_valid      = (227, 227)      # Resize the image during validation
-resize_test       = (227, 227)      # Resize the image during testing
+resize_train      = (299, 299)      # Resize the image during training (Height, Width) or None
+resize_valid      = (299, 299)      # Resize the image during validation
+resize_test       = (299, 299)      # Resize the image during testing
 
 # Data shuffle
 shuffle_train     = True            # Whether to shuffle the training data
@@ -42,9 +44,9 @@ seed_test         = 1924            # Random seed for the testing shuffle
 optimizer         = 'rmsprop'       # Optimizer
 learning_rate     = 0.0001          # Training learning rate
 weight_decay      = 0.              # Weight decay or L2 parameter norm penalty
-n_epochs          = 30               # Number of epochs during training
-load_pretrained   = False           # Load a pretrained model for doing finetuning
-weights_file      = './weights/alexnet_weights.h5'  # Training weight file name
+n_epochs          = 30              # Number of epochs during training
+load_pretrained   = True           # Load a pretrained model for doing finetuning
+weights_file      = 'weights.hdf5'  # Training weight file name
 
 # Callback save results
 save_results_enabled         = False           # Enable the Callback

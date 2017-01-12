@@ -180,6 +180,7 @@ class ImageDataGenerator(object):
                  featurewise_std_normalization=False,
                  samplewise_std_normalization=False,
                  gcn=False,
+                 imageNet=False,
                  zca_whitening=False,
                  rotation_range=0.,
                  width_shift_range=0.,
@@ -259,6 +260,23 @@ class ImageDataGenerator(object):
             save_format=save_format)
 
     def standardize(self, x, y=None):
+        if self.imageNet:
+            if self.dim_ordering == 'th':
+                # 'RGB'->'BGR'
+                x = x[::-1, :, :]
+                # Zero-center by mean pixel
+                x[0, :, :] -= 103.939
+                x[1, :, :] -= 116.779
+                x[2, :, :] -= 123.68
+            else:
+                # 'RGB'->'BGR'
+                x = x[:, :, ::-1]
+                # Zero-center by mean pixel
+                x[:, :, 0] -= 103.939
+                x[:, :, 1] -= 116.779
+                x[:, :, 2] -= 123.68
+            return x
+
         if self.rescale:
             x *= self.rescale
         # x is a single image, so it doesn't have image number at index 0
@@ -551,11 +569,11 @@ class DirectoryIterator(Iterator):
         self.target_size = (None, None) if target_size is None else tuple(target_size)
 
         # Check color mode
-        if color_mode not in {'rgb', 'grayscale'}:
+        if color_mode not in {'rgb', 'grayscale', 'bgr'}:
             raise ValueError('Invalid color mode:', color_mode,
                              '; expected "rgb" or "grayscale".')
         self.color_mode = color_mode
-        if self.color_mode == 'rgb':
+        if self.color_mode == 'rgb' or self.color_mode == 'bgr':
             self.grayscale = False
             if self.dim_ordering == 'tf':
                 self.image_shape = self.target_size + (3,)
