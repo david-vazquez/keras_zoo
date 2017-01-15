@@ -54,35 +54,5 @@ def plot_history(hist, save_path, n_classes,
     # Save fig
     plt.savefig(os.path.join(save_path, 'plot1.png'))
 
-    # Show plot
-    # plt.show()
+    # Close plot
     plt.close()
-
-
-# # Plot training metrics per class
-# def plot2(hist, save_path, n_classes):
-#     best_index = np.argmax(hist['val_jaccard'])
-#
-#     for i in range(n_classes):
-#         b_va_jaccard = np.max(hist[str(i)+'_val_jacc'])
-#         b_va_jaccard2 = hist[str(i)+'_val_jacc'][best_index]
-#         plt.plot(hist[str(i)+'_val_jacc'],
-#                  label='Class{} Jaccard ({:.3f},{:.3f})'.format(i, b_va_jaccard,
-#                                                                    b_va_jaccard2))
-#
-#     # Add title
-#     plt.title('Model training history (Jaccard per class)')
-#
-#     # Add axis labels
-#     plt.ylabel('Metric')
-#     plt.xlabel('Epoch')
-#
-#     # Add legend
-#     plt.legend(loc='upper left')
-#
-#     # Save fig
-#     plt.savefig(os.path.join(save_path, 'plot2.png'))
-#
-#     # Show plot
-#     # plt.show()
-#     plt.close()

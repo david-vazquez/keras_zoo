@@ -1,12 +1,13 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
+import skimage.io as io
+from skimage.color import rgb2gray
+import skimage.transform
 import numpy as np
 from numpy import ma
 from six.moves import range
 import os
-#import seaborn as sns
-# import scipy.misc
 import SimpleITK as sitk
 
 from keras import backend as K
@@ -117,12 +118,25 @@ def apply_warp(x, warp_field, fill_mode='reflect',
     return x_warped
 
 
+# List the subdirectories in a directory
+def list_subdirs(directory):
+    subdirs = []
+    for subdir in sorted(os.listdir(directory)):
+        if os.path.isdir(os.path.join(directory, subdir)):
+            subdirs.append(subdir)
+    return subdirs
+
+
+# Checks if a file is an image
+def has_valid_extension(fname, white_list_formats = {'png', 'jpg', 'jpeg', 'bmp', 'tif'}):
+    for extension in white_list_formats:
+        if fname.lower().endswith('.' + extension):
+            return True
+    return False
+
+
 # Load image
 def load_img(path, grayscale=False, resize=None, order=1):
-    import skimage.io as io
-    from skimage.color import rgb2gray
-    import skimage.transform
-
     # Load image
     img = io.imread(path)
 
@@ -179,8 +193,8 @@ class ImageDataGenerator(object):
                  samplewise_center=False,
                  featurewise_std_normalization=False,
                  samplewise_std_normalization=False,
-                 gcn=False,
-                 imageNet=False,
+                 gcn=False,#
+                 imageNet=False,#
                  zca_whitening=False,
                  rotation_range=0.,
                  width_shift_range=0.,
@@ -194,6 +208,7 @@ class ImageDataGenerator(object):
                  horizontal_flip=False,
                  vertical_flip=False,
                  rescale=None,
+                 preprocessing_function=None,
                  spline_warp=False,
                  warp_sigma=0.1,
                  warp_grid_size=3,
@@ -204,10 +219,10 @@ class ImageDataGenerator(object):
         if dim_ordering == 'default':
             dim_ordering = K.image_dim_ordering()
         self.__dict__.update(locals())
-        self.mean = None
-        self.std = None
         self.principal_components = None
-        self.rescale = rescale
+        # self.rescale = rescale
+        self.preprocessing_function = preprocessing_function
+        self.cb_weights = None
 
         if dim_ordering not in {'tf', 'th'}:
             raise Exception('dim_ordering should be "tf" (channel after row '
@@ -222,6 +237,20 @@ class ImageDataGenerator(object):
             self.channel_index = 3
             self.row_index = 1
             self.col_index = 2
+
+        # Broadcast the shape of mean and std
+        if rgb_mean is not None and featurewise_center:
+            broadcast_shape = [1, 1, 1]
+            broadcast_shape[self.channel_index - 1] = len(rgb_mean)
+            self.mean = np.reshape(rgb_mean, broadcast_shape)
+            print ('   Mean {}: {}'.format(self.mean.shape, self.rgb_mean))
+
+        # Broadcast the shape of std
+        if rgb_std is not None and featurewise_std_normalization:
+            broadcast_shape = [1, 1, 1]
+            broadcast_shape[self.channel_index - 1] = len(rgb_std)
+            self.std = np.reshape(rgb_std, broadcast_shape)
+            print ('   Std {}: {}'.format(self.std.shape, self.rgb_std))
 
         if np.isscalar(zoom_range):
             self.zoom_range = [1 - zoom_range, 1 + zoom_range]
@@ -277,10 +306,11 @@ class ImageDataGenerator(object):
                 x[:, :, 2] -= 123.68
             return x
 
-        if self.rescale:
-            x *= self.rescale
         # x is a single image, so it doesn't have image number at index 0
         img_channel_index = self.channel_index - 1
+
+        if self.rescale:
+            x *= self.rescale
 
         if self.gcn:
             x_before = x.copy()
@@ -295,8 +325,6 @@ class ImageDataGenerator(object):
             # Compute mean and std masked
             mean_masked = np.mean(x_masked)
             std_masked = np.std(x_masked)
-            # print ('Mean   : ' + str(mean))
-            # print ('Std   : ' + str(std))
 
             # Normalize
             s = 1
@@ -306,13 +334,6 @@ class ImageDataGenerator(object):
             # Set void pixels to 0
             x = x*mask
 
-            # max_v = np.max(x)
-            # min_v = np.min(x)
-            # x_after = (x-min_v)/(max_v-min_v)
-            # combined_image = np.concatenate((x_before, x_after), axis=1)
-            # import scipy.misc
-            # scipy.misc.toimage(combined_image).save('./gcn.png')
-            # exit()
 
         if self.samplewise_center:
             x -= np.mean(x, axis=img_channel_index, keepdims=True)
@@ -320,19 +341,33 @@ class ImageDataGenerator(object):
             x /= (np.std(x, axis=img_channel_index, keepdims=True) + 1e-7)
 
         if self.featurewise_center:
-            x -= self.mean
+            if self.mean is not None:
+                x -= self.mean
+            else:
+                warnings.warn('This ImageDataGenerator specifies '
+                              '`featurewise_center`, but it hasn\'t'
+                              'been fit on any training data. Fit it '
+                              'first by calling `.fit(numpy_data)`.')
         if self.featurewise_std_normalization:
-            x /= (self.std + 1e-7)
-
-        if self.rgb_mean is not None:
-            x -= np.reshape(self.rgb_mean, (3, 1, 1))
-        if self.rgb_std is not None:
-            x /= np.reshape(self.rgb_std, (3, 1, 1))
+            if self.std is not None:
+                x /= (self.std + 1e-7)
+            else:
+                warnings.warn('This ImageDataGenerator specifies '
+                              '`featurewise_std_normalization`, but it hasn\'t'
+                              'been fit on any training data. Fit it '
+                              'first by calling `.fit(numpy_data)`.')
 
         if self.zca_whitening:
-            flatx = np.reshape(x, (x.size))
-            whitex = np.dot(flatx, self.principal_components)
-            x = np.reshape(whitex, (x.shape[0], x.shape[1], x.shape[2]))
+            if self.principal_components is not None:
+                flatx = np.reshape(x, (x.size))
+                whitex = np.dot(flatx, self.principal_components)
+                x = np.reshape(whitex, (x.shape[0], x.shape[1], x.shape[2]))
+            else:
+                warnings.warn('This ImageDataGenerator specifies '
+                              '`zca_whitening`, but it hasn\'t'
+                              'been fit on any training data. Fit it '
+                              'first by calling `.fit(numpy_data)`.')
+
         return x
 
     def random_transform(self, x, y=None):
@@ -401,7 +436,7 @@ class ImageDataGenerator(object):
             zoom_matrix = np.array([[zx, 0, 0],
                                     [0, zy, 0],
                                     [0, 0, 1]])
-
+# Broadcast the shape of mean and std
             transform_matrix = np.dot(np.dot(np.dot(rotation_matrix,
                                                     translation_matrix),
                                              shear_matrix), zoom_matrix)
@@ -502,15 +537,35 @@ class ImageDataGenerator(object):
         return x, y
 
     def fit(self, X, augment=False, rounds=1, seed=None):
-        '''Required for featurewise_center, featurewise_std_normalization
+        """Required for featurewise_center, featurewise_std_normalization
         and zca_whitening.
+
         # Arguments
-            X: Numpy array, the data to fit on.
-            augment: whether to fit on randomly augmented samples
-            rounds: if `augment`, how many augmentation passes to do over
-            the data
+            X: Numpy array, the data to fit on. Should have rank 4.
+                In case of grayscale data,
+                the channels axis should have value 1, and in case
+                of RGB data, it should have value 3.
+            augment: Whether to fit on randomly augmented samples
+            rounds: If `augment`,
+                how many augmentation passes to do over the data
             seed: random seed.
-        '''
+        """
+        X = np.asarray(X)
+        if X.ndim != 4:
+            raise ValueError('Input to `.fit()` should have rank 4. '
+                             'Got array with shape: ' + str(X.shape))
+        if X.shape[self.channel_index] not in {1, 3, 4}:
+            raise ValueError(
+                'Expected input to be images (as Numpy array) '
+                'following the dimension ordering convention "' + self.dim_ordering + '" '
+                '(channels on axis ' + str(self.channel_index) + '), i.e. expected '
+                'either 1, 3 or 4 channels on axis ' + str(self.channel_index) + '. '
+                'However, it was passed an array with shape ' + str(X.shape) +
+                ' (' + str(X.shape[self.channel_index]) + ' channels).')
+
+        if seed is not None:
+            np.random.seed(seed)
+
         X = np.copy(X)
         if augment:
             aX = np.zeros(tuple([rounds * X.shape[0]] + list(X.shape)[1:]))
@@ -520,29 +575,152 @@ class ImageDataGenerator(object):
             X = aX
 
         if self.featurewise_center:
-            self.mean = np.mean(X, axis=0)
+            self.mean = np.mean(X, axis=(0, self.row_index, self.col_index))
+            broadcast_shape = [1, 1, 1]
+            broadcast_shape[self.channel_index - 1] = X.shape[self.channel_index]
+            self.mean = np.reshape(self.mean, broadcast_shape)
             X -= self.mean
 
         if self.featurewise_std_normalization:
-            self.std = np.std(X, axis=0)
-            X /= (self.std + 1e-7)
+            self.std = np.std(X, axis=(0, self.row_index, self.col_index))
+            broadcast_shape = [1, 1, 1]
+            broadcast_shape[self.channel_index - 1] = X.shape[self.channel_index]
+            self.std = np.reshape(self.std, broadcast_shape)
+            X /= (self.std + K.epsilon())
 
         if self.zca_whitening:
             flatX = np.reshape(X, (X.shape[0], X.shape[1] * X.shape[2] * X.shape[3]))
-            sigma = np.dot(flatX.T, flatX) / flatX.shape[1]
+            sigma = np.dot(flatX.T, flatX) / flatX.shape[0]
             U, S, V = linalg.svd(sigma)
             self.principal_components = np.dot(np.dot(U, np.diag(1. / np.sqrt(S + 10e-7))), U.T)
 
+    def fit_from_directory(self, directory, gt_directory=None, n_classes=None,
+                           void_labels=None, cb_weights_method=None):
+        """Required for featurewise_center, featurewise_std_normalization
+        and zca_whitening.
+
+        # Arguments
+            directory: Path to the images
+            gt_directory: Path to the masks (Only for segmentation)
+            n_classes: Number of classes (Only for segmentation)
+            void_labels: Void labels (Only for segmentation)
+            cb_weights_method: Class weight balance (Only for segmentation)
+        """
+        # Get file names
+        def get_filenames(directory):
+            subdirs = list_subdirs(directory)
+            subdirs.append(directory)
+
+            file_names = []
+            for subdir in subdirs:
+                subpath = os.path.join(directory, subdir)
+                for fname in os.listdir(subpath):
+                    if has_valid_extension(fname):
+                        file_names.append(os.path.join(directory, subdir,
+                                                       fname))
+
+            return file_names
+
+        # Precompute the mean and std
+        def compute_mean_std(directory, method='mean', mean=None):
+            # Get file names
+            file_names = get_filenames(directory)
+
+            # Process each file
+            sum, n = 0, 0
+            for file_name in file_names:
+                # Load image and reshape as a vector
+                x = io.imread(file_name)
+                if self.rescale:
+                    x = x*self.rescale
+                x = x.reshape((x.shape[0]*x.shape[1], x.shape[2]))
+                n += x.shape[0]
+
+                # Compute mean or std
+                if method == 'mean':
+                    sum += np.sum(x, axis=0)
+                elif method == 'var':
+                    x -= mean
+                    sum += np.sum(x*x, axis=0)
+
+            return sum/n
+
+        # Compute mean
+        if self.featurewise_center:
+            self.rgb_mean = compute_mean_std(directory, method='mean',
+                                             mean=None)
+            # Broadcast the shape
+            broadcast_shape = [1, 1, 1]
+            broadcast_shape[self.channel_index - 1] = len(self.rgb_mean)
+            self.mean = np.reshape(self.rgb_mean, broadcast_shape)
+            print ('   Mean {}: {}'.format(self.mean.shape, self.rgb_mean,
+                                           self.mean))
+
+        # Compute std
+        if self.featurewise_std_normalization:
+            if not self.featurewise_center:
+                self.rgb_mean = compute_mean_std(directory, method='mean',
+                                                 mean=None)
+            var = compute_mean_std(directory, method='var', mean=self.rgb_mean)
+            self.rgb_std = np.sqrt(var)
+            # Broadcast the shape
+            broadcast_shape = [1, 1, 1]
+            broadcast_shape[self.channel_index - 1] = len(self.rgb_std)
+            self.std = np.reshape(self.rgb_std, broadcast_shape)
+            print ('   Std {}: {}'.format(self.std.shape, self.rgb_std))
+
+        # Compute ZCA
+        if self.zca_whitening:
+            raise ValueError('ZCA Not implemented')
+
+        # Compute class balance segmentation
+        if cb_weights_method:
+            # Get file names
+            file_names = get_filenames(gt_directory)
+
+            # Count the number of samples of each class
+            count_per_label = np.zeros(n_classes + len(void_labels))
+            total_count_per_label = np.zeros(n_classes + len(void_labels))
+
+            # Process each file
+            for file_name in file_names:
+                # Load image and mask
+                mask = io.imread(file_name)
+                mask = mask.astype('int32')
+
+                # Count elements
+                unique_labels, counts_label = np.unique(mask, return_counts=True)
+                count_per_label[unique_labels] += counts_label
+                total_count_per_label[unique_labels] += np.sum(counts_label[:n_classes])
+
+            # Remove void class
+            count_per_label = count_per_label[:n_classes]
+            total_count_per_label = total_count_per_label[:n_classes]
+
+            # Compute the priors
+            priors = count_per_label/total_count_per_label
+
+            # Compute the weights
+            self.weights_median_freq_cost = np.median(priors) / priors
+            self.weights_rare_freq_cost = 1 / (n_classes * priors)
+
+            # print ('Count per label: ' + str(count_per_label))
+            # print ('Total count per label: ' + str(total_count_per_label))
+            # print ('Prior: ' + str(priors))
+            # print ('Weights median_freq_cost: ' + str(self.weights_median_freq_cost))
+            # print ('Weights rare_freq_cost: ' + str(self.weights_rare_freq_cost))
+
+            if cb_weights_method == 'median_freq_cost':
+                self.cb_weights = self.weights_median_freq_cost
+                print ('Weights median_freq_cost: ' + str(self.weights_median_freq_cost))
+            elif cb_weights_method == 'rare_freq_cost':
+                self.cb_weights = self.weights_rare_freq_cost
+                print ('Weights rare_freq_cost: ' + str(self.weights_rare_freq_cost))
+            else:
+                raise ValueError('Unknown class balancing method: ' + cb_weights_method)
+
 
 class DirectoryIterator(Iterator):
-
-    white_list_formats = {'png', 'jpg', 'jpeg', 'bmp', 'tif'}
-
-    def has_valid_extension(self, fname):
-        for extension in self.white_list_formats:
-            if fname.lower().endswith('.' + extension):
-                return True
-        return False
 
     def __init__(self, directory, image_data_generator,
                  resize=None, target_size=None, color_mode='rgb',
@@ -604,10 +782,7 @@ class DirectoryIterator(Iterator):
             if self.class_mode == 'segmentation':
                 raise ValueError('You should input the class names')
             else:
-                classes = []
-                for subdir in sorted(os.listdir(directory)):
-                    if os.path.isdir(os.path.join(directory, subdir)):
-                        classes.append(subdir)
+                classes = list_subdirs(directory)
         self.nb_class = len(classes)
         self.class_indices = dict(zip(classes, range(len(classes))))
 
@@ -620,13 +795,13 @@ class DirectoryIterator(Iterator):
             for subdir in classes:
                 subpath = os.path.join(directory, subdir)
                 for fname in os.listdir(subpath):
-                    if self.has_valid_extension(fname):
+                    if has_valid_extension(fname):
                         self.classes.append(self.class_indices[subdir])
                         self.filenames.append(os.path.join(subdir, fname))
             self.classes = np.array(self.classes)
         else:
             for fname in os.listdir(directory):
-                if self.has_valid_extension(fname):
+                if has_valid_extension(fname):
                     self.filenames.append(fname)
                     # Look for the GT filename
                     gt_fname = os.path.join(gt_directory,

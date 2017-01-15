@@ -6,7 +6,7 @@ from keras.layers.convolutional import (Convolution2D, MaxPooling2D,
 
 from keras.applications.resnet50 import ResNet50
 
-def build_resnet(img_shape=(3, 224, 224), n_classes=1000, l2_reg=0.,
+def build_resnet50(img_shape=(3, 224, 224), n_classes=1000, l2_reg=0.,
                 load_pretrained=False, freeze_layers_from='base_model'):
     # Decide if load pretrained weights from imagenet
     if load_pretrained:

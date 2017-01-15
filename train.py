@@ -1,18 +1,15 @@
 #!/usr/bin/env python
 # Import python libraries
-import argparse
-import os
+import (argparse, os)
 import sys
 import shutil
 import time
 import imp
-import pickle
 import math
 from distutils.dir_util import copy_tree
 from getpass import getuser
 import matplotlib
 matplotlib.use('Agg')  # Faster plot
-
 # Import keras libraries
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.optimizers import RMSprop
@@ -24,55 +21,131 @@ from models.fcn8 import build_fcn8
 from models.lenet import build_lenet
 from models.alexNet import build_alexNet
 from models.vgg import build_vgg
+from models.resnet import build_resnet50
 from models.inceptionV3 import build_inceptionV3
 
 # Import metrics and callbacks
 from metrics.metrics import cce_flatt, IoU
-from callbacks.callbacks import (Evaluate_model,
-                                 compute_metrics,
-                                 History_plot,
-                                 Jacc_new,
-                                 Save_results)
+from callbacks.callbacks import (History_plot, Jacc_new, Save_results)
 
 # Import tools
-from tools.loader_sem_seg import ImageDataGenerator
+from tools.data_loader import ImageDataGenerator
 from tools.logger import Logger
-from tools.plot_history import plot_history
-from tools.compute_mean_std import compute_mean_std
-from tools.compute_class_balance import compute_class_balance
 
 
-# Normalization mean and std computed on training set for RGB pixel values
-def compute_normalization_constants(cf):
-    if cf.input_norm in {'mean', 'std', 'meanAndStd'}:
-        if cf.compute_constants:
-             m, s = compute_mean_std(cf.dataset.path_train_img,
-                                     cf.dataset.path_train_mask,
-                                     cf.dataset.n_classes)
-             cf.dataset.rgb_mean, cf.dataset.rgb_std = m, s
-        if cf.input_norm not in {'mean', 'meanAndStd'}:
-            cf.dataset.rgb_mean = None
-        if cf.input_norm not in {'std', 'meanAndStd'}:
-            cf.dataset.rgb_std = None
-        cf.dataset.rgb_rescale = None
-    elif cf.input_norm == 'rescale':
-        if cf.compute_constants:
-            cf.dataset.rgb_rescale = 1/255.
-        cf.dataset.rgb_mean, cf.dataset.rgb_std = None, None
-    else:
-        raise ValueError('Unknown normalization scheme')
+# Load datasets
+def load_datasets(cf):
+    mean = cf.dataset.rgb_mean
+    std = cf.dataset.rgb_std
+    cf.dataset.cb_weights = None
 
+    # Load training set
+    print ('\n > Reading training set...')
+    # Create the data generator with its data augmentation
+    dg_tr = ImageDataGenerator(imageNet=cf.norm_imageNet_preprocess,
+                               rgb_mean=mean,
+                               rgb_std=std,
+                               rescale=cf.norm_rescale,
+                               featurewise_center=cf.norm_featurewise_center,
+                               featurewise_std_normalization=cf.norm_featurewise_std_normalization,
+                               samplewise_center=cf.norm_samplewise_center,
+                               samplewise_std_normalization=cf.norm_samplewise_std_normalization,
+                               gcn=cf.norm_gcn,
+                               zca_whitening=cf.norm_zca_whitening,
+                               crop_size=cf.crop_size_train,
+                               rotation_range=cf.da_rotation_range,
+                               width_shift_range=cf.da_width_shift_range,
+                               height_shift_range=cf.da_height_shift_range,
+                               shear_range=cf.da_shear_range,
+                               zoom_range=cf.da_zoom_range,
+                               channel_shift_range=cf.da_channel_shift_range,
+                               fill_mode=cf.da_fill_mode,
+                               cval=cf.da_cval,
+                               void_label=cf.dataset.void_class[0] if cf.dataset.void_class else None,
+                               horizontal_flip=cf.da_horizontal_flip,
+                               vertical_flip=cf.da_vertical_flip,
+                               spline_warp=cf.da_spline_warp,
+                               warp_sigma=cf.da_warp_sigma,
+                               warp_grid_size=cf.da_warp_grid_size
+                               )
 
-# Compute class balance weights
-def compute_class_balance_weights(cf):
-    if cf.cb_weights_method is not None:
-        w = compute_class_balance(cf.dataset.path_train_mask,
-                                  n_classes=cf.dataset.n_classes,
-                                  method=cf.cb_weights_method,
-                                  void_labels=cf.dataset.void_class)
-        cf.dataset.cb_weights = w
-    else:
-        cf.dataset.cb_weights = None
+    if cf.norm_fit_dataset:
+        print ('   Computing normalization constants from training set...')
+        # if cf.cb_weights_method is None:
+        #     dg_tr.fit_from_directory(cf.dataset.path_train_img)
+        # else:
+        dg_tr.fit_from_directory(cf.dataset.path_train_img,
+                                 cf.dataset.path_train_mask,
+                                 len(cf.dataset.classes),
+                                 cf.dataset.void_class,
+                                 cf.cb_weights_method)
+
+        mean = dg_tr.rgb_mean
+        std = dg_tr.rgb_std
+        cf.dataset.cb_weights = dg_tr.cb_weights
+
+    train_gen = dg_tr.flow_from_directory(directory=cf.dataset.path_train_img,
+                                          gt_directory=cf.dataset.path_train_mask,
+                                          resize=cf.resize_train,
+                                          target_size=cf.target_size_train,
+                                          color_mode=cf.dataset.color_mode,
+                                          classes=cf.dataset.classes,
+                                          class_mode=cf.dataset.class_mode,
+                                          batch_size=cf.batch_size_train,
+                                          shuffle=cf.shuffle_train,
+                                          seed=cf.seed_train,
+                                          save_to_dir=cf.savepath if cf.da_save_to_dir else None,
+                                          save_prefix='data_augmentation',
+                                          save_format='png')
+
+    # Load validation set
+    print ('\n > Reading validation set...')
+    dg_va = ImageDataGenerator(imageNet=cf.norm_imageNet_preprocess,
+                               rgb_mean=mean,
+                               rgb_std=std,
+                               rescale=cf.norm_rescale,
+                               featurewise_center=cf.norm_featurewise_center,
+                               featurewise_std_normalization=cf.norm_featurewise_std_normalization,
+                               samplewise_center=cf.norm_samplewise_center,
+                               samplewise_std_normalization=cf.norm_samplewise_std_normalization,
+                               gcn=cf.norm_gcn,
+                               zca_whitening=cf.norm_zca_whitening)
+    valid_gen = dg_va.flow_from_directory(directory=cf.dataset.path_valid_img,
+                                          gt_directory=cf.dataset.path_valid_mask,
+                                          resize=cf.resize_valid,
+                                          target_size=cf.target_size_valid,
+                                          color_mode=cf.dataset.color_mode,
+                                          classes=cf.dataset.classes,
+                                          class_mode=cf.dataset.class_mode,
+                                          batch_size=cf.batch_size_valid,
+                                          shuffle=cf.shuffle_valid,
+                                          seed=cf.seed_valid)
+
+    # Load testing set
+    print ('\n > Reading testing set...')
+    dg_ts = ImageDataGenerator(imageNet=cf.norm_imageNet_preprocess,
+                               rgb_mean=mean,
+                               rgb_std=std,
+                               rescale=cf.norm_rescale,
+                               featurewise_center=cf.norm_featurewise_center,
+                               featurewise_std_normalization=cf.norm_featurewise_std_normalization,
+                               samplewise_center=cf.norm_samplewise_center,
+                               samplewise_std_normalization=cf.norm_samplewise_std_normalization,
+                               gcn=cf.norm_gcn,
+                               zca_whitening=cf.norm_zca_whitening)
+    test_gen = dg_ts.flow_from_directory(directory=cf.dataset.path_test_img,
+                                         gt_directory=cf.dataset.path_test_mask,
+                                         resize=cf.resize_test,
+                                         target_size=cf.target_size_test,
+                                         color_mode=cf.dataset.color_mode,
+                                         classes=cf.dataset.classes,
+                                         class_mode=cf.dataset.class_mode,
+                                         batch_size=cf.batch_size_test,
+                                         shuffle=cf.shuffle_test,
+                                         seed=cf.seed_test)
+
+    # Return the data generators
+    return train_gen, valid_gen, test_gen
 
 
 # Create the optimizer
@@ -80,8 +153,8 @@ def create_optimizer(cf):
     # Create the optimizer
     if cf.optimizer == 'rmsprop':
         opt = RMSprop(lr=cf.learning_rate, rho=0.9, epsilon=1e-8, clipnorm=10)
-        print ('   Optimizer: rmsprop. Lr: {}. Rho: 0.9, epsilon=1e-8,' \
-               ' clipnorm=10'.format(cf.learning_rate))
+        print ('   Optimizer: rmsprop. Lr: {}. Rho: 0.9, epsilon=1e-8, '
+               'clipnorm=10'.format(cf.learning_rate))
     else:
         raise ValueError('Unknown optimizer')
 
@@ -91,9 +164,7 @@ def create_optimizer(cf):
 
 # Build the model
 def build_model(cf, optimizer):
-
     # Define the input size, loss and metrics
-    # TODO: TF
     if cf.dataset.class_mode == 'categorical':
         if K.image_dim_ordering() == 'th':
             in_shape = (cf.dataset.n_channels,
@@ -127,17 +198,18 @@ def build_model(cf, optimizer):
                           load_pretrained=cf.load_imageNet,
                           freeze_layers_from=cf.freeze_layers_from)
     elif cf.model_name == 'vgg19':
-        model = build_vgg(in_shape, cf.dataset.n_classes, 16, cf.weight_decay,
+        model = build_vgg(in_shape, cf.dataset.n_classes, 19, cf.weight_decay,
                           load_pretrained=cf.load_imageNet,
                           freeze_layers_from=cf.freeze_layers_from)
     elif cf.model_name == 'resnet50':
-        model = build_vgg(in_shape, cf.dataset.n_classes, 16, cf.weight_decay,
-                          load_pretrained=cf.load_imageNet,
-                          freeze_layers_from=cf.freeze_layers_from)
+        model = build_resnet50(in_shape, cf.dataset.n_classes, cf.weight_decay,
+                               load_pretrained=cf.load_imageNet,
+                               freeze_layers_from=cf.freeze_layers_from)
     elif cf.model_name == 'InceptionV3':
-        model = build_inceptionV3(in_shape, cf.dataset.n_classes, cf.weight_decay,
-                          load_pretrained=cf.load_imageNet,
-                          freeze_layers_from=cf.freeze_layers_from)
+        model = build_inceptionV3(in_shape, cf.dataset.n_classes,
+                                  cf.weight_decay,
+                                  load_pretrained=cf.load_imageNet,
+                                  freeze_layers_from=cf.freeze_layers_from)
     else:
         raise ValueError('Unknown model')
 
@@ -167,88 +239,8 @@ def build_model(cf, optimizer):
     return model
 
 
-# Load datasets
-def load_datasets(cf):
-    # Load training set
-    print ('\n > Reading training set...')
-    # Create the data generator with its data augmentation
-    dg_tr = ImageDataGenerator(crop_size=cf.crop_size_train,
-                               featurewise_center=cf.da_featurewise_center,
-                               samplewise_center=cf.da_samplewise_center,
-                               featurewise_std_normalization=cf.da_featurewise_std_normalization,
-                               samplewise_std_normalization=cf.da_samplewise_std_normalization,
-                               rgb_mean=cf.dataset.rgb_mean,
-                               rgb_std=cf.dataset.rgb_std,
-                               gcn=cf.da_gcn,
-                               imageNet=cf.load_imageNet,
-                               zca_whitening=cf.da_zca_whitening,
-                               rotation_range=cf.da_rotation_range,
-                               width_shift_range=cf.da_width_shift_range,
-                               height_shift_range=cf.da_height_shift_range,
-                               shear_range=cf.da_shear_range,
-                               zoom_range=cf.da_zoom_range,
-                               channel_shift_range=cf.da_channel_shift_range,
-                               fill_mode=cf.da_fill_mode,
-                               cval=cf.da_cval,
-                               void_label=cf.dataset.void_class[0] if cf.dataset.void_class else None,
-                               horizontal_flip=cf.da_horizontal_flip,
-                               vertical_flip=cf.da_vertical_flip,
-                               rescale=cf.dataset.rgb_rescale,
-                               spline_warp=cf.da_spline_warp,
-                               warp_sigma=cf.da_warp_sigma,
-                               warp_grid_size=cf.da_warp_grid_size
-                               )
-    train_gen = dg_tr.flow_from_directory(directory=cf.dataset.path_train_img,
-                                          gt_directory=cf.dataset.path_train_mask,
-                                          resize=cf.resize_train,
-                                          target_size=cf.target_size_train,
-                                          color_mode=cf.dataset.color_mode,
-                                          classes=cf.dataset.classes,
-                                          class_mode=cf.dataset.class_mode,
-                                          batch_size=cf.batch_size_train,
-                                          shuffle=cf.shuffle_train,
-                                          seed=cf.seed_train,
-                                          save_to_dir=savepath if cf.da_save_to_dir else None,
-                                          save_prefix='data_augmentation',
-                                          save_format='png')
-
-    # Load validation set
-    print ('\n > Reading validation set...')
-    dg_va = ImageDataGenerator(rgb_mean=cf.rgb_mean, rgb_std=cf.rgb_std,
-                               rescale=cf.rgb_rescale, imageNet=cf.load_imageNet)
-    valid_gen = dg_va.flow_from_directory(directory=cf.dataset.path_valid_img,
-                                          gt_directory=cf.dataset.path_valid_mask,
-                                          resize=cf.resize_valid,
-                                          target_size=cf.target_size_valid,
-                                          color_mode=cf.dataset.color_mode,
-                                          classes=cf.dataset.classes,
-                                          class_mode=cf.dataset.class_mode,
-                                          batch_size=cf.batch_size_valid,
-                                          shuffle=cf.shuffle_valid,
-                                          seed=cf.seed_valid)
-
-    # Load testing set
-    print ('\n > Reading testing set...')
-    dg_ts = ImageDataGenerator(rgb_mean=cf.rgb_mean, rgb_std=cf.rgb_std,
-                               rescale=cf.rgb_rescale, imageNet=cf.load_imageNet)
-    test_gen = dg_ts.flow_from_directory(directory=cf.dataset.path_test_img,
-                                         gt_directory=cf.dataset.path_test_mask,
-                                         resize=cf.resize_test,
-                                         target_size=cf.target_size_test,
-                                         color_mode=cf.dataset.color_mode,
-                                         classes=cf.dataset.classes, #cf.dataset.n_classes,
-                                         class_mode=cf.dataset.class_mode,
-                                         batch_size=cf.batch_size_test,
-                                         shuffle=cf.shuffle_test,
-                                         seed=cf.seed_test)
-
-    # Return the data generators
-    return train_gen, valid_gen, test_gen
-
-
 # Create callbacks
 def create_callbacks(cf, valid_gen):
-
     cb = []
 
     # Jaccard callback
@@ -318,8 +310,8 @@ def train_model(cf, model, train_gen, valid_gen, cb):
         return None
 
 
-# Test the model
-def test_model(cf, model, test_gen):
+# Predict the model
+def predict_model(cf, model, test_gen):
     if cf.test_model:
         print('\n > Testing the model...')
         # Load best trained model
@@ -330,34 +322,30 @@ def test_model(cf, model, test_gen):
                                 max_q_size=10, nb_worker=1, pickle_safe=False)
         total_time = time.time() - start_time
         fps = float(cf.n_images_test) / total_time
-        s_p_f =  total_time / float(cf.n_images_test)
-        print ('Testing time: {}. FPS: {}. Seconds per Frame: {}'.format(total_time, fps, s_p_f))
+        s_p_f = total_time / float(cf.n_images_test)
+        print ('   Testing time: {}. FPS: {}. Seconds per Frame: {}'.format(total_time, fps, s_p_f))
 
 
-# Plot training history
-def plot_training_history(cf, hist, test_metrics):
-    if (hist is not None):
-        # Save the results
-        print ("\n > Saving history...")
-        with open(os.path.join(cf.savepath, "history.pickle"), 'w') as f:
-            pickle.dump([hist.history, test_metrics], f)
+# Test the model
+def test_model(cf, model, test_gen):
+    if cf.test_model:
+        print('\n > Testing the model...')
+        # Load best trained model
+        model.load_weights(os.path.join(cf.savepath, "weights.hdf5"))
 
-        # Show the trained model history
-        if cf.plot_hist:
-            # Load the results
-            print ("\n > Loading history...")
-            with open(os.path.join(cf.savepath, "history.pickle")) as f:
-                history, test_metrics = pickle.load(f)
+        start_time = time.time()
+        test_metrics = model.evaluate_generator(test_gen,
+                                                cf.n_images_test,
+                                                max_q_size=10,
+                                                nb_worker=1,
+                                                pickle_safe=False)
+        total_time = time.time() - start_time
+        fps = float(cf.n_images_test) / total_time
+        s_p_f = total_time / float(cf.n_images_test)
+        print ('   Testing time: {}. FPS: {}. Seconds per Frame: {}'.format(total_time, fps, s_p_f))
+        print ('   Testing metrics: {}'.format(model.metrics_names))
+        print ('   Testing metrics: {}'.format(test_metrics))
 
-            # Plot history
-            print('\n > Ploting the trained model history...')
-            #plot_history(history, cf.savepath, cf.dataset.n_classes)
-            plot_history(history, cf.savepath, cf.dataset.n_classes,
-                         train_metrics=cf.train_metrics,
-                         valid_metrics=cf.valid_metrics,
-                         best_metric=cf.best_metric,
-                         best_type=cf.best_type,
-                         verbose=True)
 
 # Copy result to shared directory
 def copy_to_shared(cf):
@@ -376,17 +364,8 @@ def train(cf):
     sys.stdout = Logger(cf.log_file)
     print (' ---> Init experiment: ' + cf.exp_name + ' <---')
 
-    # Compute normalization constants
-    print ('\n > Computing normalization constants...')
-    compute_normalization_constants(cf)
-    print ('   Mean: {}. Std: {}. Rescale: {}.'.format(cf.dataset.rgb_mean,
-                                                       cf.dataset.rgb_std,
-                                                       cf.dataset.rgb_rescale))
-
-    # Compute class balance weights
-    print ('\n > Computing class balance weights...')
-    compute_class_balance_weights(cf)
-    print ('   Weights: ' + str(cf.dataset.cb_weights))
+    # Create the data generators
+    train_gen, valid_gen, test_gen = load_datasets(cf)
 
     # Create the optimizer
     print ('\n > Creating optimizer...')
@@ -395,9 +374,6 @@ def train(cf):
     # Build model
     print ('\n > Building model...')
     model = build_model(cf, optimizer)
-
-    # Create the data generators
-    train_gen, valid_gen, test_gen = load_datasets(cf)
 
     # Create the callbacks
     print ('\n > Creating callbacks...')
@@ -408,9 +384,6 @@ def train(cf):
 
     # Compute test metrics
     test_metrics = test_model(cf, model, test_gen)
-
-    # Plot training history
-    plot_training_history(cf, hist, test_metrics)
 
     # Copy result to shared directory
     copy_to_shared(cf)
@@ -470,25 +443,25 @@ def load_config_files(config_path, exp_name,
         cf.dataset.path_test_mask = None
 
     # If in Debug mode use few images
-    if cf.debug and cf.debug_images_train>0:
+    if cf.debug and cf.debug_images_train > 0:
         cf.dataset.n_images_train = cf.debug_images_train
-    if cf.debug and cf.debug_images_valid>0:
+    if cf.debug and cf.debug_images_valid > 0:
         cf.dataset.n_images_valid = cf.debug_images_valid
-    if cf.debug and cf.debug_images_test>0:
+    if cf.debug and cf.debug_images_test > 0:
         cf.dataset.n_images_test = cf.debug_images_test
 
     # Define target sizes
-    if cf.crop_size_train is not None: cf.target_size_train = cf.crop_size_train
-    elif cf.resize_train is not None: cf.target_size_train = cf.resize_train
-    else: cf.target_size_train = cf.dataset.img_shape
+    if cf.crop_size_train is not None:cf.target_size_train = cf.crop_size_train
+    elif cf.resize_train is not None:cf.target_size_train = cf.resize_train
+    else:cf.target_size_train = cf.dataset.img_shape
 
-    if cf.crop_size_valid is not None: cf.target_size_valid = cf.crop_size_valid
-    elif cf.resize_valid is not None: cf.target_size_valid = cf.resize_valid;
-    else: cf.target_size_valid = cf.dataset.img_shape
+    if cf.crop_size_valid is not None:cf.target_size_valid = cf.crop_size_valid
+    elif cf.resize_valid is not None:cf.target_size_valid = cf.resize_valid;
+    else:cf.target_size_valid = cf.dataset.img_shape
 
-    if cf.crop_size_test is not None: cf.target_size_test = cf.crop_size_test
-    elif cf.resize_test is not None: cf.target_size_test = cf.resize_test
-    else: cf.target_size_test = cf.dataset.img_shape
+    if cf.crop_size_test is not None:cf.target_size_test = cf.crop_size_test
+    elif cf.resize_test is not None:cf.target_size_test = cf.resize_test
+    else:cf.target_size_test = cf.dataset.img_shape
 
     # Plot metrics
     if cf.dataset.class_mode == 'segmentation':
@@ -528,11 +501,11 @@ def main():
                         help='Name of the experiment')
     arguments = parser.parse_args()
 
-    assert arguments.config_path is not None, 'Please provide a configuration' \
-                                              'path using -c config/pathname' \
+    assert arguments.config_path is not None, 'Please provide a configuration'\
+                                              'path using -c config/pathname'\
                                               ' in the command line'
-    assert arguments.exp_name is not None, 'Please provide a name for the ' \
-                                           'experiment using -e name in the ' \
+    assert arguments.exp_name is not None, 'Please provide a name for the '\
+                                           'experiment using -e name in the '\
                                            'command line'
 
     # Load configuration files

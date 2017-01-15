@@ -1,5 +1,5 @@
 # Dataset
-dataset_name                 = 'cityscapes'    # Dataset name
+dataset_name                 = 'camvid'        # Dataset name
 
 # Model
 model_name                   = 'fcn8'          # Model to use ['fcn8' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19' | 'resnet50' | 'InceptionV3']
@@ -16,8 +16,8 @@ test_model                   = False           # Test the model
 # Debug
 debug                        = True            # Use only few images for debuging
 debug_images_train           = 50              # N images for training in debug mode (-1 means all)
-debug_images_valid           = 50              # N images for validation in debug mode (-1 means all)
-debug_images_test            = 50              # N images for testing in debug mode (-1 means all)
+debug_images_valid           = 30              # N images for validation in debug mode (-1 means all)
+debug_images_test            = 30              # N images for testing in debug mode (-1 means all)
 
 # Batch sizes
 batch_size_train             = 10              # Batch size during training
@@ -26,9 +26,9 @@ batch_size_test              = 30              # Batch size during testing
 crop_size_train              = (224, 224)      # Crop size during training (Height, Width) or None
 crop_size_valid              = None            # Crop size during validation
 crop_size_test               = None            # Crop size during testing
-resize_train                 = (256, 512)      # Resize the image during training (Height, Width) or None
-resize_valid                 = (256, 512)      # Resize the image during validation
-resize_test                  = (256, 512)      # Resize the image during testing
+resize_train                 = (270, 480)      # Resize the image during training (Height, Width) or None
+resize_valid                 = (270, 480)      # Resize the image during validation
+resize_test                  = (270, 480)      # Resize the image during testing
 
 # Data shuffle
 shuffle_train                = True            # Whether to shuffle the training data
@@ -62,10 +62,10 @@ checkpoint_monitor           = 'val_jaccard'   # Metric to monitor
 checkpoint_mode              = 'max'           # Mode ['max' | 'min']
 checkpoint_save_best_only    = True            # Save best or last model
 checkpoint_save_weights_only = True            # Save only weights or also model
-checkpoint_verbose           = 0              # Verbosity of the checkpoint
+checkpoint_verbose           = 0               # Verbosity of the checkpoint
 
 # Callback plot
-plotHist_enabled             = True            # Enable the Callback
+plotHist_enabled             = True           # Enable the Callback
 plotHist_verbose             = 0               # Verbosity of the callback
 
 # Data augmentation for training and normalization
@@ -78,7 +78,7 @@ norm_samplewise_center             = False  # Substract mean - sample
 norm_samplewise_std_normalization  = False  # Divide std - sample
 norm_gcn                           = False  # Global contrast normalization
 norm_zca_whitening                 = False  # Apply ZCA whitening
-cb_weights_method                  = None      # Label weight balance [None | 'median_freq_cost' | 'rare_freq_cost']
+cb_weights_method                  = 'median_freq_cost'            # Label weight balance [None | 'median_freq_cost' | 'rare_freq_cost']
 
 # Data augmentation for training
 da_rotation_range                  = 0      # Rnd rotation degrees 0-180
