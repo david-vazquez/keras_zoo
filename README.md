@@ -2,7 +2,9 @@
 
 ## Introduction
 
-This repo contains the code to train and evaluate state of the art classification, detection and segmentation methods in a unified Keras framework working with Theano and TensorFlow. Pretrained models are also supplied. The available models are:
+This repo contains the code to train and evaluate state of the art classification, detection and segmentation methods in a unified Keras framework working with Theano and TensorFlow. Pretrained models are also supplied.
+
+## Available models
 
 ### Classification
  - [x] Lenet network as described in [Gradient-Based Learning Applied to Document Recognition](http://yann.lecun.com/exdb/publis/pdf/lecun-01a.pdf).
@@ -19,21 +21,25 @@ This repo contains the code to train and evaluate state of the art classificatio
  - [x] FCN8 network as described in [Fully Convolutional Neural Networks](https://arxiv.org/abs/1608.06993).
  - [ ] Segnet network as described in []().
 
-It has wrappers for the followind datasets:
+## Available dataset wrappers
+
 ### Classification
  - [x] MIT dataset described in []().
+ - [x] TT100K classsification dataset described in []().
  - [ ] ImageNet dataset described in []().
  - [ ] Pascal dataset described in []().
  
 ### Detection
- - [ ] TT100K dataset described in []().
+ - [ ] TT100K detection dataset described in []().
   
 ### Segmentation
  - [x] Camvid dataset described in [Semantic Object Classes in Video: A High-Definition Ground Truth Database ](http://www.cs.ucl.ac.uk/staff/G.Brostow/papers/SemanticObjectClassesInVideo_BrostowEtAl2009.pdf).
  - [x] Cityscapes dataset described in [The Cityscapes Dataset for Semantic Urban Scene Understanding](https://www.cityscapes-dataset.com/wordpress/wp-content/papercite-data/pdf/cordts2016cityscapes.pdf).
  - [x] Synthia dataset described in [The SYNTHIA Dataset: A Large Collection of Synthetic Images for Semantic Segmentation of Urban Scenes](http://synthia-dataset.net/wp-content/uploads/2016/06/gros_cvpr16-1.pdf).
  - [x] Polyps dataset described in []().
- - [ ] Pascal dataset described in []().
+ - [ ] MSCOCO dataset described in []().
+ - [ ] KITTI dataset described in []().
+ - [ ] TT100K segmentation dataset described in []().
 
 ## Installation
 You need to install :
@@ -41,9 +47,13 @@ You need to install :
 - [Keras](https://github.com/fchollet/keras)
 
 ## Run experiments
-The architecture of the model is defined in fcn8.py. To train a model, you need to prepare the configuration in train file  where all the parameters needed for creating and training your model are precised.
+All the parameters of the experiment are defined at config/dataset.py where dataset.py is the name of the dataset to use. Configure this file according to you needs.
 
-To train a model, use the command: `THEANO_FLAGS='device=cuda0,floatX=float32' python train.py`. All the logs of the experiments are stored in the result folder of the experiment.
+To train/test a model in Theano, use the command: `THEANO_FLAGS='device=cuda0,floatX=float32,lib.cnmem=0.95' python train.py -c config/dataset.py -e expName` where dataset is the name of the dataset you want to use and expName the name of the experiment.
+
+To train/test a model in TensorFlow, use the command: `CUDA_VISIBLE_DEVICES=0' python train.py -c config/dataset.py -e expName` where dataset is the name of the dataset you want to use and expName the name of the experiment.
+
+All the logs of the experiments are stored in the result folder of the experiment.
 
 ## Authors
 David Vázquez, Adriana Romero, Michal Drozdzal
@@ -54,4 +64,7 @@ David Vázquez, Adriana Romero, Michal Drozdzal
 - [ ] Relaunch: Remember the number of the last epoch
 - [ ] Mix
 - [ ] Slurm
-- [ ] TensorFlow
+- [ ] TensorFlow FCN8
+- [ ] FCN8 PRETRAINED
+- [ ] Weight decay
+- [ ] Add missing datasets
