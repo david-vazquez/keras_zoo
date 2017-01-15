@@ -1,15 +1,15 @@
-# Keras implementation of Fully Convolutional Networks (FCN)
+# Keras implementation of Classification, Detection and Segmentation Networks
 
 ## Introduction
 
 This repo contains the code to train and evaluate state of the art classification, detection and segmentation methods in a unified Keras framework working with Theano and TensorFlow. Pretrained models are also supplied. The available models are:
 
 ### Classification
- - [x] Lenet network as described in []().
- - [x] AlexNet network as described in []().
- - [x] VGG16 and VGG19 network as described in []().
- - [ ] GoogleNet network as described in []().
- - [ ] ResNet18 ResNet34 ResNet50 ResNet101 and ResNet152 network as described in []().
+ - [x] Lenet network as described in [Gradient-Based Learning Applied to Document Recognition](http://yann.lecun.com/exdb/publis/pdf/lecun-01a.pdf).
+ - [x] AlexNet network as described in [ImageNet Classification with Deep Convolutional Neural Networks](https://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional-neural-networks.pdf).
+ - [x] VGG16 and VGG19 network as described in [Very Deep Convolutional Networks for Large-Scale Image Recognition](https://arxiv.org/pdf/1409.1556.pdf).
+ - [x] ResNet50 network as described in [Deep Residual Learning for Image Recognition](https://arxiv.org/pdf/1512.03385v1.pdf).
+ - [x] InceptionV3 network as described in [Rethinking the Inception Architecture for Computer Vision](https://arxiv.org/pdf/1512.00567v3.pdf).
  
 ### Detection
  - [ ] YOLO network as described in []().
@@ -29,10 +29,10 @@ It has wrappers for the followind datasets:
  - [ ] TT100K dataset described in []().
   
 ### Segmentation
- - [ ] Camvid dataset described in []().
- - [x] Cityscapes dataset described in []().
- - [ ] Synthia dataset described in []().
- - [ ] Polyps dataset described in []().
+ - [x] Camvid dataset described in [Semantic Object Classes in Video: A High-Definition Ground Truth Database ](http://www.cs.ucl.ac.uk/staff/G.Brostow/papers/SemanticObjectClassesInVideo_BrostowEtAl2009.pdf).
+ - [x] Cityscapes dataset described in [The Cityscapes Dataset for Semantic Urban Scene Understanding](https://www.cityscapes-dataset.com/wordpress/wp-content/papercite-data/pdf/cordts2016cityscapes.pdf).
+ - [x] Synthia dataset described in [The SYNTHIA Dataset: A Large Collection of Synthetic Images for Semantic Segmentation of Urban Scenes](http://synthia-dataset.net/wp-content/uploads/2016/06/gros_cvpr16-1.pdf).
+ - [x] Polyps dataset described in []().
  - [ ] Pascal dataset described in []().
 
 ## Installation
