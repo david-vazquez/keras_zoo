@@ -1,23 +1,27 @@
 # Dataset
 dataset_name                 = 'mit'           # Dataset name
+dataset_name2                = None            # Second dataset name. None if not Domain Adaptation
+perc_mb2                     = None            # Percentage of data from the second dataset in each minibatch
 
 # Model
-model_name                   = 'resnet50'         # Model to use ['fcn8' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19' | 'resnet50' | 'InceptionV3']
-freeze_layers_from           = 'base_model'    # Freeze layers from 0 to this layer during training (Useful for finetunning) [None | 'base_model' | Layer_id]
+model_name                   = 'lenet'         # Model to use ['fcn8' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19' | 'resnet50' | 'InceptionV3']
+freeze_layers_from           = None    # Freeze layers from 0 to this layer during training (Useful for finetunning) [None | 'base_model' | Layer_id]
 show_model                   = False           # Show the architecture layers
-load_imageNet                = True            # Load Imagenet weights and normalize following imagenet procedure (NOTE: enable norm_imageNet_preprocess)
+load_imageNet                = False            # Load Imagenet weights and normalize following imagenet procedure (NOTE: enable norm_imageNet_preprocess)
 load_pretrained              = False           # Load a pretrained model for doing finetuning
 weights_file                 = 'weights.hdf5'  # Training weight file name
 
 # Parameters
-train_model                  = False            # Train the model
-test_model                   = True           # Test the model
+train_model                  = True            # Train the model
+test_model                   = False           # Test the model
+pred_model                   = False           # Predict using the model
 
 # Debug
 debug                        = False           # Use only few images for debuging
 debug_images_train           = 50              # N images for training in debug mode (-1 means all)
 debug_images_valid           = 50              # N images for validation in debug mode (-1 means all)
 debug_images_test            = 50              # N images for testing in debug mode (-1 means all)
+debug_n_epochs               = 2               # N of training epochs in debug mode
 
 # Batch sizes
 batch_size_train             = 10              # Batch size during training
@@ -71,7 +75,7 @@ plotHist_verbose             = 0               # Verbosity of the callback
 # Data augmentation for training and normalization
 norm_imageNet_preprocess           = False     # Normalize following imagenet procedure
 norm_fit_dataset                   = False      # If True it recompute std and mean from images. Either it uses the std and mean set at the dataset config file
-norm_rescale                       = None    # Scalar to divide and set range 0-1
+norm_rescale                       = 1/255.    # Scalar to divide and set range 0-1
 norm_featurewise_center            = False     # Substract mean - dataset
 norm_featurewise_std_normalization = False     # Divide std - dataset
 norm_samplewise_center             = False     # Substract mean - sample

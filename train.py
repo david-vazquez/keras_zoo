@@ -1,6 +1,7 @@
-#!/usr/bin/env python
 # Import python libraries
-import (argparse, os)
+#!/usr/bin/env python
+import argparse
+import os
 import sys
 import shutil
 import time
@@ -8,16 +9,19 @@ import imp
 import math
 from distutils.dir_util import copy_tree
 from getpass import getuser
+import numpy as np
 import matplotlib
 matplotlib.use('Agg')  # Faster plot
 # Import keras libraries
-from keras.callbacks import EarlyStopping, ModelCheckpoint
+from keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger
 from keras.optimizers import RMSprop
 from keras.utils.visualize_util import plot
 from keras import backend as K
+from keras.engine.training import GeneratorEnqueuer
 
 # Import models
 from models.fcn8 import build_fcn8
+from models.segnet import build_segnet
 from models.lenet import build_lenet
 from models.alexNet import build_alexNet
 from models.vgg import build_vgg
@@ -31,7 +35,7 @@ from callbacks.callbacks import (History_plot, Jacc_new, Save_results)
 # Import tools
 from tools.data_loader import ImageDataGenerator
 from tools.logger import Logger
-
+from tools.save_images import save_img3
 
 # Load datasets
 def load_datasets(cf):
@@ -69,6 +73,7 @@ def load_datasets(cf):
                                warp_grid_size=cf.da_warp_grid_size
                                )
 
+    # Compute normalization constants if required
     if cf.norm_fit_dataset:
         print ('   Computing normalization constants from training set...')
         # if cf.cb_weights_method is None:
@@ -84,19 +89,39 @@ def load_datasets(cf):
         std = dg_tr.rgb_std
         cf.dataset.cb_weights = dg_tr.cb_weights
 
-    train_gen = dg_tr.flow_from_directory(directory=cf.dataset.path_train_img,
-                                          gt_directory=cf.dataset.path_train_mask,
-                                          resize=cf.resize_train,
-                                          target_size=cf.target_size_train,
-                                          color_mode=cf.dataset.color_mode,
-                                          classes=cf.dataset.classes,
-                                          class_mode=cf.dataset.class_mode,
-                                          batch_size=cf.batch_size_train,
-                                          shuffle=cf.shuffle_train,
-                                          seed=cf.seed_train,
-                                          save_to_dir=cf.savepath if cf.da_save_to_dir else None,
-                                          save_prefix='data_augmentation',
-                                          save_format='png')
+    # Load training data
+    if not cf.dataset_name2:
+        train_gen = dg_tr.flow_from_directory(directory=cf.dataset.path_train_img,
+                                              gt_directory=cf.dataset.path_train_mask,
+                                              resize=cf.resize_train,
+                                              target_size=cf.target_size_train,
+                                              color_mode=cf.dataset.color_mode,
+                                              classes=cf.dataset.classes,
+                                              class_mode=cf.dataset.class_mode,
+                                              batch_size=cf.batch_size_train,
+                                              shuffle=cf.shuffle_train,
+                                              seed=cf.seed_train,
+                                              save_to_dir=cf.savepath if cf.da_save_to_dir else None,
+                                              save_prefix='data_augmentation',
+                                              save_format='png')
+    else:
+        train_gen = dg_tr.flow_from_directory2(directory=cf.dataset.path_train_img,
+                                               gt_directory=cf.dataset.path_train_mask,
+                                               resize=cf.resize_train,
+                                               target_size=cf.target_size_train,
+                                               color_mode=cf.dataset.color_mode,
+                                               classes=cf.dataset.classes,
+                                               class_mode=cf.dataset.class_mode,
+                                               batch_size=int(cf.batch_size_train*(1.-cf.perc_mb2)),
+                                               shuffle=cf.shuffle_train,
+                                               seed=cf.seed_train,
+                                               save_to_dir=cf.savepath if cf.da_save_to_dir else None,
+                                               save_prefix='data_augmentation',
+                                               save_format='png',
+                                               directory2=cf.dataset2.path_train_img,
+                                               gt_directory2=cf.dataset2.path_train_mask,
+                                               batch_size2=int(cf.batch_size_train*cf.perc_mb2)
+                                               )
 
     # Load validation set
     print ('\n > Reading validation set...')
@@ -109,7 +134,8 @@ def load_datasets(cf):
                                samplewise_center=cf.norm_samplewise_center,
                                samplewise_std_normalization=cf.norm_samplewise_std_normalization,
                                gcn=cf.norm_gcn,
-                               zca_whitening=cf.norm_zca_whitening)
+                               zca_whitening=cf.norm_zca_whitening,
+                               crop_size=cf.crop_size_valid)
     valid_gen = dg_va.flow_from_directory(directory=cf.dataset.path_valid_img,
                                           gt_directory=cf.dataset.path_valid_mask,
                                           resize=cf.resize_valid,
@@ -168,8 +194,8 @@ def build_model(cf, optimizer):
     if cf.dataset.class_mode == 'categorical':
         if K.image_dim_ordering() == 'th':
             in_shape = (cf.dataset.n_channels,
-                        cf.target_size_train[0],
-                        cf.target_size_train[1])
+                        None, # cf.target_size_train[0],
+                        None) # cf.target_size_train[1])
         else:
             in_shape = (cf.target_size_train[0],
                         cf.target_size_train[1],
@@ -181,14 +207,24 @@ def build_model(cf, optimizer):
             in_shape = (cf.dataset.n_channels, None, None)
         else:
             in_shape = (None, None, cf.dataset.n_channels)
+            #in_shape = (cf.target_size_train[0],
+            #            cf.target_size_train[1],
+            #            cf.dataset.n_channels)
         loss = cce_flatt(cf.dataset.void_class, cf.dataset.cb_weights)
         metrics = [IoU(cf.dataset.n_classes, cf.dataset.void_class)]
+        # metrics = []
     else:
         raise ValueError('Unknown problem type')
 
     # Create the model
     if cf.model_name == 'fcn8':
-        model = build_fcn8(in_shape, cf.dataset.n_classes, cf.weight_decay)
+        model = build_fcn8(in_shape, cf.dataset.n_classes, cf.weight_decay,
+                           freeze_layers_from=cf.freeze_layers_from,
+                           path_weights='weights/pascal-fcn8s-dag.mat')
+    elif cf.model_name == 'segnet':
+        model = build_segnet(in_shape, cf.dataset.n_classes, cf.weight_decay,
+                           freeze_layers_from=cf.freeze_layers_from,
+                           path_weights=None)
     elif cf.model_name == 'lenet':
         model = build_lenet(in_shape, cf.dataset.n_classes, cf.weight_decay)
     elif cf.model_name == 'alexNet':
@@ -215,16 +251,8 @@ def build_model(cf, optimizer):
 
     # Load pretrained weights
     if cf.load_pretrained:
-        # Get weights file name
-        path, _ = os.path.split(cf.weights_file)
-        if path == '':
-            weights_file = os.path.join(cf.savepath, cf.weights_file)
-        else:
-            weights_file = cf.weights_file
-
-        # Load weights
-        print('   loading model weights from: ' + weights_file + '...')
-        model.load_weights(weights_file, by_name=True)
+        print('   loading model weights from: ' + cf.weights_file + '...')
+        model.load_weights(cf.weights_file, by_name=True)
 
     # Compile model
     model.compile(loss=loss, metrics=metrics, optimizer=optimizer)
@@ -253,7 +281,7 @@ def create_callbacks(cf, valid_gen):
         print('   Save image result')
         cb += [Save_results(n_classes=cf.dataset.n_classes,
                             void_label=cf.dataset.void_class,
-                            save_path=cf.dataset.savepath,
+                            save_path=cf.savepath,
                             generator=valid_gen,
                             epoch_length=int(math.ceil(cf.save_results_nsamples/float(cf.save_results_batch_size))),
                             color_map=cf.dataset.color_map,
@@ -284,6 +312,10 @@ def create_callbacks(cf, valid_gen):
                             cf.train_metrics, cf.valid_metrics,
                             cf.best_metric, cf.best_type, cf.plotHist_verbose)]
 
+    # Save the log
+    cb += [CSVLogger(os.path.join(cf.savepath , 'logFile.csv'),
+                     separator=',', append=False)]
+
     # Output the list of callbacks
     return cb
 
@@ -293,12 +325,12 @@ def train_model(cf, model, train_gen, valid_gen, cb):
     if (cf.train_model):
         print('\n > Training the model...')
         hist = model.fit_generator(generator=train_gen,
-                                   samples_per_epoch=cf.n_images_train,
+                                   samples_per_epoch=cf.dataset.n_images_train,
                                    nb_epoch=cf.n_epochs,
                                    verbose=1,
                                    callbacks=cb,
                                    validation_data=valid_gen,
-                                   nb_val_samples=cf.n_images_valid,
+                                   nb_val_samples=cf.dataset.n_images_valid,
                                    class_weight=None,
                                    max_q_size=10,
                                    nb_worker=1,
@@ -310,20 +342,68 @@ def train_model(cf, model, train_gen, valid_gen, cb):
         return None
 
 
-# Predict the model
-def predict_model(cf, model, test_gen):
-    if cf.test_model:
-        print('\n > Testing the model...')
-        # Load best trained model
-        model.load_weights(os.path.join(cf.savepath, "weights.hdf5"))
+# # Predict the model
+# def predict_model(cf, model, test_gen):
+#     if cf.test_model:
+#         print('\n > Testing the model...')
+#         # Load best trained model
+#         model.load_weights(os.path.join(cf.savepath, "weights.hdf5"))
+#
+#         # Predict model
+#         start_time = time.time()
+#         pred = model.predict_generator(test_gen, cf.dataset.n_images_test,
+#                                 max_q_size=10, nb_worker=1, pickle_safe=False)
+#         total_time = time.time() - start_time
+#         fps = float(cf.dataset.n_images_test) / total_time
+#         s_p_f = total_time / float(cf.dataset.n_images_test)
+#         print ('   Testing time: {}. FPS: {}. Seconds per Frame: {}'.format(total_time, fps, s_p_f))
+#
+#         # Save images
+#         print(pred)
 
+
+# Predict the model
+def predict_model(cf, model, test_gen, tag='pred'):
+    if cf.pred_model:
+        print('\n > Predicting the model...')
+        # Load best trained model
+        # model.load_weights(os.path.join(cf.savepath, "weights.hdf5"))
+        model.load_weights(cf.weights_file)
+
+        # Create a data generator
+        data_gen_queue, _stop, _generator_threads = generator_queue(test_gen,
+                                                                    max_q_size=1)
+
+        # Process the dataset
         start_time = time.time()
-        model.predict_generator(test_gen, cf.n_images_test,
-                                max_q_size=10, nb_worker=1, pickle_safe=False)
+        for _ in range(int(math.ceil(cf.dataset.n_images_train/float(cf.batch_size_test)))):
+
+            # Get data for this minibatch
+            data = data_gen_queue.get()
+            x_true = data[0]
+            y_true = data[1].astype('int32')
+
+            # Get prediction for this minibatch
+            y_pred = model.predict(x_true)
+
+            # Compute the argmax
+            y_pred = np.argmax(y_pred, axis=1)
+
+            # Reshape y_true
+            y_true = np.reshape(y_true, (y_true.shape[0], y_true.shape[2],
+                                         y_true.shape[3]))
+
+            save_img3(x_true, y_true, y_pred, cf.savepath, 0,
+                      cf.dataset.color_map, tag+str(_), cf.dataset.void_class)
+
+        # Stop data generator
+        _stop.set()
+
         total_time = time.time() - start_time
-        fps = float(cf.n_images_test) / total_time
-        s_p_f = total_time / float(cf.n_images_test)
-        print ('   Testing time: {}. FPS: {}. Seconds per Frame: {}'.format(total_time, fps, s_p_f))
+        fps = float(cf.dataset.n_images_test) / total_time
+        s_p_f = total_time / float(cf.dataset.n_images_test)
+        print ('   Predicting time: {}. FPS: {}. Seconds per Frame: {}'.format(total_time, fps, s_p_f))
+
 
 
 # Test the model
@@ -331,20 +411,36 @@ def test_model(cf, model, test_gen):
     if cf.test_model:
         print('\n > Testing the model...')
         # Load best trained model
-        model.load_weights(os.path.join(cf.savepath, "weights.hdf5"))
+        #model.load_weights(os.path.join(cf.savepath, "weights.hdf5"))
+        model.load_weights(cf.weights_file)
 
+        # Evaluate model
         start_time = time.time()
         test_metrics = model.evaluate_generator(test_gen,
-                                                cf.n_images_test,
+                                                cf.dataset.n_images_test,
                                                 max_q_size=10,
                                                 nb_worker=1,
                                                 pickle_safe=False)
         total_time = time.time() - start_time
-        fps = float(cf.n_images_test) / total_time
-        s_p_f = total_time / float(cf.n_images_test)
+        fps = float(cf.dataset.n_images_test) / total_time
+        s_p_f = total_time / float(cf.dataset.n_images_test)
         print ('   Testing time: {}. FPS: {}. Seconds per Frame: {}'.format(total_time, fps, s_p_f))
-        print ('   Testing metrics: {}'.format(model.metrics_names))
-        print ('   Testing metrics: {}'.format(test_metrics))
+
+        # Compute Jaccard per class
+        metrics_dict = dict(zip(model.metrics_names, test_metrics))
+        I = np.zeros(cf.dataset.n_classes)
+        U = np.zeros(cf.dataset.n_classes)
+        jacc_percl = np.zeros(cf.dataset.n_classes)
+        for i in range(cf.dataset.n_classes):
+            I[i] = metrics_dict['I'+str(i)]
+            U[i] = metrics_dict['U'+str(i)]
+            jacc_percl[i] = I[i] / U[i]
+            print ('   {:2d} ({:^15}): Jacc: {:6.2f}'.format(i,
+                                                             cf.dataset.classes[i],
+                                                             jacc_percl[i]*100))
+        # Compute jaccard mean
+        jacc_mean = np.nanmean(jacc_percl)
+        print ('   Jaccard mean: {}'.format(jacc_mean))
 
 
 # Copy result to shared directory
@@ -383,7 +479,12 @@ def train(cf):
     hist = train_model(cf, model, train_gen, valid_gen, cb)
 
     # Compute test metrics
-    test_metrics = test_model(cf, model, test_gen)
+    #test_metrics = test_model(cf, model, test_gen)
+    test_metrics = test_model(cf, model, valid_gen)
+
+    # Compute test metrics
+    #predict_model(cf, model, test_gen, tag='pred')
+    predict_model(cf, model, valid_gen, tag='pred')
 
     # Copy result to shared directory
     copy_to_shared(cf)
@@ -392,10 +493,45 @@ def train(cf):
     print (' ---> Finish experiment: ' + cf.exp_name + ' <---')
 
 
+# Load the configuration file of the dataset
+def load_config_dataset(dataset_name, dataset_path, shared_dataset_path, name='config'):
+    # Copy the dataset from the shared to the local path if not existing
+    shared_dataset_path = os.path.join(shared_dataset_path, dataset_name)
+    dataset_path = os.path.join(dataset_path, dataset_name)
+    if not os.path.exists(dataset_path):
+        print('The local path {} does not exist. Copying '
+              'dataset...'.format(dataset_path))
+        shutil.copytree(shared_dataset_path, dataset_path)
+        print('Done.')
+
+    # Load dataset config file
+    dataset_config_path = os.path.join(dataset_path, 'config.py')
+    dataset_conf = imp.load_source(name, dataset_config_path)
+    dataset_conf.config_path = dataset_config_path
+
+    # Compose dataset paths
+    dataset_conf.path = dataset_path
+    if dataset_conf.class_mode == 'segmentation':
+        dataset_conf.path_train_img = os.path.join(dataset_conf.path, 'train', 'images')
+        dataset_conf.path_train_mask = os.path.join(dataset_conf.path, 'train', 'masks')
+        dataset_conf.path_valid_img = os.path.join(dataset_conf.path, 'valid', 'images')
+        dataset_conf.path_valid_mask = os.path.join(dataset_conf.path, 'valid', 'masks')
+        dataset_conf.path_test_img = os.path.join(dataset_conf.path, 'test', 'images')
+        dataset_conf.path_test_mask = os.path.join(dataset_conf.path, 'test', 'masks')
+    else:
+        dataset_conf.path_train_img = os.path.join(dataset_conf.path, 'train')
+        dataset_conf.path_train_mask = None
+        dataset_conf.path_valid_img = os.path.join(dataset_conf.path, 'valid')
+        dataset_conf.path_valid_mask = None
+        dataset_conf.path_test_img = os.path.join(dataset_conf.path, 'test')
+        dataset_conf.path_test_mask = None
+
+    return dataset_conf
+
+
 def load_config_files(config_path, exp_name,
                       dataset_path, shared_dataset_path,
                       experiments_path, shared_experiments_path):
-
     # Load configuration file
     cf = imp.load_source('config', config_path)
 
@@ -411,36 +547,16 @@ def load_config_files(config_path, exp_name,
     if not os.path.exists(cf.savepath):
         os.makedirs(cf.savepath)
 
-    # Copy the dataset from the shared to the local path if not existing
-    shared_dataset_path = os.path.join(shared_dataset_path, cf.dataset_name)
-    dataset_path = os.path.join(dataset_path, cf.dataset_name)
-    if not os.path.exists(dataset_path):
-        print('The local path {} does not exist. Copying '
-              'dataset...'.format(dataset_path))
-        shutil.copytree(shared_dataset_path, dataset_path)
-        print('Done.')
+    # Copy config file
+    shutil.copyfile(config_path, os.path.join(cf.savepath, "config.py"))
 
-    # Load dataset
-    dataset_config_path = os.path.join(dataset_path, 'config.py')
-    cf.dataset = imp.load_source('config', dataset_config_path)
-    cf.dataset.config_path = dataset_config_path
-
-    # Compose dataset paths
-    cf.dataset.path = dataset_path
-    if cf.dataset.class_mode == 'segmentation':
-        cf.dataset.path_train_img = os.path.join(cf.dataset.path, 'train', 'images')
-        cf.dataset.path_train_mask = os.path.join(cf.dataset.path, 'train', 'masks')
-        cf.dataset.path_valid_img = os.path.join(cf.dataset.path, 'valid', 'images')
-        cf.dataset.path_valid_mask = os.path.join(cf.dataset.path, 'valid', 'masks')
-        cf.dataset.path_test_img = os.path.join(cf.dataset.path, 'test', 'images')
-        cf.dataset.path_test_mask = os.path.join(cf.dataset.path, 'test', 'masks')
-    else:
-        cf.dataset.path_train_img = os.path.join(cf.dataset.path, 'train')
-        cf.dataset.path_train_mask = None
-        cf.dataset.path_valid_img = os.path.join(cf.dataset.path, 'valid')
-        cf.dataset.path_valid_mask = None
-        cf.dataset.path_test_img = os.path.join(cf.dataset.path, 'test')
-        cf.dataset.path_test_mask = None
+    # Load dataset configuration
+    cf.dataset = load_config_dataset(cf.dataset_name, dataset_path,
+                                     shared_dataset_path, 'config_dataset')
+    if cf.dataset_name2:
+        cf.dataset2 = load_config_dataset(cf.dataset_name2,
+                                                dataset_path,
+                                                shared_dataset_path, 'config_dataset2')
 
     # If in Debug mode use few images
     if cf.debug and cf.debug_images_train > 0:
@@ -449,19 +565,26 @@ def load_config_files(config_path, exp_name,
         cf.dataset.n_images_valid = cf.debug_images_valid
     if cf.debug and cf.debug_images_test > 0:
         cf.dataset.n_images_test = cf.debug_images_test
+    if cf.debug and cf.debug_n_epochs > 0:
+        cf.n_epochs = cf.debug_n_epochs
 
     # Define target sizes
-    if cf.crop_size_train is not None:cf.target_size_train = cf.crop_size_train
-    elif cf.resize_train is not None:cf.target_size_train = cf.resize_train
-    else:cf.target_size_train = cf.dataset.img_shape
+    if cf.crop_size_train is not None: cf.target_size_train = cf.crop_size_train
+    elif cf.resize_train is not None: cf.target_size_train = cf.resize_train
+    else: cf.target_size_train = cf.dataset.img_shape
 
-    if cf.crop_size_valid is not None:cf.target_size_valid = cf.crop_size_valid
-    elif cf.resize_valid is not None:cf.target_size_valid = cf.resize_valid;
-    else:cf.target_size_valid = cf.dataset.img_shape
+    if cf.crop_size_valid is not None: cf.target_size_valid = cf.crop_size_valid
+    elif cf.resize_valid is not None: cf.target_size_valid = cf.resize_valid
+    else: cf.target_size_valid = cf.dataset.img_shape
 
-    if cf.crop_size_test is not None:cf.target_size_test = cf.crop_size_test
-    elif cf.resize_test is not None:cf.target_size_test = cf.resize_test
-    else:cf.target_size_test = cf.dataset.img_shape
+    if cf.crop_size_test is not None: cf.target_size_test = cf.crop_size_test
+    elif cf.resize_test is not None: cf.target_size_test = cf.resize_test
+    else: cf.target_size_test = cf.dataset.img_shape
+
+    # Get weights file name
+    path, _ = os.path.split(cf.weights_file)
+    if path == '':
+        cf.weights_file = os.path.join(cf.savepath, cf.weights_file)
 
     # Plot metrics
     if cf.dataset.class_mode == 'segmentation':

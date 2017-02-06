@@ -5,6 +5,8 @@ if dim_ordering == 'th':
 
 from keras.layers.convolutional import Convolution2D
 from keras.utils.np_utils import conv_output_length, conv_input_length
+
+
 def _preprocess_conv2d_input(x, dim_ordering):
     if dim_ordering == 'tf':
         # TF uses the last dimension as channel dimension,
@@ -51,7 +53,7 @@ def _preprocess_image_shape(dim_ordering, image_shape):
     return image_shape
 
 
-def _preprocess_filter_shape(dim_ordering, filter_shape):
+def _preprocess_conv2d_filter_shape(dim_ordering, filter_shape):
     # Theano might not accept long type
     def int_or_none(value):
         try:
@@ -100,7 +102,8 @@ def deconv2d(x, kernel, output_shape, strides=(1, 1),
     kernel = kernel.dimshuffle((1, 0, 2, 3))
     th_border_mode = _preprocess_border_mode(border_mode)
     np_kernel = kernel.eval()
-    filter_shape = _preprocess_filter_shape(dim_ordering, filter_shape)
+    filter_shape = _preprocess_conv2d_filter_shape(dim_ordering, filter_shape)
+    filter_shape = tuple(filter_shape[i] for i in (1, 0, 2, 3))
 
     op = T.nnet.abstract_conv.AbstractConv2d_gradInputs(imshp=output_shape,
                                                         kshp=filter_shape,
@@ -108,9 +111,10 @@ def deconv2d(x, kernel, output_shape, strides=(1, 1),
                                                         border_mode=th_border_mode,
                                                         filter_flip=not flip_filters)
 
+    # Set output size as [None, None]
     output_size = [None] * 2
 
-
+    # Check if the width and heigth dimensions are None
     for i in [-2, -1]:
         if output_shape[i] is None:
             output_size[i] = conv_input_length(x.shape[i], filter_shape[i],
@@ -193,10 +197,11 @@ class Deconvolution2D(Convolution2D):
         else:
             raise Exception('Invalid dim_ordering: ' + self.dim_ordering)
 
-        rows = conv_input_length(rows, self.nb_row,
-                                 self.border_mode, self.subsample[0])
-        cols = conv_input_length(cols, self.nb_col,
-                                 self.border_mode, self.subsample[1])
+        # rows = conv_input_length(rows, self.nb_row,
+        #                          self.border_mode, self.subsample[0])
+        # cols = conv_input_length(cols, self.nb_col,
+        #                          self.border_mode, self.subsample[1])
+
         if self.dim_ordering == 'th':
             return (input_shape[0], self.nb_filter, rows, cols)
         elif self.dim_ordering == 'tf':
@@ -205,10 +210,7 @@ class Deconvolution2D(Convolution2D):
             raise Exception('Invalid dim_ordering: ' + self.dim_ordering)
 
     def call(self, x, mask=None):
-        # out_shape_tmp = self.output_shape_[:2] + (1, 1)
-        # print(out_shape_tmp)
-        out_shape_tmp = self.output_shape_
-        output = deconv2d(x, self.W, out_shape_tmp,
+        output = deconv2d(x, self.W, self.output_shape_,
                             strides=self.subsample,
                             border_mode=self.border_mode,
                             dim_ordering=self.dim_ordering,

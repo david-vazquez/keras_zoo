@@ -1,5 +1,7 @@
 # Dataset
 dataset_name                 = 'polyps'        # Dataset name
+dataset_name2                = None            # Second dataset name. None if not Domain Adaptation
+perc_mb2                     = None            # Percentage of data from the second dataset in each minibatch
 
 # Model
 model_name                   = 'fcn8'          # Model to use ['fcn8' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19' | 'resnet50' | 'InceptionV3']
@@ -12,12 +14,14 @@ weights_file                 = 'weights.hdf5'  # Training weight file name
 # Parameters
 train_model                  = True            # Train the model
 test_model                   = False           # Test the model
+pred_model                   = False           # Predict using the model
 
 # Debug
 debug                        = True            # Use only few images for debuging
 debug_images_train           = 50              # N images for training in debug mode (-1 means all)
 debug_images_valid           = 30              # N images for validation in debug mode (-1 means all)
 debug_images_test            = -1              # N images for testing in debug mode (-1 means all)
+debug_n_epochs               = 2               # N of training epochs in debug mode
 
 # Batch sizes
 batch_size_train             = 10              # Batch size during training

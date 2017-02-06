@@ -3,27 +3,45 @@ dim_ordering = K.image_dim_ordering()
 if dim_ordering == 'th':
     import theano
     from theano import tensor as T
+else:
+    import tensorflow as tf
 
 
 def cce_flatt(void_class, weights_class):
     def categorical_crossentropy_flatt(y_true, y_pred):
         '''Expects a binary class matrix instead of a vector of scalar classes.
         '''
-        y_pred = K.permute_dimensions(y_pred, (0, 2, 3, 1))
+        if dim_ordering == 'th':
+            y_pred = K.permute_dimensions(y_pred, (0, 2, 3, 1))
         shp_y_pred = K.shape(y_pred)
         y_pred = K.reshape(y_pred, (shp_y_pred[0]*shp_y_pred[1]*shp_y_pred[2],
                            shp_y_pred[3]))  # go back to b01,c
         # shp_y_true = K.shape(y_true)
-        y_true = K.cast(K.flatten(y_true), 'int32')  # b,01 -> b01
+
+        if dim_ordering == 'th':
+            y_true = K.cast(K.flatten(y_true), 'int32')  # b,01 -> b01
+        else:
+            y_true = K.cast(K.flatten(y_true), 'int32')  # b,01 -> b01
 
         # remove void classes from cross_entropy
         if len(void_class):
             for i in range(len(void_class)):
                 # get idx of non void classes and remove void classes
                 # from y_true and y_pred
-                idxs = K.not_equal(y_true, void_class[i]).nonzero()
-                y_pred = y_pred[idxs]
-                y_true = y_true[idxs]
+                idxs = K.not_equal(y_true, void_class[i])
+                if dim_ordering == 'th':
+                    idxs = idxs.nonzero()
+                    y_pred = y_pred[idxs]
+                    y_true = y_true[idxs]
+                else:
+                    y_pred = tf.boolean_mask(y_pred, idxs)
+                    y_true = tf.boolean_mask(y_true, idxs)
+
+        if dim_ordering == 'th':
+            y_true = T.extra_ops.to_one_hot(y_true, nb_class=y_pred.shape[-1])
+        else:
+            y_true = tf.one_hot(y_true, K.shape(y_pred)[-1], on_value=1, off_value=0, axis=None, dtype=None, name=None)
+            y_true = K.cast(y_true, 'float32')  # b,01 -> b01
         out = K.categorical_crossentropy(y_pred, y_true)
 
         # Class balancing
@@ -40,7 +58,8 @@ def IoU(n_classes, void_labels):
     def IoU_flatt(y_true, y_pred):
         '''Expects a binary class matrix instead of a vector of scalar classes.
         '''
-        y_pred = K.permute_dimensions(y_pred, (0, 2, 3, 1))
+        if dim_ordering == 'th':
+            y_pred = K.permute_dimensions(y_pred, (0, 2, 3, 1))
         shp_y_pred = K.shape(y_pred)
         y_pred = K.reshape(y_pred, (shp_y_pred[0]*shp_y_pred[1]*shp_y_pred[2],
                            shp_y_pred[3]))  # go back to b01,c
@@ -56,20 +75,32 @@ def IoU(n_classes, void_labels):
             else:
                 not_void = not_void * K.not_equal(y_true, void_labels[i])
 
-        I = K.zeros(n_classes)
-        U = K.zeros(n_classes)
+        sum_I = K.zeros((1,), dtype='float32')
 
         out = {}
         for i in range(n_classes):
             y_true_i = K.equal(y_true, i)
             y_pred_i = K.equal(y_pred, i)
-            I = T.set_subtensor(I[i], K.sum(y_true_i * y_pred_i))
 
-            U = T.set_subtensor(U[i], K.sum(T.or_(y_true_i, y_pred_i) * not_void))
-            out['I'+str(i)] = I[i]
-            out['U'+str(i)] = U[i]
+            if dim_ordering == 'th':
+                I_i = K.sum(y_true_i * y_pred_i)
+                U_i = K.sum(T.or_(y_true_i, y_pred_i) * not_void)
+                # I = T.set_subtensor(I[i], I_i)
+                # U = T.set_subtensor(U[i], U_i)
+                sum_I = sum_I + I_i
+            else:
+                U_i = K.sum(K.cast(tf.logical_and(tf.logical_or(y_true_i, y_pred_i), not_void), 'float32'))
+                y_true_i = K.cast(y_true_i, 'float32')
+                y_pred_i = K.cast(y_pred_i, 'float32')
+                I_i = K.sum(y_true_i * y_pred_i)
+                sum_I = sum_I + I_i
+            out['I'+str(i)] = I_i
+            out['U'+str(i)] = U_i
 
-        accuracy = T.sum(I) / T.sum(not_void)
+        if dim_ordering == 'th':
+            accuracy = K.sum(sum_I) / K.sum(not_void)
+        else:
+            accuracy = K.sum(sum_I) / tf.reduce_sum(tf.cast(not_void, 'float32'))
         out['acc'] = accuracy
         return out
     return IoU_flatt

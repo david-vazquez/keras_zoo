@@ -288,6 +288,27 @@ class ImageDataGenerator(object):
             save_to_dir=save_to_dir, save_prefix=save_prefix,
             save_format=save_format)
 
+    def flow_from_directory2(self, directory,
+                             resize=None, target_size=(256, 256),
+                             color_mode='rgb',
+                             classes=None, class_mode='categorical',
+                             batch_size=32, shuffle=True, seed=None,
+                             gt_directory=None,
+                             save_to_dir=None, save_prefix='',
+                             save_format='jpeg', directory2=None,
+                             gt_directory2=None, batch_size2=None):
+        return DirectoryIterator2(
+            directory, self, resize=resize,
+            target_size=target_size, color_mode=color_mode,
+            classes=classes, class_mode=class_mode,
+            dim_ordering=self.dim_ordering,
+            batch_size=batch_size, shuffle=shuffle, seed=seed,
+            gt_directory=gt_directory,
+            save_to_dir=save_to_dir, save_prefix=save_prefix,
+            save_format=save_format,
+            directory2=directory2, gt_directory2=gt_directory2,
+            batch_size2=batch_size2)
+
     def standardize(self, x, y=None):
         if self.imageNet:
             if self.dim_ordering == 'th':
@@ -490,6 +511,7 @@ class ImageDataGenerator(object):
             h, w = x.shape[img_row_index], x.shape[img_col_index]
 
             # Padd image if it is smaller than the crop size
+            pad_h1, pad_h2, pad_w1, pad_w2 = 0, 0, 0, 0
             if h < crop[0]:
                 total_pad = crop[0] - h
                 pad_h1 = total_pad/2
@@ -783,6 +805,8 @@ class DirectoryIterator(Iterator):
                 raise ValueError('You should input the class names')
             else:
                 classes = list_subdirs(directory)
+        else:
+            classes = classes.values()
         self.nb_class = len(classes)
         self.class_indices = dict(zip(classes, range(len(classes))))
 
@@ -833,6 +857,7 @@ class DirectoryIterator(Iterator):
         for i, j in enumerate(index_array):
             # Load image
             fname = self.filenames[j]
+            # print(fname)
             img = load_img(os.path.join(self.directory, fname),
                            grayscale=self.grayscale,
                            resize=self.resize, order=1)
@@ -899,3 +924,49 @@ class DirectoryIterator(Iterator):
             return batch_x
 
         return batch_x, batch_y
+
+
+class DirectoryIterator2(object):
+
+    def __init__(self, directory, image_data_generator,
+                 resize=None, target_size=None, color_mode='rgb',
+                 dim_ordering='default',
+                 classes=None, class_mode='categorical',
+                 batch_size=32, shuffle=True, seed=None, gt_directory=None,
+                 save_to_dir=None, save_prefix='', save_format='jpeg',
+                 directory2=None, gt_directory2=None, batch_size2=None):
+
+        self.DI1 = DirectoryIterator(
+            directory, image_data_generator, resize=resize,
+            target_size=target_size, color_mode=color_mode,
+            classes=classes, class_mode=class_mode,
+            dim_ordering=dim_ordering,
+            batch_size=batch_size, shuffle=shuffle, seed=seed,
+            gt_directory=gt_directory,
+            save_to_dir=save_to_dir, save_prefix=save_prefix,
+            save_format=save_format)
+
+        self.DI2 = DirectoryIterator(
+            directory2, image_data_generator, resize=resize,
+            target_size=target_size, color_mode=color_mode,
+            classes=classes, class_mode=class_mode,
+            dim_ordering=dim_ordering,
+            batch_size=batch_size2, shuffle=shuffle, seed=seed,
+            gt_directory=gt_directory2,
+            save_to_dir=save_to_dir, save_prefix=save_prefix,
+            save_format=save_format)
+
+    def next(self):
+        batch_x1, batch_y1 = self.DI1.next()
+        batch_x2, batch_y2 = self.DI2.next()
+        batch_x = np.concatenate((batch_x1, batch_x2))
+        batch_y = np.concatenate((batch_y1, batch_y2))
+        return batch_x, batch_y
+
+    def __iter__(self):
+        # needed if we want to do something like:
+        # for x, y in data_gen.flow(...):
+        return self
+
+    def __next__(self, *args, **kwargs):
+        return self.next(*args, **kwargs)

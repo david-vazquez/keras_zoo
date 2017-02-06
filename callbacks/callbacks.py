@@ -1,6 +1,8 @@
 # Imports
+from keras import backend as K
+dim_ordering = K.image_dim_ordering()
 from keras.callbacks import Callback, Progbar, ProgbarLogger
-from keras.engine.training import generator_queue
+from keras.engine.training import GeneratorEnqueuer
 from tools.save_images import save_img3
 from tools.plot_history import plot_history
 import numpy as np
@@ -137,7 +139,7 @@ class Jacc_new(Callback):
             self.U[i] = logs['U'+str(i)]
             self.jacc_percl[i] = self.I[i] / self.U[i]
             logs[str(i)+'_jacc'] = self.jacc_percl[i]
-        self.jacc = np.mean(self.jacc_percl)
+        self.jacc = np.nanmean(self.jacc_percl)
         logs['jaccard'] = self.jacc
 
         for i in range(self.n_classes):
@@ -165,31 +167,47 @@ class Save_results(Callback):
         self.tag = tag
 
     def on_epoch_end(self, epoch, logs={}):
+
         # Create a data generator
-        data_gen_queue, _stop, _generator_threads = generator_queue(self.generator,
-                                                                    max_q_size=1)
+        enqueuer = GeneratorEnqueuer(self.generator, pickle_safe=False)
+        enqueuer.start(nb_worker=1, max_q_size=1, wait_time=0.05)
+
+        # Create a data generator
+        #data_gen_queue, _stop, _generator_threads = generator_queue(self.generator,
+        #                                                            max_q_size=1)
 
         # Process the dataset
         for _ in range(self.epoch_length):
 
             # Get data for this minibatch
-            data = data_gen_queue.get()
+            data = None
+            while enqueuer.is_running():
+                if not enqueuer.queue.empty():
+                    data = enqueuer.queue.get()
+                    break
+                else:
+                    time.sleep(0.05)
+            #data = data_gen_queue.get()
             x_true = data[0]
             y_true = data[1].astype('int32')
 
             # Get prediction for this minibatch
             y_pred = self.model.predict(x_true)
 
-            # Compute the argmax
-            y_pred = np.argmax(y_pred, axis=1)
-
-            # Reshape y_true
-            y_true = np.reshape(y_true, (y_true.shape[0], y_true.shape[2],
-                                         y_true.shape[3]))
-
+            # Reshape y_true and compute the y_pred argmax
+            if K.image_dim_ordering() == 'th':
+                y_pred = np.argmax(y_pred, axis=1)
+                y_true = np.reshape(y_true, (y_true.shape[0], y_true.shape[2],
+                                             y_true.shape[3]))
+            else:
+                y_pred = np.argmax(y_pred, axis=3)
+                y_true = np.reshape(y_true, (y_true.shape[0], y_true.shape[1],
+                                             y_true.shape[2]))
             # Save output images
             save_img3(x_true, y_true, y_pred, self.save_path, epoch,
                       self.color_map, self.tag+str(_), self.void_label)
 
         # Stop data generator
-        _stop.set()
+        #_stop.set()
+        if enqueuer is not None:
+            enqueuer.stop()

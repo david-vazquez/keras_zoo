@@ -12,7 +12,8 @@ from layers.deconv import Deconvolution2D
 
 
 def build_fcn8(img_shape=(3, None, None), nclasses=8, l2_reg=0.,
-               init='glorot_uniform'):
+               init='glorot_uniform', path_weights=None,
+               freeze_layers_from=None):
 
     # Regularization warning
     if l2_reg > 0.:
@@ -120,9 +121,17 @@ def build_fcn8(img_shape=(3, None, None), nclasses=8, l2_reg=0.,
     softmax_fcn8 = NdSoftmax()(score)
 
     # Complete model
-    net = Model(input=inputs, output=softmax_fcn8)
+    model = Model(input=inputs, output=softmax_fcn8)
 
-    return net
+    # Load pretrained Model
+    if path_weights:
+        load_matcovnet(model, path_weights, n_classes=nclasses)
+
+    # Freeze some layers
+    if freeze_layers_from is not None:
+        freeze_layers(model, freeze_layers_from)
+
+    return model
 
 
 def custom_sum(tensors):
@@ -133,6 +142,94 @@ def custom_sum(tensors):
 def custom_sum_shape(tensors):
     t1, t2 = tensors
     return t1
+
+
+# Freeze layers for finetunning
+def freeze_layers(model, freeze_layers_from):
+    # Freeze the VGG part only
+    if freeze_layers_from == 'base_model':
+        print ('   Freezing base model layers')
+        freeze_layers_from = 23
+
+    # Show layers (Debug pruposes)
+    for i, layer in enumerate(model.layers):
+        print(i, layer.name)
+    print ('   Freezing from layer 0 to ' + str(freeze_layers_from))
+
+    # Freeze layers
+    for layer in model.layers[:freeze_layers_from]:
+       layer.trainable = False
+    for layer in model.layers[freeze_layers_from:]:
+       layer.trainable = True
+
+
+# Lad weights from matconvnet
+def load_matcovnet(model, path_weights, n_classes):
+
+    import scipy.io as sio
+    import numpy as np
+
+    print('   Loading pretrained model: ' + path_weights)
+    # Depending the model has one name or other
+    if 'tvg' in path_weights:
+        str_filter = 'f'
+        str_bias = 'b'
+    else:
+        str_filter = '_filter'
+        str_bias = '_bias'
+
+    # Open the .mat file in python
+    W = sio.loadmat(path_weights)
+
+    # Load the parameter values into the model
+    num_params = W.get('params').shape[1]
+    for i in range(num_params):
+        # Get layer name from the saved model
+        name = str(W.get('params')[0][i][0])[3:-2]
+
+        # Get parameter value
+        param_value = W.get('params')[0][i][1]
+
+        # Load weights
+        if name.endswith(str_filter):
+            raw_name = name[:-len(str_filter)]
+
+            # Skip final part
+            if n_classes==21 or ('score' not in raw_name and \
+               'upsample' not in raw_name and \
+               'final' not in raw_name and \
+               'probs' not in raw_name):
+
+                print ('   Initializing weights of layer: ' + raw_name)
+                print('    - Weights Loaded: ' + str(param_value.shape))
+                param_value = param_value.T
+                print('    - Weights Loaded: ' + str(param_value.shape))
+                param_value = np.swapaxes(param_value, 2, 3)
+                print('    - Weights Loaded: ' + str(param_value.shape))
+
+                # Load current model weights
+                w = model.get_layer(name=raw_name).get_weights()
+                print('    - Weights model: ' + str(w[0].shape))
+                if len(w)>1:
+                    print('    - Bias model: ' + str(w[1].shape))
+
+                print('    - Weights Loaded: ' + str(param_value.shape))
+                w[0] = param_value
+                model.get_layer(name=raw_name).set_weights(w)
+
+        # Load bias terms
+        if name.endswith(str_bias):
+            raw_name = name[:-len(str_bias)]
+            if n_classes==21 or ('score' not in raw_name and \
+               'upsample' not in raw_name and \
+               'final' not in raw_name and \
+               'probs' not in raw_name):
+                print ('Initializing bias of layer: ' + raw_name)
+                param_value = np.squeeze(param_value)
+                w = model.get_layer(name=raw_name).get_weights()
+                w[1] = param_value
+                model.get_layer(name=raw_name).set_weights(w)
+    return model
 
 
 if __name__ == '__main__':

@@ -69,13 +69,11 @@ def get_input_shape(output_length, filter_size, stride, pad=0):
     return (output_length - 1) * stride - 2 * pad + filter_size
 
 
+# Works TH and TF
 class CropLayer2D(Layer):
-    def __init__(self, img_in, dim_ordering='th', *args, **kwargs):
+    def __init__(self, img_in, *args, **kwargs):
         self.img_in = img_in
-        assert dim_ordering in ['tf', 'th'], ('dim_ordering must be '
-                                              'in [tf, th]')
-        self.dim_ordering = dim_ordering
-
+        self.dim_ordering = K.image_dim_ordering()
         super(CropLayer2D, self).__init__(*args, **kwargs)
 
     def build(self, input_shape):
@@ -86,15 +84,23 @@ class CropLayer2D(Layer):
         super(CropLayer2D, self).build(input_shape)
 
     def call(self, x, mask=False):
-        input_shape = x.shape
-        cs = self.img_in.shape[-2:]
+        input_shape = K.shape(x)
+        cs = K.shape(self.img_in)
         if self.dim_ordering == 'th':
-            dif = input_shape[-2:] - cs
-        dif = dif/2
+            input_shape = input_shape[-2:]
+            cs = cs[-2:]
+        else:
+            input_shape = input_shape[1:3]
+            cs = cs[1:3]
+        dif = (input_shape - cs)/2
         if self.dim_ordering == 'th':
             if K.ndim(x) == 5:
                 return x[:, :, :, dif[0]:dif[0]+cs[0], dif[1]:dif[1]+cs[1]]
             return x[:, :, dif[0]:dif[0]+cs[0], dif[1]:dif[1]+cs[1]]
+        else:
+            if K.ndim(x) == 5:
+                return x[:, :, dif[0]:dif[0]+cs[0], dif[1]:dif[1]+cs[1], :]
+            return x[:, dif[0]:dif[0]+cs[0], dif[1]:dif[1]+cs[1], :]
 
     def get_output_shape_for(self, input_shape):
         if self.dim_ordering == 'th':
@@ -147,6 +153,7 @@ class MergeSequences(Layer):
             return T.unbroadcast(ret, 0)
 
 
+# Works TH and TF
 class NdSoftmax(Layer):
     '''N-dimensional Softmax
     Will compute the Softmax on channel_idx and return a tensor of the
@@ -168,9 +175,9 @@ class NdSoftmax(Layer):
 
     def call(self, x, mask=None):
         ch_idx = self.channel_index
-        l_idx = x.ndim - 1  # last index
+        l_idx = K.ndim(x) - 1  # last index
         x = K.permute_dimensions(
-            x, tuple(i for i in range(x.ndim) if i != ch_idx) + (ch_idx,))
+            x, tuple(i for i in range(K.ndim(x)) if i != ch_idx) + (ch_idx,))
         sh = K.shape(x)
         x = K.reshape(x, (-1, sh[-1]))
         x = K.softmax(x)
@@ -180,6 +187,7 @@ class NdSoftmax(Layer):
         return x
 
 
+# Works TH and TF
 class DePool2D(UpSampling2D):
     '''Simplar to UpSample, yet traverse only maxpooled elements
     # Input shape
@@ -203,7 +211,7 @@ class DePool2D(UpSampling2D):
 
     def __init__(self, pool2d_layer, *args, **kwargs):
         self._pool2d_layer = pool2d_layer
-        super().__init__(*args, **kwargs)
+        super(DePool2D, self).__init__(*args, **kwargs)
 
     def get_output(self, train=False):
         X = self.get_input(train)

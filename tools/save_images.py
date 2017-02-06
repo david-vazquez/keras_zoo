@@ -1,4 +1,6 @@
 # Imports
+from keras import backend as K
+dim_ordering = K.image_dim_ordering()
 from skimage.color import rgb2gray, gray2rgb
 from skimage import img_as_float
 import numpy as np
@@ -48,10 +50,15 @@ def my_label2rgboverlay(labels, colors, image, bglabel=None,
 # Save 3 images (Image, mask and result)
 def save_img3(image_batch, mask_batch, output, out_images_folder, epoch,
              color_map, tag, void_label):
+    # print('output shape: ' + str(output.shape))
+    # print('Mask shape: ' + str(mask_batch.shape))
     output[(mask_batch == void_label).nonzero()] = void_label
     images = []
     for j in range(output.shape[0]):
-        img = image_batch[j].transpose((1, 2, 0))
+        img = image_batch[j]
+        if dim_ordering == 'th':
+            img = img.transpose((1, 2, 0))
+
         img = norm_01(img, mask_batch[j], void_label)*255
 
         #img = image_batch[j].transpose((1, 2, 0))
@@ -78,7 +85,9 @@ def save_img4(image_batch, mask_batch, output, output2, out_images_folder,
     output[(mask_batch == void_label).nonzero()] = void_label
     images = []
     for j in range(output.shape[0]):
-        img = image_batch[j].transpose((1, 2, 0))
+        img = image_batch[j]
+        if dim_ordering == 'th':
+            img = img.transpose((1, 2, 0))
         img = norm_01(img, mask_batch[j], void_label)
 
         label_out = my_label2rgb(output[j], bglabel=void_label,
@@ -104,7 +113,9 @@ def save_img4(image_batch, mask_batch, output, output2, out_images_folder,
 
 # Save 2 images (Image and mask)
 def save_img2(img, mask, fname, color_map, void_label):
-    img = img.transpose((1, 2, 0))
+    if dim_ordering == 'th':
+        img = img.transpose((1, 2, 0))
+
     mask = mask.reshape(mask.shape[1:3])
     img = norm_01(img, mask, void_label)
 
