@@ -12,6 +12,7 @@ from getpass import getuser
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')  # Faster plot
+
 # Import keras libraries
 from keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger
 from keras.optimizers import RMSprop
@@ -206,10 +207,10 @@ def build_model(cf, optimizer):
         if K.image_dim_ordering() == 'th':
             in_shape = (cf.dataset.n_channels, None, None)
         else:
-            in_shape = (None, None, cf.dataset.n_channels)
             #in_shape = (cf.target_size_train[0],
-            #            cf.target_size_train[1],
-            #            cf.dataset.n_channels)
+            #           cf.target_size_train[1],
+            #           cf.dataset.n_channels)
+            in_shape = (None, None, cf.dataset.n_channels)
         loss = cce_flatt(cf.dataset.void_class, cf.dataset.cb_weights)
         metrics = [IoU(cf.dataset.n_classes, cf.dataset.void_class)]
         # metrics = []
@@ -220,7 +221,7 @@ def build_model(cf, optimizer):
     if cf.model_name == 'fcn8':
         model = build_fcn8(in_shape, cf.dataset.n_classes, cf.weight_decay,
                            freeze_layers_from=cf.freeze_layers_from,
-                           path_weights='weights/pascal-fcn8s-dag.mat')
+                           path_weights='weights/pascal-fcn8s-dag.mat') # TODO:
     elif cf.model_name == 'segnet':
         model = build_segnet(in_shape, cf.dataset.n_classes, cf.weight_decay,
                            freeze_layers_from=cf.freeze_layers_from,
