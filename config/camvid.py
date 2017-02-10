@@ -4,8 +4,8 @@ dataset_name2                = None            # Second dataset name. None if no
 perc_mb2                     = None            # Percentage of data from the second dataset in each minibatch
 
 # Model
-model_name                   = 'fcn8'          # Model to use ['fcn8' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19' | 'resnet50' | 'InceptionV3']
-freeze_layers_from           = 'base_model'    # Freeze layers from 0 to this layer during training (Useful for finetunning) [None | 'base_model' | Layer_id]
+model_name                   = 'resnetFCN'          # Model to use ['fcn8' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19' | 'resnet50' | 'InceptionV3']
+freeze_layers_from           = None #'base_model'    # Freeze layers from 0 to this layer during training (Useful for finetunning) [None | 'base_model' | Layer_id]
 show_model                   = True            # Show the architecture layers
 load_imageNet                = False           # Load Imagenet weights and normalize following imagenet procedure
 load_pretrained              = False           # Load a pretrained model for doing finetuning

@@ -23,6 +23,7 @@ from keras.engine.training import GeneratorEnqueuer
 # Import models
 from models.fcn8 import build_fcn8
 from models.segnet import build_segnet
+from models.resnetFCN import build_resnetFCN
 from models.lenet import build_lenet
 from models.alexNet import build_alexNet
 from models.vgg import build_vgg
@@ -207,10 +208,10 @@ def build_model(cf, optimizer):
         if K.image_dim_ordering() == 'th':
             in_shape = (cf.dataset.n_channels, None, None)
         else:
-            #in_shape = (cf.target_size_train[0],
-            #           cf.target_size_train[1],
-            #           cf.dataset.n_channels)
-            in_shape = (None, None, cf.dataset.n_channels)
+            in_shape = (cf.target_size_train[0],
+                       cf.target_size_train[1],
+                       cf.dataset.n_channels)
+            #in_shape = (None, None, cf.dataset.n_channels)
         loss = cce_flatt(cf.dataset.void_class, cf.dataset.cb_weights)
         metrics = [IoU(cf.dataset.n_classes, cf.dataset.void_class)]
         # metrics = []
@@ -224,6 +225,10 @@ def build_model(cf, optimizer):
                            path_weights='weights/pascal-fcn8s-dag.mat') # TODO:
     elif cf.model_name == 'segnet':
         model = build_segnet(in_shape, cf.dataset.n_classes, cf.weight_decay,
+                           freeze_layers_from=cf.freeze_layers_from,
+                           path_weights=None)
+    elif cf.model_name == 'resnetFCN':
+        model = build_resnetFCN(in_shape, cf.dataset.n_classes, cf.weight_decay,
                            freeze_layers_from=cf.freeze_layers_from,
                            path_weights=None)
     elif cf.model_name == 'lenet':
