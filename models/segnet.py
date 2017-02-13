@@ -18,6 +18,10 @@ if dim_ordering == 'th':
 else:
     channel_idx = 3
 
+# Paper: https://arxiv.org/abs/1511.00561
+# Original code: https://github.com/alexgkendall/caffe-segnet
+# Adapted from: https://github.com/imlab-uiip/keras-segnet
+# Adapted from: https://github.com/pradyu1993/segnet
 
 # Downsample blocks of the basic-segnet
 def downsampling_block_basic(inputs, n_filters, filter_size,
@@ -259,18 +263,9 @@ def load_matcovnet(model, path_weights, n_classes):
 
 
 if __name__ == '__main__':
-    start = time.time()
-    input_shape = [2, 224, 224]
-    seq_len = 1
-    batch = 1
-    print ('BUILD')
-    # input_shape = [3, None, None]
-    model = build_fcn8(input_shape,
-                       # test_value=test_val,
-                       x_shape=(batch, seq_len, ) + tuple(input_shape),
-                       load_weights_fcn8=False,
-                       seq_length=seq_len, nclasses=9)
-    print ('COMPILING')
-    model.compile(loss="binary_crossentropy", optimizer="rmsprop")
+    input_shape = [3, 224, 224]
+    print (' > Building')
+    model = build_segnet(input_shape, 11, 0.)
+    print (' > Compiling')
+    model.compile(loss="categorical_crossentropy", optimizer="rmsprop")
     model.summary()
-    print ('END COMPILING')

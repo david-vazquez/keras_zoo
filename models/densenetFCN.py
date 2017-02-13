@@ -13,7 +13,13 @@ from layers.deconv import Deconvolution2D
 from keras import initializations
 import sys
 sys.setrecursionlimit(10000)
-#from keras.engine.topology import Merge
+
+# Paper: https://arxiv.org/abs/1608.06993
+# Original code: https://github.com/liuzhuang13/DenseNet
+# Adapted from: https://github.com/tdeboissiere/DeepLearningImplementations/tree/master/DenseNet
+# Adapted from: https://github.com/robertomest/convnet-study
+# Adapted from: https://github.com/titu1994/DenseNet
+# Adapted from: https://github.com/SimJeg/FC-DenseNet
 
 # Custom layers import
 from layers.ourlayers import (CropLayer2D, NdSoftmax, DePool2D)

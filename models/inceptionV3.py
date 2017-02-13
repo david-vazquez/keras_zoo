@@ -4,6 +4,7 @@ from keras.layers import Dense, Activation, Flatten
 from keras.layers.convolutional import (AveragePooling2D)
 from keras.applications.inception_v3 import InceptionV3
 
+# Paper: https://arxiv.org/abs/1512.00567
 
 def build_inceptionV3(img_shape=(3, 299, 299), n_classes=1000, l2_reg=0.,
                 load_pretrained=False, freeze_layers_from='base_model'):

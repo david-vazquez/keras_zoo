@@ -13,6 +13,10 @@ from layers.deconv import Deconvolution2D
 from keras import backend as K
 dim_ordering = K.image_dim_ordering()
 
+# Paper: https://people.eecs.berkeley.edu/~jonlong/long_shelhamer_fcn.pdf
+# Original caffe code: https://github.com/shelhamer/fcn.berkeleyvision.org
+# Adapted from: MILA internal code
+
 def build_fcn8(img_shape=(3, None, None), nclasses=8, l2_reg=0.,
                init='glorot_uniform', path_weights=None,
                freeze_layers_from=None):
@@ -240,18 +244,9 @@ def load_matcovnet(model, path_weights, n_classes):
 
 
 if __name__ == '__main__':
-    start = time.time()
-    input_shape = [2, 224, 224]
-    seq_len = 1
-    batch = 1
-    print ('BUILD')
-    # input_shape = [3, None, None]
-    model = build_fcn8(input_shape,
-                       # test_value=test_val,
-                       x_shape=(batch, seq_len, ) + tuple(input_shape),
-                       load_weights_fcn8=False,
-                       seq_length=seq_len, nclasses=9)
-    print ('COMPILING')
-    model.compile(loss="binary_crossentropy", optimizer="rmsprop")
+    input_shape = [3, 224, 224]
+    print (' > Building')
+    model = build_fcn8(input_shape, 11, 0.)
+    print (' > Compiling')
+    model.compile(loss="categorical_crossentropy", optimizer="rmsprop")
     model.summary()
-    print ('END COMPILING')

@@ -10,7 +10,9 @@ from keras.layers import merge
 from keras.regularizers import l2
 from layers.deconv import Deconvolution2D
 from keras import initializations
-#from keras.engine.topology import Merge
+
+# Paper: https://arxiv.org/abs/1611.10080
+# Original code in Mxnet: https://github.com/itijyou/ademxapp
 
 # Custom layers import
 from layers.ourlayers import (CropLayer2D, NdSoftmax, DePool2D)
@@ -26,7 +28,7 @@ else:
 
 # Create a convolution block: BN - RELU - CONV
 def bn_relu_conv(inputs, n_filters, filter_size, stride, dropout,
-                 use_bias, dilation=1, name=None):
+                 use_bias, dilation=1, name=None, l2_reg=0.):
 
     first = BatchNormalization(mode=0, axis=channel_idx, name="bn"+name)(inputs)
     first = Activation('relu', name="res"+name+"_relu")(first)
@@ -37,20 +39,22 @@ def bn_relu_conv(inputs, n_filters, filter_size, stride, dropout,
         second = Convolution2D(n_filters, filter_size, filter_size,
                                'he_normal', subsample=(stride, stride),
                                bias=use_bias, border_mode='same',
-                               name="res"+name)(first)
+                               name="res"+name,
+                               W_regularizer=l2(l2_reg))(first)
     else:
         second = AtrousConvolution2D(n_filters, filter_size, filter_size,
                                      'he_normal', subsample=(stride, stride),
                                      atrous_rate=(dilation, dilation),
                                      border_mode='same', bias=use_bias,
-                                     name="res"+name)(first)
+                                     name="res"+name,
+                                     W_regularizer=l2(l2_reg))(first)
 
     return first, second
 
 
 # Create a block
 def create_block_n(inputs, n_filters, filter_size, strides, dropouts,
-                   dilations, name, dim_match, plus_lvl):
+                   dilations, name, dim_match, plus_lvl, l2_reg=0.):
     # Parameters Initialization
     if dim_match:
         strides=[1]*len(strides)
@@ -62,12 +66,13 @@ def create_block_n(inputs, n_filters, filter_size, strides, dropouts,
     name = name+"_branch2"
     shortcut0, last_layer = bn_relu_conv(inputs, n_filters[0], filter_size[0],
         strides[0], dropouts[0], False, dilations0 if filter_size[0]>1 else 1,
-        name=name+"a")
+        name=name+"a", l2_reg=l2_reg)
 
     for i in range(1, len(n_filters)):
         last_layer = bn_relu_conv(last_layer, n_filters[i], filter_size[i],
             strides[i], dropouts[i], False,
-            dilations[i] if filter_size[i]>1 else 1, name=name+"b"+str(i))[1]
+            dilations[i] if filter_size[i]>1 else 1, name=name+"b"+str(i),
+            l2_reg=l2_reg)[1]
 
     # Define shortcut
     if dim_match:
@@ -76,7 +81,8 @@ def create_block_n(inputs, n_filters, filter_size, strides, dropouts,
         shortcut_name = "res"+name[0:-1]+"1"
         shortcut = Convolution2D(n_filters[-1], 1, 1, 'he_normal',
                                  subsample=(strides[0], strides[0]),
-                                 bias=False, name=shortcut_name)(shortcut0)
+                                 bias=False, name=shortcut_name,
+                                 W_regularizer=l2(l2_reg))(shortcut0)
 
     # Fuse branches
     fused = merge([last_layer, shortcut], mode='sum',
@@ -86,11 +92,13 @@ def create_block_n(inputs, n_filters, filter_size, strides, dropouts,
 
 
 # Create the main body of the net
-def create_body(inputs, blocks, n_filters, dilations, strides, dropouts):
+def create_body(inputs, blocks, n_filters, dilations, strides, dropouts,
+                l2_reg=0.):
 
     # Create the first convolutional layer
     inputs = Convolution2D(64, 3, 3, bias=False, name="conv1a",
-                           border_mode='same')(inputs)
+                           border_mode='same',
+                           W_regularizer=l2(l2_reg))(inputs)
 
     # Create the next blocks
     cont=0
@@ -99,22 +107,22 @@ def create_body(inputs, blocks, n_filters, dilations, strides, dropouts):
         for j in range(blocks[i]):
             name = str(i+1)+'a' if j==0 else str(i+1)+'b'+str(j)
             inputs = create_block_n(inputs, n_filters[i], kernel_size,
-                                    strides[i], dropouts[i],
-                                    dilations[i], name=name,
-                                    dim_match=j>0,
-                                    plus_lvl=34+cont)
+                                    strides[i], dropouts[i], dilations[i],
+                                    name=name, dim_match=j>0, plus_lvl=34+cont,
+                                    l2_reg=l2_reg)
             cont=cont+1
 
     return inputs
 
 
 # Create the classifier part
-def create_classifier(body, data, n_classes):
+def create_classifier(body, data, n_classes, l2_reg=0.):
     # Include last layers
     top = BatchNormalization(mode=0, axis=channel_idx, name="bn7")(body)
     top = Activation('relu', name="relu7")(top)
     top = AtrousConvolution2D(512, 3, 3, 'he_normal', atrous_rate=(12,12),
-                              border_mode='same', name="conv6a")(top)
+                              border_mode='same', name="conv6a",
+                              W_regularizer=l2(l2_reg))(top)
     top = Activation('relu', name="conv6a_relu")(top)
     name = "hyperplane_num_cls_%d_branch_%d" % (n_classes, 12)
 
@@ -122,12 +130,13 @@ def create_classifier(body, data, n_classes):
         return initializations.normal(shape, scale=0.01, name=name)
     top = AtrousConvolution2D(n_classes, 3, 3, my_init,
                               atrous_rate=(12,12), border_mode='same',
-                              name=name)(top)
+                              name=name, W_regularizer=l2(l2_reg))(top)
 
     # TODO: Init bilinear
     top = Deconvolution2D(n_classes, 16, 16, top._keras_shape, 'glorot_uniform',
                           'linear', border_mode='valid', subsample=(8, 8),
-                          bias=False, name="upscaling_"+str(n_classes))(top)
+                          bias=False, name="upscaling_"+str(n_classes),
+                          W_regularizer=l2(l2_reg))(top)
 
     top = CropLayer2D(data, name='score')(top)
     top = NdSoftmax()(top)
@@ -136,7 +145,7 @@ def create_classifier(body, data, n_classes):
 
 
 # Create model of basic segnet
-def deeplab_resnet38_aspp_ssm(inputs, n_classes):
+def deeplab_resnet38_aspp_ssm(inputs, n_classes, l2_reg=0.):
     # Number of bn_relu_convs in each block
     blocks = [0, 3, 3, 6, 3, 1, 1]
     # Number of filters in each bn_relu_convs
@@ -151,10 +160,10 @@ def deeplab_resnet38_aspp_ssm(inputs, n_classes):
 
     # Network Body - Only convolutionals blocks
     body = create_body(inputs, blocks, n_filers, dilations, strides,
-                       dropouts)
+                       dropouts, l2_reg)
 
     # Classifier
-    top = create_classifier(body, inputs, n_classes)
+    top = create_classifier(body, inputs, n_classes, l2_reg)
 
     # Complete model
     model = Model(input=inputs, output=top)
@@ -173,7 +182,7 @@ def build_resnetFCN(img_shape=(3, None, None), n_classes=8, l2_reg=0.,
     inputs = Input(img_shape)
 
     # Create model
-    model = deeplab_resnet38_aspp_ssm(inputs, n_classes)
+    model = deeplab_resnet38_aspp_ssm(inputs, n_classes, l2_reg)
 
     # Load pretrained Model
     if path_weights:

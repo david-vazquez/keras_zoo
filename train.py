@@ -621,24 +621,17 @@ def load_config_files(config_path, exp_name,
 # Main function
 def main():
 
-    # Define the user paths
-    usr_path = os.path.join('/home', getuser())
-    shared_path = '/datatmp'
-    dataset_path = os.path.join(shared_path, 'Datasets')
-    shared_dataset_path = os.path.join(shared_path, 'Datasets')
-    experiments_path = os.path.join(shared_path, 'Experiments')
-    shared_experiments_path = os.path.join(shared_path, 'Experiments')
-
     # Get parameters from arguments
-    parser = argparse.ArgumentParser(description='FCN model training')
-    parser.add_argument('-c', '--config_path',
-                        type=str,
-                        default=None,
-                        help='Configuration file')
-    parser.add_argument('-e', '--exp_name',
-                        type=str,
-                        default=None,
-                        help='Name of the experiment')
+    parser = argparse.ArgumentParser(description='Model training')
+    parser.add_argument('-c', '--config_path', type=str,
+                        default=None, help='Configuration file')
+    parser.add_argument('-e', '--exp_name', type=str,
+                        default=None, help='Name of the experiment')
+    parser.add_argument('-s', '--shared_path', type=str,
+                        default='/data', help='Name of the experiment')
+    parser.add_argument('-l', '--local_path', type=str,
+                        default='/datatmp', help='Name of the experiment')
+
     arguments = parser.parse_args()
 
     assert arguments.config_path is not None, 'Please provide a configuration'\
@@ -647,6 +640,14 @@ def main():
     assert arguments.exp_name is not None, 'Please provide a name for the '\
                                            'experiment using -e name in the '\
                                            'command line'
+
+    # Define the user paths
+    shared_path = arguments.shared_path
+    local_path = arguments.local_path
+    dataset_path = os.path.join(local_path, 'Datasets')
+    shared_dataset_path = os.path.join(shared_path, 'Datasets')
+    experiments_path = os.path.join(local_path, getuser(), 'Experiments')
+    shared_experiments_path = os.path.join(shared_path, getuser(), 'Experiments')
 
     # Load configuration files
     cf = load_config_files(arguments.config_path, arguments.exp_name,
