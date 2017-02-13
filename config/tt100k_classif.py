@@ -52,6 +52,7 @@ n_epochs                     = 30              # Number of epochs during trainin
 save_results_enabled         = True            # Enable the Callback
 save_results_nsamples        = 5               # Number of samples to save
 save_results_batch_size      = 5               # Size of the batch
+save_results_n_legend_rows   = 1               # Number of rows when showwing the legend
 
 # Callback early stoping
 earlyStopping_enabled        = True            # Enable the Callback

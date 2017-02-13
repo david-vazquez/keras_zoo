@@ -4,9 +4,9 @@ dataset_name2                = None            # Second dataset name. None if no
 perc_mb2                     = None            # Percentage of data from the second dataset in each minibatch
 
 # Model
-model_name                   = 'lenet'         # Model to use ['fcn8' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19' | 'resnet50' | 'InceptionV3']
+model_name                   = 'densenetFCN'         # Model to use ['fcn8' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19' | 'resnet50' | 'InceptionV3']
 freeze_layers_from           = None    # Freeze layers from 0 to this layer during training (Useful for finetunning) [None | 'base_model' | Layer_id]
-show_model                   = False           # Show the architecture layers
+show_model                   = True           # Show the architecture layers
 load_imageNet                = False            # Load Imagenet weights and normalize following imagenet procedure (NOTE: enable norm_imageNet_preprocess)
 load_pretrained              = False           # Load a pretrained model for doing finetuning
 weights_file                 = 'weights.hdf5'  # Training weight file name
@@ -30,9 +30,9 @@ batch_size_test              = 30              # Batch size during testing
 crop_size_train              = None            # Crop size during training (Height, Width) or None
 crop_size_valid              = None            # Crop size during validation
 crop_size_test               = None            # Crop size during testing
-resize_train                 = (299, 299)      # Resize the image during training (Height, Width) or None
-resize_valid                 = (299, 299)      # Resize the image during validation
-resize_test                  = (299, 299)      # Resize the image during testing
+resize_train                 = (224, 224)      # Resize the image during training (Height, Width) or None
+resize_valid                 = (224, 224)      # Resize the image during validation
+resize_test                  = (224, 224)      # Resize the image during testing
 
 # Data shuffle
 shuffle_train                = True            # Whether to shuffle the training data
@@ -52,6 +52,7 @@ n_epochs                     = 30              # Number of epochs during trainin
 save_results_enabled         = False           # Enable the Callback
 save_results_nsamples        = 5               # Number of samples to save
 save_results_batch_size      = 5               # Size of the batch
+save_results_n_legend_rows   = 1               # Number of rows when showwing the legend
 
 # Callback early stoping
 earlyStopping_enabled        = True            # Enable the Callback

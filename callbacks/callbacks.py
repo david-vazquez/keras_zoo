@@ -155,8 +155,8 @@ class Jacc_new(Callback):
 # Save the image results
 class Save_results(Callback):
     def __init__(self, n_classes, void_label, save_path,
-                 generator, epoch_length, color_map, tag,
-                 *args):
+                 generator, epoch_length, color_map, classes, tag,
+                 n_legend_rows=1, *args):
         super(Callback, self).__init__()
         self.n_classes = n_classes
         self.void_label = void_label
@@ -164,6 +164,8 @@ class Save_results(Callback):
         self.generator = generator
         self.epoch_length = epoch_length
         self.color_map = color_map
+        self.classes = classes
+        self.n_legend_rows = n_legend_rows
         self.tag = tag
 
     def on_epoch_end(self, epoch, logs={}):
@@ -171,10 +173,6 @@ class Save_results(Callback):
         # Create a data generator
         enqueuer = GeneratorEnqueuer(self.generator, pickle_safe=False)
         enqueuer.start(nb_worker=1, max_q_size=1, wait_time=0.05)
-
-        # Create a data generator
-        #data_gen_queue, _stop, _generator_threads = generator_queue(self.generator,
-        #                                                            max_q_size=1)
 
         # Process the dataset
         for _ in range(self.epoch_length):
@@ -205,9 +203,9 @@ class Save_results(Callback):
                                              y_true.shape[2]))
             # Save output images
             save_img3(x_true, y_true, y_pred, self.save_path, epoch,
-                      self.color_map, self.tag+str(_), self.void_label)
+                      self.color_map, self.classes, self.tag+str(_), self.void_label,
+                      self.n_legend_rows)
 
         # Stop data generator
-        #_stop.set()
         if enqueuer is not None:
             enqueuer.stop()

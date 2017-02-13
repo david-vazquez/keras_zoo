@@ -24,6 +24,7 @@ from keras.engine.training import GeneratorEnqueuer
 from models.fcn8 import build_fcn8
 from models.segnet import build_segnet
 from models.resnetFCN import build_resnetFCN
+from models.densenetFCN import build_densenetFCN
 from models.lenet import build_lenet
 from models.alexNet import build_alexNet
 from models.vgg import build_vgg
@@ -208,10 +209,10 @@ def build_model(cf, optimizer):
         if K.image_dim_ordering() == 'th':
             in_shape = (cf.dataset.n_channels, None, None)
         else:
-            in_shape = (cf.target_size_train[0],
-                       cf.target_size_train[1],
-                       cf.dataset.n_channels)
-            #in_shape = (None, None, cf.dataset.n_channels)
+            #in_shape = (cf.target_size_train[0],
+            #           cf.target_size_train[1],
+            #           cf.dataset.n_channels)
+            in_shape = (None, None, cf.dataset.n_channels)
         loss = cce_flatt(cf.dataset.void_class, cf.dataset.cb_weights)
         metrics = [IoU(cf.dataset.n_classes, cf.dataset.void_class)]
         # metrics = []
@@ -223,14 +224,22 @@ def build_model(cf, optimizer):
         model = build_fcn8(in_shape, cf.dataset.n_classes, cf.weight_decay,
                            freeze_layers_from=cf.freeze_layers_from,
                            path_weights='weights/pascal-fcn8s-dag.mat') # TODO:
-    elif cf.model_name == 'segnet':
+    elif cf.model_name == 'segnet_basic':
         model = build_segnet(in_shape, cf.dataset.n_classes, cf.weight_decay,
-                           freeze_layers_from=cf.freeze_layers_from,
-                           path_weights=None)
+                             freeze_layers_from=cf.freeze_layers_from,
+                             path_weights=None, basic=True)
+    elif cf.model_name == 'segnet_vgg':
+        model = build_segnet(in_shape, cf.dataset.n_classes, cf.weight_decay,
+                             freeze_layers_from=cf.freeze_layers_from,
+                             path_weights=None, basic=False)
     elif cf.model_name == 'resnetFCN':
         model = build_resnetFCN(in_shape, cf.dataset.n_classes, cf.weight_decay,
-                           freeze_layers_from=cf.freeze_layers_from,
-                           path_weights=None)
+                                freeze_layers_from=cf.freeze_layers_from,
+                                path_weights=None)
+    elif cf.model_name == 'densenetFCN':
+        model = build_densenetFCN(in_shape, cf.dataset.n_classes, cf.weight_decay,
+                                  freeze_layers_from=cf.freeze_layers_from,
+                                  path_weights=None)
     elif cf.model_name == 'lenet':
         model = build_lenet(in_shape, cf.dataset.n_classes, cf.weight_decay)
     elif cf.model_name == 'alexNet':
@@ -291,6 +300,8 @@ def create_callbacks(cf, valid_gen):
                             generator=valid_gen,
                             epoch_length=int(math.ceil(cf.save_results_nsamples/float(cf.save_results_batch_size))),
                             color_map=cf.dataset.color_map,
+                            classes=cf.dataset.classes,
+                            n_legend_rows=cf.save_results_n_legend_rows,
                             tag='valid')]
 
     # Early stopping
@@ -400,7 +411,7 @@ def predict_model(cf, model, test_gen, tag='pred'):
                                          y_true.shape[3]))
 
             save_img3(x_true, y_true, y_pred, cf.savepath, 0,
-                      cf.dataset.color_map, tag+str(_), cf.dataset.void_class)
+                      cf.dataset.color_map, cf.dataset.classes, tag+str(_), cf.dataset.void_class)
 
         # Stop data generator
         _stop.set()
