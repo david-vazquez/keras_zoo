@@ -37,7 +37,7 @@ class Model():
             return None
 
     # Predict the model
-    def predict_model(self, test_gen, tag='pred'):
+    def predict(self, test_gen, tag='pred'):
         if self.cf.pred_model:
             print('\n > Predicting the model...')
             # Load best trained model
@@ -78,7 +78,7 @@ class Model():
             print ('   Predicting time: {}. FPS: {}. Seconds per Frame: {}'.format(total_time, fps, s_p_f))
 
     # Test the model
-    def test_model(self, test_gen):
+    def test(self, test_gen):
         if self.cf.test_model:
             print('\n > Testing the model...')
             # Load best trained model
