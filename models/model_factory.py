@@ -1,7 +1,7 @@
 import os
 
 # Keras imports
-from metrics.metrics import cce_flatt, IoU
+from metrics.metrics import cce_flatt, IoU, YOLOLoss
 from keras import backend as K
 from keras.utils.visualize_util import plot
 
@@ -11,6 +11,9 @@ from models.alexNet import build_alexNet
 from models.vgg import build_vgg
 from models.resnet import build_resnet50
 from models.inceptionV3 import build_inceptionV3
+
+# Detection models
+from models.yolo import build_yolo
 
 # Segmentation models
 from models.fcn8 import build_fcn8
@@ -44,6 +47,14 @@ class Model_Factory():
                             cf.dataset.n_channels)
             loss = 'categorical_crossentropy'
             metrics = ['accuracy']
+        elif cf.dataset.class_mode == 'detection':
+            in_shape = (cf.dataset.n_channels,
+                        cf.target_size_train[0],
+                        cf.target_size_train[1])
+            # TODO yolo and ssd have different losses
+            loss = YOLOLoss(in_shape, cf.dataset.n_classes, cf.dataset.priors)
+            # TODO implement detection mAP or f-score metric
+            metrics = []
         elif cf.dataset.class_mode == 'segmentation':
             if K.image_dim_ordering() == 'th':
                 if variable_input_size:
@@ -69,7 +80,7 @@ class Model_Factory():
     def make(self, cf, optimizer=None):
         if cf.model_name in ['lenet', 'alexNet', 'vgg16', 'vgg19', 'resnet50',
                              'InceptionV3', 'fcn8', 'unet', 'segnet',
-                             'segnet_basic', 'resnetFCN']:
+                             'segnet_basic', 'resnetFCN', 'yolo']:
             if optimizer is None:
                 raise ValueError('optimizer can not be None')
 
@@ -142,6 +153,11 @@ class Model_Factory():
                                       cf.weight_decay,
                                       load_pretrained=cf.load_imageNet,
                                       freeze_layers_from=cf.freeze_layers_from)
+        elif cf.model_name == 'yolo':
+            model = build_yolo(in_shape, cf.dataset.n_classes,
+                               cf.dataset.n_priors,
+                               load_pretrained=cf.load_imageNet,
+                               freeze_layers_from=cf.freeze_layers_from)
         else:
             raise ValueError('Unknown model')
 
