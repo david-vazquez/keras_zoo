@@ -792,16 +792,16 @@ class DirectoryIterator(Iterator):
 
         # Check class mode
         if class_mode not in {'categorical', 'binary', 'sparse',
-                              'segmentation', None}:
+                              'segmentation', 'detection', None}:
             raise ValueError('Invalid class_mode:', class_mode,
                              '; expected one of "categorical", '
-                             '"binary", "sparse", "segmentation" or None.')
+                             '"binary", "sparse", "segmentation", "detection" or None.')
         self.class_mode = class_mode
         self.has_gt_image = True if self.class_mode == 'segmentation' else False
 
         # Check class names
         if not classes:
-            if self.class_mode == 'segmentation':
+            if self.class_mode == 'segmentation' or self.class_mode == 'detection':
                 raise ValueError('You should input the class names')
             else:
                 classes = list_subdirs(directory)
@@ -815,7 +815,13 @@ class DirectoryIterator(Iterator):
         self.classes = []
 
         # Get filenames
-        if not self.class_mode == 'segmentation':
+        if self.class_mode == 'detection':
+            for fname in os.listdir(directory):
+                gt_fname = os.path.join(directory,fname.replace('jpg','txt'))
+                if has_valid_extension(fname) and os.path.isfile(gt_fname):
+                    self.filenames.append(fname)
+            self.filenames = np.sort(self.filenames)
+        elif not self.class_mode == 'segmentation':
             for subdir in classes:
                 subpath = os.path.join(directory, subdir)
                 for fname in os.listdir(subpath):
@@ -852,6 +858,9 @@ class DirectoryIterator(Iterator):
             batch_x = np.zeros((current_batch_size,) + self.image_shape)
             if self.has_gt_image:
                 batch_y = np.zeros((current_batch_size,) + self.gt_image_shape)
+            if self.class_mode == 'detection':
+                # TODO yolo and ssd expect different batch_y formats
+                batch_y = np.zeros((current_batch_size, 5, self.gt_image_shape[1]/32, self.gt_image_shape[2]/32))
 
         # Build batch of image data
         for i, j in enumerate(index_array):
@@ -873,6 +882,27 @@ class DirectoryIterator(Iterator):
             else:
                 y = None
 
+            # Load GT image if detection
+            if self.class_mode == 'detection':
+                label_path = os.path.join(self.directory, fname).replace('jpg','txt')
+                gt = np.loadtxt(label_path)
+                if len(gt.shape) == 1:
+                    gt = gt[np.newaxis,]
+                y = np.zeros((5, self.gt_image_shape[1]/32, self.gt_image_shape[2]/32))
+                y[0,:,:] = -1 # indicates nothing on this position
+                #TODO shuffle gt boxes order
+                max_truth_boxes = 30 #max_truth_boxes must be passed via cf
+                for t in range(min(gt.shape[0],max_truth_boxes)):
+                    w = 20 # TODO put this 20 as funtion of input shape
+                    t_i = t%w
+                    t_j = t/w
+                    y[0,t_j,t_i] = gt[t,0] # object class
+                    y[1,t_j,t_i] = gt[t,1] # x coordinate
+                    y[2,t_j,t_i] = gt[t,2] # y coordinate
+                    y[3,t_j,t_i] = gt[t,3] # width
+                    y[4,t_j,t_i] = gt[t,4] # height
+
+
             # Standarize image
             x = self.image_data_generator.standardize(x, y)
 
@@ -882,11 +912,11 @@ class DirectoryIterator(Iterator):
             # Add images to batches
             if current_batch_size > 1:
                 batch_x[i] = x
-                if self.has_gt_image:
+                if self.has_gt_image or self.class_mode == 'detection':
                     batch_y[i] = y
             else:
                 batch_x = np.expand_dims(x, axis=0)
-                if self.has_gt_image:
+                if self.has_gt_image or self.class_mode == 'detection':
                     batch_y = np.expand_dims(y, axis=0)
 
         # optionally save augmented images to disk for debugging purposes

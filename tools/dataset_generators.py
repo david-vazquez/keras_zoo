@@ -39,7 +39,8 @@ class Dataset_Generators():
                                    vertical_flip=cf.da_vertical_flip,
                                    spline_warp=cf.da_spline_warp,
                                    warp_sigma=cf.da_warp_sigma,
-                                   warp_grid_size=cf.da_warp_grid_size
+                                   warp_grid_size=cf.da_warp_grid_size,
+                                   dim_ordering='th' if cf.model_name == 'yolo' else 'default'
                                    )
 
         # Compute normalization constants if required
@@ -104,7 +105,8 @@ class Dataset_Generators():
                                    samplewise_std_normalization=cf.norm_samplewise_std_normalization,
                                    gcn=cf.norm_gcn,
                                    zca_whitening=cf.norm_zca_whitening,
-                                   crop_size=cf.crop_size_valid)
+                                   crop_size=cf.crop_size_valid,
+                                   dim_ordering='th' if cf.model_name == 'yolo' else 'default')
         valid_gen = dg_va.flow_from_directory(directory=cf.dataset.path_valid_img,
                                               gt_directory=cf.dataset.path_valid_mask,
                                               resize=cf.resize_valid,
@@ -127,7 +129,8 @@ class Dataset_Generators():
                                    samplewise_center=cf.norm_samplewise_center,
                                    samplewise_std_normalization=cf.norm_samplewise_std_normalization,
                                    gcn=cf.norm_gcn,
-                                   zca_whitening=cf.norm_zca_whitening)
+                                   zca_whitening=cf.norm_zca_whitening,
+                                   dim_ordering='th' if cf.model_name == 'yolo' else 'default')
         test_gen = dg_ts.flow_from_directory(directory=cf.dataset.path_test_img,
                                              gt_directory=cf.dataset.path_test_mask,
                                              resize=cf.resize_test,
