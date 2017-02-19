@@ -19,18 +19,19 @@ from models.segnet import build_segnet
 from models.resnetFCN import build_resnetFCN
 from models.densenetFCN import build_densenetFCN
 
+# Adversarial models
+from models.adversarial_semseg import Adversarial_Semseg
+
+from models.model import One_Net_Model
+
 
 # Build the model
 class Model_Factory():
-    def __init__(self, cf, optimizer):
-        self.cf = cf
-        self.optimizer = optimizer
+    def __init__(self):
+        pass
 
-
-    def make(self):
-        cf = self.cf
-        optimizer = self.optimizer
-
+    # Define the input size, loss and metrics
+    def basic_model_properties(self, cf, variable_input_size):
         # Define the input size, loss and metrics
         if cf.dataset.class_mode == 'categorical':
             if K.image_dim_ordering() == 'th':
@@ -45,23 +46,61 @@ class Model_Factory():
             metrics = ['accuracy']
         elif cf.dataset.class_mode == 'segmentation':
             if K.image_dim_ordering() == 'th':
-                in_shape = (cf.dataset.n_channels, None, None)
+                if variable_input_size:
+                    in_shape = (cf.dataset.n_channels, None, None)
+                else:
+                    in_shape = (cf.dataset.n_channels,
+                                cf.target_size_train[0],
+                                cf.target_size_train[1])
             else:
-                in_shape = (None, None, cf.dataset.n_channels)
-                #in_shape = (cf.target_size_train[0],
-                #            cf.target_size_train[1],
-                #            cf.dataset.n_channels)
+                if variable_input_size:
+                    in_shape = (None, None, cf.dataset.n_channels)
+                else:
+                    in_shape = (cf.target_size_train[0],
+                                cf.target_size_train[1],
+                                cf.dataset.n_channels)
             loss = cce_flatt(cf.dataset.void_class, cf.dataset.cb_weights)
             metrics = [IoU(cf.dataset.n_classes, cf.dataset.void_class)]
-            # metrics = []
         else:
             raise ValueError('Unknown problem type')
+        return in_shape, loss, metrics
 
-        # Create the model
+    # Creates a Model object (not a Keras model)
+    def make(self, cf, optimizer=None):
+        if cf.model_name in ['lenet', 'alexNet', 'vgg16', 'vgg19', 'resnet50',
+                             'InceptionV3', 'fcn8', 'unet', 'segnet',
+                             'segnet_basic', 'resnetFCN']:
+            if optimizer is None:
+                raise ValueError('optimizer can not be None')
+
+            in_shape, loss, metrics = self.basic_model_properties(cf, True)
+            model = self.make_one_net_model(cf, in_shape, loss, metrics,
+                                            optimizer)
+
+        elif cf.model_name == 'adversarial_semseg':
+            if optimizer is None:
+                raise ValueError('optimizer is not None')
+
+            # loss, metrics and optimizer are made in class Adversarial_Semseg
+            in_shape, _, _ = self.basic_model_properties(cf, False)
+            model = Adversarial_Semseg(cf, in_shape)
+
+        else:
+            raise ValueError('Unknown model name')
+
+        # Output the model
+        print ('   Model: ' + cf.model_name)
+        return model
+
+    # Creates, compiles, plots and prints a Keras model. Optionally also loads its
+    # weights.
+    def make_one_net_model(self, cf, in_shape, loss, metrics, optimizer):
+        # Create the *Keras* model
         if cf.model_name == 'fcn8':
             model = build_fcn8(in_shape, cf.dataset.n_classes, cf.weight_decay,
                                freeze_layers_from=cf.freeze_layers_from,
-                               path_weights='weights/pascal-fcn8s-dag.mat')
+                               #path_weights='weights/pascal-fcn8s-dag.mat')
+                               path_weights=None)
         elif cf.model_name == 'unet':
             model = build_unet(in_shape, cf.dataset.n_classes, cf.weight_decay,
                                freeze_layers_from=cf.freeze_layers_from,
@@ -121,4 +160,7 @@ class Model_Factory():
 
         # Output the model
         print ('   Model: ' + cf.model_name)
-        return model
+        # model is a keras model, Model is a class wrapper so that we can have
+        # other models (like GANs) made of a pair of keras models, with their
+        # own ways to train, test and predict
+        return One_Net_Model(model, cf, optimizer)

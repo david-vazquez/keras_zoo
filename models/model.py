@@ -1,19 +1,40 @@
 import math
 import time
-
 import numpy as np
-
 from keras.engine.training import GeneratorEnqueuer
-
-from model_factory import Model_Factory
+#from model_factory import Model_Factory
 from tools.save_images import save_img3
 
 
+"""
+Interface for normal (one net) models and adversarial models. Objects of
+classes derived from Model are returned by method make() of the Model_Factory
+class.
+"""
 class Model():
-    def __init__(self, cf, optimizer):
+    def train(self, train_gen, valid_gen, cb):
+        pass
+
+    def predict(self, test_gen, tag='pred'):
+        pass
+
+    def test(self, test_gen):
+        pass
+
+
+"""
+Wraper of regular models like FCN, SegNet etc consisting of a one Keras model.
+But not GANs, which are made of two networks and have a different training
+strategy.
+In this class we implement the train(), test() and predict() methods common to
+all of them.
+"""
+# TODO: Better call it Regular_Model ?
+class One_Net_Model(Model):
+    def __init__(self, model, cf, optimizer):
         self.cf = cf
         self.optimizer = optimizer
-        self.model = Model_Factory(cf, optimizer).make()
+        self.model = model
 
     # Train the model
     def train(self, train_gen, valid_gen, cb):

@@ -4,12 +4,10 @@ from tools.data_loader import ImageDataGenerator
 # Load datasets
 
 class Dataset_Generators():
-    def __init__(self, cf):
-        self.cf = cf
-        
-        
-    def make(self):
-        cf = self.cf
+    def __init__(self):
+        pass
+
+    def make(self, cf):
         mean = cf.dataset.rgb_mean
         std = cf.dataset.rgb_std
         cf.dataset.cb_weights = None
@@ -142,4 +140,3 @@ class Dataset_Generators():
                                              seed=cf.seed_test)
 
         return (train_gen, valid_gen, test_gen)
-        

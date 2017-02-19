@@ -7,14 +7,10 @@ from callbacks import (History_plot, Jacc_new, Save_results)
 
 # Create callbacks
 class Callbacks_Factory():
-    def __init__(self, cf, valid_gen):
-        self.cf = cf
-        self.valid_gen = valid_gen
+    def __init__(self):
+        pass
 
-    def make(self):
-        cf = self.cf
-        valid_gen = self.valid_gen
-
+    def make(self, cf, valid_gen):
         cb = []
 
         # Jaccard callback

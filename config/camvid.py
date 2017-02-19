@@ -4,7 +4,7 @@ dataset_name2                = None            # Second dataset name. None if no
 perc_mb2                     = None            # Percentage of data from the second dataset in each minibatch
 
 # Model
-model_name                   = 'unet'     # Model to use ['fcn8' | 'segnet_basic' | 'segnet_vgg' | 'resnetFCN' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19' | 'resnet50' | 'InceptionV3']
+model_name                   = 'adversarial_semseg'     # Model to use ['fcn8' | 'segnet_basic' | 'segnet_vgg' | 'resnetFCN' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19' | 'resnet50' | 'InceptionV3']
 freeze_layers_from           = None #'base_model'    # Freeze layers from 0 to this layer during training (Useful for finetunning) [None | 'base_model' | Layer_id]
 show_model                   = True            # Show the architecture layers
 load_imageNet                = False           # Load Imagenet weights and normalize following imagenet procedure
@@ -27,7 +27,7 @@ debug_n_epochs               = 2               # N of training epochs in debug m
 batch_size_train             = 10              # Batch size during training
 batch_size_valid             = 10              # Batch size during validation
 batch_size_test              = 30              # Batch size during testing
-crop_size_train              = (224, 224)      # Crop size during training (Height, Width) or None
+crop_size_train              = (256, 256)      # Crop size during training (Height, Width) or None
 crop_size_valid              = None            # Crop size during validation
 crop_size_test               = None            # Crop size during testing
 resize_train                 = None      # Resize the image during training (Height, Width) or None

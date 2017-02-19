@@ -1,4 +1,5 @@
 # Keras imports
+from keras import backend as K
 from keras.models import Model
 from keras.layers import Input
 from keras.layers.convolutional import (Convolution2D, MaxPooling2D,
@@ -10,18 +11,19 @@ from keras.regularizers import l2
 # Custom layers import
 from layers.ourlayers import (CropLayer2D, NdSoftmax, DePool2D)
 
-# Keras dim orders
-from keras import backend as K
-dim_ordering = K.image_dim_ordering()
-if dim_ordering == 'th':
-    channel_idx = 1
-else:
-    channel_idx = 3
-
 # Paper: https://arxiv.org/abs/1511.00561
 # Original code: https://github.com/alexgkendall/caffe-segnet
 # Adapted from: https://github.com/imlab-uiip/keras-segnet
 # Adapted from: https://github.com/pradyu1993/segnet
+
+
+# Keras dim orders
+def channel_idx():
+    if K.image_dim_ordering() == 'th':
+        return 1
+    else:
+        return 3
+
 
 # Downsample blocks of the basic-segnet
 def downsampling_block_basic(inputs, n_filters, filter_size,
@@ -31,7 +33,7 @@ def downsampling_block_basic(inputs, n_filters, filter_size,
     pad = ZeroPadding2D(padding=(1, 1))(inputs)
     conv = Convolution2D(n_filters, filter_size, filter_size,
                          border_mode='same', W_regularizer=W_regularizer)(pad)
-    bn = BatchNormalization(mode=0, axis=channel_idx)(conv)
+    bn = BatchNormalization(mode=0, axis=channel_idx())(conv)
     act = Activation('relu')(bn)
     maxp = MaxPooling2D(pool_size=(2, 2), strides=(2, 2))(act)
     return maxp
@@ -46,7 +48,7 @@ def upsampling_block_basic(inputs, n_filters, filter_size, unpool_layer=None,
         up = UpSampling2D()(inputs)
     conv = Convolution2D(n_filters, filter_size, filter_size,
                          border_mode='same', W_regularizer=W_regularizer)(up)
-    bn = BatchNormalization(mode=0, axis=channel_idx)(conv)
+    bn = BatchNormalization(mode=0, axis=channel_idx())(conv)
     return bn
 
 
@@ -91,7 +93,7 @@ def downsampling_block_vgg(inputs, n_conv, n_filters, filter_size, layer_id,
                              border_mode=border_mode,
                              name=name,
                              W_regularizer=l2(l2_reg))(conv)
-        conv = BatchNormalization(mode=0, axis=channel_idx,
+        conv = BatchNormalization(mode=0, axis=channel_idx(),
                                   name=name + '_bn')(conv)
         conv = Activation(activation, name=name + '_relu')(conv)
     conv = MaxPooling2D((2, 2), (2, 2), name='pool'+str(layer_id))(conv)
@@ -112,7 +114,7 @@ def upsampling_block_vgg(inputs, n_conv, n_filters, filter_size, layer_id,
                              border_mode=border_mode,
                              name='conv'+str(layer_id)+'_'+str(i)+'_D',
                              W_regularizer=l2(l2_reg))(conv)
-        conv = BatchNormalization(mode=0, axis=channel_idx)(conv)
+        conv = BatchNormalization(mode=0, axis=channel_idx())(conv)
         conv = Activation(activation)(conv)
     return conv
 
@@ -263,9 +265,21 @@ def load_matcovnet(model, path_weights, n_classes):
 
 
 if __name__ == '__main__':
-    input_shape = [3, 224, 224]
-    print (' > Building')
-    model = build_segnet(input_shape, 11, 0.)
-    print (' > Compiling')
-    model.compile(loss="categorical_crossentropy", optimizer="rmsprop")
-    model.summary()
+    print ('BUILD full segnet')
+    model_full = build_segnet(img_shape=(3, 360, 480), n_classes=8, l2_reg=0.,
+                 init='glorot_uniform', path_weights=None,
+                 freeze_layers_from=None, use_unpool=False, basic=False)
+    print ('COMPILING full segnet')
+    model_full.compile(loss="binary_crossentropy", optimizer="rmsprop")
+    model_full.summary()
+    print ('END COMPILING full segnet')
+
+    print('')
+    print ('BUILD basic segnet')
+    model_basic = build_segnet(img_shape=(3, 360, 480), n_classes=8, l2_reg=0.,
+                 init='glorot_uniform', path_weights=None,
+                 freeze_layers_from=None, use_unpool=False, basic=True)
+    print ('COMPILING basic segnet')
+    model_basic.compile(loss="binary_crossentropy", optimizer="rmsprop")
+    model_basic.summary()
+    print ('END COMPILING basic segnet')

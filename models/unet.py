@@ -141,11 +141,10 @@ def generator_unet_deconv(img_dim, n_classes, bn_mode, batch_size,
 
 # All network models (vgg, segnet etc) have a built_net() function called by
 # make() method of Model_Factory class, that return a Keras model.
-def build_unet(img_shape, n_classes, bn_mode=2, batch_size=None, l2_reg=0.,
-               path_weights=None):
-
+def build_unet(img_shape=(3, None, None), n_classes=8, l2_reg=0.,
+                    path_weights=None, freeze_layers_from=None):
     # Create model
-    model = generator_unet_deconv(img_shape, n_classes, bn_mode, batch_size,
+    model = generator_unet_deconv(img_shape, n_classes, bn_mode=2, batch_size=10,
                                   model_name="unet")
 
     # Load pretrained Model

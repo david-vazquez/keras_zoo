@@ -1,16 +1,18 @@
 #!/usr/bin/env python
-from tools.logger import Logger
-from config.configuration import Configuration
-from tools.dataset_generators import Dataset_Generators
-from tools.optimizer_factory import Optimizer_Factory
-from models.model import Model
-from callbacks.callbacks_factory import Callbacks_Factory
-from getpass import getuser
 import argparse
 import os
 import sys
+from getpass import getuser
 import matplotlib
 matplotlib.use('Agg')  # Faster plot
+
+# Import tools
+from config.configuration import Configuration
+from tools.logger import Logger
+from tools.dataset_generators import Dataset_Generators
+from tools.optimizer_factory import Optimizer_Factory
+from callbacks.callbacks_factory import Callbacks_Factory
+from models.model_factory import Model_Factory
 
 
 # Train the network
@@ -20,19 +22,19 @@ def process(cf):
     print (' ---> Init experiment: ' + cf.exp_name + ' <---')
 
     # Create the data generators
-    train_gen, valid_gen, test_gen = Dataset_Generators(cf).make()
+    train_gen, valid_gen, test_gen = Dataset_Generators().make(cf)
 
     # Create the optimizer
     print ('\n > Creating optimizer...')
-    optimizer = Optimizer_Factory(cf).make()
+    optimizer = Optimizer_Factory().make(cf)
 
     # Build model
     print ('\n > Building model...')
-    model = Model(cf, optimizer)
+    model = Model_Factory().make(cf, optimizer)
 
     # Create the callbacks
     print ('\n > Creating callbacks...')
-    cb = Callbacks_Factory(cf, valid_gen).make()
+    cb = Callbacks_Factory().make(cf, valid_gen)
 
     if cf.train_model:
         # Train the model
