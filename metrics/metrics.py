@@ -110,8 +110,8 @@ def IoU(n_classes, void_labels):
 
 """YOLO loss function"""
 
-from models.yolo import logistic_activate,logistic_gradient,yolo_activate_regions
-from models.yolo import yolo_delta_region_box,yolo_box_iou,yolo_get_region_box 
+from tools.yolo_utils import logistic_activate,logistic_gradient,yolo_activate_regions
+from tools.yolo_utils import yolo_delta_region_box,yolo_box_iou,yolo_get_region_box 
 
 def YOLOLoss(input_shape=(3,640,640),num_classes=45,priors=[[0.25,0.25], [0.5,0.5], [1.0,1.0], [1.7,1.7], [2.5,2.5]],max_truth_boxes=30,thresh=0.6,object_scale=5.0,noobject_scale=1.0,coord_scale=1.0,class_scale=1.0):
 
