@@ -7,7 +7,7 @@ perc_mb2                     = None            # Percentage of data from the sec
 model_name                   = 'yolo'          # Model to use
 freeze_layers_from           = 41              # Freeze layers from 0 to this layer during training (Useful for finetunning) [None | 'base_model' | Layer_id]
 show_model                   = False           # Show the architecture layers
-load_imageNet                = False           # Load Imagenet weights and normalize following imagenet procedure
+load_imageNet                = True            # Load Imagenet weights and normalize following imagenet procedure
 load_pretrained              = False           # Load a pretrained model for doing finetuning
 weights_file                 = 'yolo.hdf5'  # Training weight file name
 
@@ -18,10 +18,10 @@ pred_model                   = False           # Predict using the model
 
 # Debug
 debug                        = False           # Use only few images for debuging
-debug_images_train           = 50              # N images for training in debug mode (-1 means all)
-debug_images_valid           = 50              # N images for validation in debug mode (-1 means all)
-debug_images_test            = 50              # N images for testing in debug mode (-1 means all)
-debug_n_epochs               = 2               # N of training epochs in debug mode
+debug_images_train           = 64              # N images for training in debug mode (-1 means all)
+debug_images_valid           = 64              # N images for validation in debug mode (-1 means all)
+debug_images_test            = 64              # N images for testing in debug mode (-1 means all)
+debug_n_epochs               = 2              # N of training epochs in debug mode
 
 # Batch sizes
 batch_size_train             = 4              # Batch size during training
