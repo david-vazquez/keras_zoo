@@ -893,7 +893,7 @@ class DirectoryIterator(Iterator):
                 #TODO shuffle gt boxes order
                 max_truth_boxes = 30 #max_truth_boxes must be passed via cf
                 for t in range(min(gt.shape[0],max_truth_boxes)):
-                    w = 20 # TODO put this 20 as funtion of input shape
+                    w = self.gt_image_shape[2]/32
                     t_i = t%w
                     t_j = t/w
                     y[0,t_j,t_i] = gt[t,0] # object class
