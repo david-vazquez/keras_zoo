@@ -817,9 +817,12 @@ class DirectoryIterator(Iterator):
         # Get filenames
         if self.class_mode == 'detection':
             for fname in os.listdir(directory):
-                gt_fname = os.path.join(directory,fname.replace('jpg','txt'))
-                if has_valid_extension(fname) and os.path.isfile(gt_fname):
+                if has_valid_extension(fname):
                     self.filenames.append(fname)
+                    # Look for the GT filename
+                    gt_fname = os.path.join(directory,fname.replace('jpg','txt'))
+                    if not os.path.isfile(gt_fname):
+                        raise ValueError('GT file not found: ' + gt_fname)
             self.filenames = np.sort(self.filenames)
         elif not self.class_mode == 'segmentation':
             for subdir in classes:
