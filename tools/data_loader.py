@@ -891,19 +891,28 @@ class DirectoryIterator(Iterator):
                 gt = np.loadtxt(label_path)
                 if len(gt.shape) == 1:
                     gt = gt[np.newaxis,]
+                #TODO shuffle gt boxes order
                 y = np.zeros((5, self.gt_image_shape[1]/32, self.gt_image_shape[2]/32))
                 y[0,:,:] = -1 # indicates nothing on this position
-                #TODO shuffle gt boxes order
-                max_truth_boxes = 30 #max_truth_boxes must be passed via cf
+
+                w = self.gt_image_shape[2]/32
+                h = self.gt_image_shape[1]/32
+                max_truth_boxes = w * h
+
+                t_ind = 0
                 for t in range(min(gt.shape[0],max_truth_boxes)):
-                    w = self.gt_image_shape[2]/32
-                    t_i = t%w
-                    t_j = t/w
+                    if gt[t,1] <= 0. or gt[t,1] >= 1. or gt[t,2] <= 0. or gt[t,2] >= 1.:
+                        warnings.warn('ImageDataGenerator found invalid annotation '
+                                      'on GT file '+label_path)
+                        continue
+                    t_i = t_ind%w
+                    t_j = t_ind/w
                     y[0,t_j,t_i] = gt[t,0] # object class
                     y[1,t_j,t_i] = gt[t,1] # x coordinate
                     y[2,t_j,t_i] = gt[t,2] # y coordinate
                     y[3,t_j,t_i] = gt[t,3] # width
                     y[4,t_j,t_i] = gt[t,4] # height
+                    t_ind += 1
 
 
             # Standarize image
