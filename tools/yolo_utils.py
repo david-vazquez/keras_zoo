@@ -19,7 +19,8 @@ def yolo_activate_regions(x,num_boxes,num_classes):
         index = size*k
         x[b, index + 4, :, :] = logistic_activate(x[b, index + 4, :, :])
         # softmax of class prediction
-        e_x = np.exp(x[b, index + 5:index + 5 + num_classes, :, :])
+        e_x = np.exp(x[b, index + 5:index + 5 + num_classes, :, :] -
+                     np.max(x[b, index + 5:index + 5 + num_classes, :, :],axis=0))
         x[b, index + 5:index + 5 + num_classes, :, :] = e_x/np.sum((e_x),axis=0)
     return x
 
