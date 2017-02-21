@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
+import warnings
 import skimage.io as io
 from skimage.color import rgb2gray
 import skimage.transform
