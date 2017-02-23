@@ -46,11 +46,15 @@ class Configuration():
 
         # Load dataset configuration
         cf.dataset = self.load_config_dataset(cf.dataset_name, dataset_path,
-                                         shared_dataset_path, 'config_dataset')
+                                              shared_dataset_path,
+                                              cf.problem_type,
+                                              'config_dataset')
         if cf.dataset_name2:
             cf.dataset2 = self.load_config_dataset(cf.dataset_name2,
-                                                    dataset_path,
-                                                    shared_dataset_path, 'config_dataset2')
+                                                   dataset_path,
+                                                   shared_dataset_path,
+                                                   cf.problem_type,
+                                                   'config_dataset2')
 
         # If in Debug mode use few images
         if cf.debug and cf.debug_images_train > 0:
@@ -96,10 +100,10 @@ class Configuration():
         return cf
 
     # Load the configuration file of the dataset
-    def load_config_dataset(self, dataset_name, dataset_path, shared_dataset_path, name='config'):
+    def load_config_dataset(self, dataset_name, dataset_path, shared_dataset_path, problem_type, name='config'):
         # Copy the dataset from the shared to the local path if not existing
-        shared_dataset_path = os.path.join(shared_dataset_path, dataset_name)
-        dataset_path = os.path.join(dataset_path, dataset_name)
+        shared_dataset_path = os.path.join(shared_dataset_path, problem_type, dataset_name)
+        dataset_path = os.path.join(dataset_path, problem_type, dataset_name)
         if not os.path.exists(dataset_path):
             print('The local path {} does not exist. Copying '
                   'dataset...'.format(dataset_path))

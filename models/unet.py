@@ -10,154 +10,165 @@ Limitations:
  - number of rows and columns must be power of two (not necessarily square images)
  - tensorflow backend (why? because of Deconvolution2D ?)
  - need to provide the batch size as a parameter, but it can be None
-
-TODO: add L2 regularization ?
 """
-import numpy as np
 
 # Keras imports
 from keras.models import Model
 from keras.layers import (Input, merge)
-from keras.layers.convolutional import (Convolution2D, Deconvolution2D)
-from keras.layers.normalization import BatchNormalization
-from keras.layers.core import (Activation, Dropout)
-# from keras.regularizers import l2
-# TODO add regularization
-
-from keras import backend as K
-from keras.layers.advanced_activations import LeakyReLU
-
+from keras.layers.convolutional import (Convolution2D, MaxPooling2D,
+                                        ZeroPadding2D)
+from keras.layers.core import Dropout
+from keras.regularizers import l2
+from layers.deconv import Deconvolution2D
 from layers.ourlayers import (CropLayer2D, NdSoftmax)
 
 
-def conv_block(x, f, name, bn_mode, bn_axis, bn=True, subsample=(2, 2)):
-    x = LeakyReLU(0.2)(x)
-    x = Convolution2D(f, 3, 3, subsample=subsample, name=name,
-                      init='glorot_uniform', border_mode="same")(x)
-    if bn:
-        x = BatchNormalization(mode=bn_mode, axis=bn_axis)(x)
+def build_unet(img_shape=(3, None, None), nclasses=8, l2_reg=0.,
+               init='glorot_uniform', path_weights=None,
+               freeze_layers_from=None, padding=100, dropout=True):
 
-    return x
+    # Regularization warning
+    if l2_reg > 0.:
+        print ("Regularizing the weights: " + str(l2_reg))
 
+    # Input
+    inputs = Input(img_shape, name='input')
+    padded = ZeroPadding2D(padding=(padding, padding), name='padded')(inputs)
 
-def deconv_block(x, x2, f, h, w, batch_size, name, bn_mode, bn_axis,
-                 bn=True, dropout=False):
+    # Block 1
+    conv1_1 = Convolution2D(64, 3, 3, init, 'relu', border_mode='valid',
+                            name='conv1_1', W_regularizer=l2(l2_reg))(padded)
+    conv1_2 = Convolution2D(64, 3, 3, init, 'relu', border_mode='valid',
+                            name='conv1_2', W_regularizer=l2(l2_reg))(conv1_1)
+    pool1 = MaxPooling2D((2, 2), (2, 2), name='pool1')(conv1_2)
 
-    o_shape = (batch_size, h * 2, w * 2, f)
-    x = Activation("relu")(x)
-    x = Deconvolution2D(f, 3, 3, output_shape=o_shape, subsample=(2, 2),
-                        init='glorot_uniform', border_mode="same")(x)
-    if bn:
-        x = BatchNormalization(mode=bn_mode, axis=bn_axis)(x)
+    # Block 2
+    conv2_1 = Convolution2D(128, 3, 3, init, 'relu', border_mode='valid',
+                            name='conv2_1', W_regularizer=l2(l2_reg))(pool1)
+    conv2_2 = Convolution2D(128, 3, 3, init, 'relu', border_mode='valid',
+                            name='conv2_2', W_regularizer=l2(l2_reg))(conv2_1)
+    pool2 = MaxPooling2D((2, 2), (2, 2), name='pool2')(conv2_2)
+
+    # Block 3
+    conv3_1 = Convolution2D(256, 3, 3, init, 'relu', border_mode='valid',
+                            name='conv3_1', W_regularizer=l2(l2_reg))(pool2)
+    conv3_2 = Convolution2D(256, 3, 3, init, 'relu', border_mode='valid',
+                            name='conv3_2', W_regularizer=l2(l2_reg))(conv3_1)
+    pool3 = MaxPooling2D((2, 2), (2, 2), name='pool3')(conv3_2)
+
+    # Block 4
+    conv4_1 = Convolution2D(512, 3, 3, init, 'relu', border_mode='valid',
+                            name='conv4_1', W_regularizer=l2(l2_reg))(pool3)
+    conv4_2 = Convolution2D(512, 3, 3, init, 'relu', border_mode='valid',
+                            name='conv4_2', W_regularizer=l2(l2_reg))(conv4_1)
     if dropout:
-        x = Dropout(0.5)(x)
-    x = merge([x, x2], mode='concat', concat_axis=bn_axis)
+        conv4_2 = Dropout(0.5, name='drop1')(conv4_2)
+    pool4 = MaxPooling2D((2, 2), (2, 2), name='pool4')(conv4_2)
 
-    return x
+    # Block 5
+    conv5_1 = Convolution2D(1024, 3, 3, init, 'relu', border_mode='valid',
+                            name='conv5_1', W_regularizer=l2(l2_reg))(pool4)
+    conv5_2 = Convolution2D(1024, 3, 3, init, 'relu', border_mode='valid',
+                            name='conv5_2', W_regularizer=l2(l2_reg))(conv5_1)
+    if dropout:
+        conv5_2 = Dropout(0.5, name='drop2')(conv5_2)
+    # pool5 = MaxPooling2D((2, 2), (2, 2), name='pool4')(conv5_2)
 
+    # Upsampling 1
+    upconv4 = Deconvolution2D(512, 2, 2, conv5_2._keras_shape, init,
+                              'linear', border_mode='valid', subsample=(2, 2),
+                              name='upconv4', W_regularizer=l2(l2_reg))(conv5_2)
+    conv4_2_crop = CropLayer2D(upconv4, name='conv4_2_crop')(conv4_2)
+    upconv4_crop = CropLayer2D(upconv4, name='upconv4_crop')(upconv4)
+    Concat_4 = merge([conv4_2_crop, upconv4_crop], mode='concat', concat_axis=3, name='Concat_4')
+    conv6_1 = Convolution2D(512, 3, 3, init, 'relu', border_mode='valid',
+                            name='conv6_1', W_regularizer=l2(l2_reg))(Concat_4)
+    conv6_2 = Convolution2D(512, 3, 3, init, 'relu', border_mode='valid',
+                            name='conv6_2', W_regularizer=l2(l2_reg))(conv6_1)
 
-# States if a number is a power of two
-def is_power2(num):
-    return num > 0 and ((num & (num - 1)) == 0)
+    # Upsampling 2
+    upconv3 = Deconvolution2D(256, 2, 2, conv6_2._keras_shape, init,
+                              'linear', border_mode='valid', subsample=(2, 2),
+                              name='upconv3', W_regularizer=l2(l2_reg))(conv6_2)
+    conv3_2_crop = CropLayer2D(upconv3, name='conv3_2_crop')(conv3_2)
+    Concat_3 = merge([conv3_2_crop, upconv3], mode='concat', name='Concat_3')
+    conv7_1 = Convolution2D(256, 3, 3, init, 'relu', border_mode='valid',
+                            name='conv7_1', W_regularizer=l2(l2_reg))(Concat_3)
+    conv7_2 = Convolution2D(256, 3, 3, init, 'relu', border_mode='valid',
+                            name='conv7_2', W_regularizer=l2(l2_reg))(conv7_1)
 
+    # Upsampling 3
+    upconv2 = Deconvolution2D(128, 2, 2, conv7_2._keras_shape, init,
+                              'linear', border_mode='valid', subsample=(2, 2),
+                              name='upconv2', W_regularizer=l2(l2_reg))(conv7_2)
+    conv2_2_crop = CropLayer2D(upconv2, name='conv2_2_crop')(conv2_2)
+    Concat_2 = merge([conv2_2_crop, upconv2], mode='concat', name='Concat_2')
+    conv8_1 = Convolution2D(128, 3, 3, init, 'relu', border_mode='valid',
+                            name='conv8_1', W_regularizer=l2(l2_reg))(Concat_2)
+    conv8_2 = Convolution2D(128, 3, 3, init, 'relu', border_mode='valid',
+                            name='conv8_2', W_regularizer=l2(l2_reg))(conv8_1)
 
-def generator_unet_deconv(img_dim, n_classes, bn_mode, batch_size,
-                          model_name="unet"):
+    # Upsampling 4
+    upconv1 = Deconvolution2D(64, 2, 2, conv8_2._keras_shape, init,
+                              'linear', border_mode='valid', subsample=(2, 2),
+                              name='upconv1', W_regularizer=l2(l2_reg))(conv8_2)
+    conv1_2_crop = CropLayer2D(upconv1, name='conv1_2_crop')(conv1_2)
+    Concat_1 = merge([conv1_2_crop, upconv1], mode='concat', name='Concat_1')
+    conv9_1 = Convolution2D(64, 3, 3, init, 'relu', border_mode='valid',
+                            name='conv9_1', W_regularizer=l2(l2_reg))(Concat_1)
+    conv9_2 = Convolution2D(64, 3, 3, init, 'relu', border_mode='valid',
+                            name='conv9_2', W_regularizer=l2(l2_reg))(conv9_1)
 
-    n_filters = 64
-    bn_axis = -1
-    h, w, nb_channels = img_dim
-    min_s = min(img_dim[:-1])  # TODO: ??
+    conv10 = Convolution2D(nclasses, 1, 1, init, 'linear', border_mode='valid',
+                           name='conv10', W_regularizer=l2(l2_reg))(conv9_2)
 
-    # TODO: Solve this
-    assert K.backend() == "tensorflow", "Not implemented with theano backend"
+    # Crop
+    final_crop = CropLayer2D(inputs, name='final_crop')(conv10)
 
-    # TODO: Remove this
-    assert is_power2(h) and is_power2(w), "rows and cols must be powers of 2"
+    # Softmax
+    softmax_unet = NdSoftmax()(final_crop)
 
-    unet_input = Input(shape=img_dim, name="input")
-
-    # Prepare encoder filters
-    n_conv = int(np.floor(np.log(min_s) / np.log(2)))
-    list_n_filters = [n_filters * min(8, (2 ** i)) for i in range(n_conv)]
-
-    # Encoder first layer
-    list_encoder = [Convolution2D(list_n_filters[0], 3, 3, subsample=(2, 2),
-                                  name="conv2D_1",
-                                  border_mode="same")(unet_input)]
-    h, w = h / 2, w / 2
-
-    # Encoder next layers
-    for i, f in enumerate(list_n_filters[1:]):
-        conv = conv_block(list_encoder[-1], f, "conv2D_%s" % (i + 2),
-                          bn_mode, bn_axis)
-        list_encoder.append(conv)
-        h, w = h / 2, w / 2
-
-    # Prepare decoder filters
-    list_n_filters = list_n_filters[:-1][::-1]
-    if len(list_n_filters) < n_conv - 1:
-        list_n_filters.append(n_filters)
-
-    # Decoder first layer
-    list_decoder = [deconv_block(list_encoder[-1], list_encoder[-2],
-                                 list_n_filters[0], h, w, batch_size,
-                                 "upconv2D_1", bn_mode, bn_axis, dropout=True)]
-    h, w = h * 2, w * 2
-
-    # Decoder next layers
-    for i, f in enumerate(list_n_filters[1:]):
-        conv = deconv_block(list_decoder[-1], list_encoder[-(i + 3)], f, h,
-                            w, batch_size, "upconv2D_%s" % (i + 2),
-                            bn_mode, bn_axis, dropout=(i < 2))
-        list_decoder.append(conv)
-        h, w = h * 2, w * 2
-
-    x = Activation("relu")(list_decoder[-1])
-    # The original implementation outputs a new image of same shape as input image
-    # goes as:
-    #    o_shape = (batch_size,) + img_dim
-    #    x = Deconvolution2D(nb_channels, 3, 3, output_shape=o_shape, subsample=(2, 2), border_mode="same")(x)
-    #    x = Activation("tanh")(x)
-    #    generator_unet = Model(input=unet_input, output=x)
-
-    o_shape = (batch_size, img_dim[0], img_dim[1], n_classes)
-    x = Deconvolution2D(n_classes, 3, 3, output_shape=o_shape,
-                        subsample=(2, 2), border_mode="same")(x)
-
-    score = CropLayer2D(unet_input, name='score')(x)
-    # CropLayer2D is probably innecessary since x has already the same rows and
-    # cols than unet_input
-
-    softmx = NdSoftmax()(score)
-    # TODO: add a parameter to choose between sigmoid, softmax and tanh ?
-    # In another implementation, http://vess2ret.inesctec.pt they do so.
-    # or return score = logits ?
-
-    generator_unet = Model(input=unet_input, output=softmx)
-
-    return generator_unet
-
-
-# All network models (vgg, segnet etc) have a built_net() function called by
-# make() method of Model_Factory class, that return a Keras model.
-def build_unet(img_shape, n_classes, bn_mode=2, batch_size=None, l2_reg=0.,
-               path_weights=None):
-
-    # Create model
-    model = generator_unet_deconv(img_shape, n_classes, bn_mode, batch_size,
-                                  model_name="unet")
+    # Complete model
+    model = Model(input=inputs, output=softmax_unet)
 
     # Load pretrained Model
     if path_weights:
         pass
 
+    # Freeze some layers
+    if freeze_layers_from is not None:
+        freeze_layers(model, freeze_layers_from)
+
     return model
+
+
+def custom_concat_shape(tensors):
+    t1, t2 = tensors
+    return t1
+
+
+# Freeze layers for finetunning
+def freeze_layers(model, freeze_layers_from):
+    # Freeze the VGG part only
+    if freeze_layers_from == 'base_model':
+        print ('   Freezing base model layers')
+        freeze_layers_from = 23
+
+    # Show layers (Debug pruposes)
+    for i, layer in enumerate(model.layers):
+        print(i, layer.name)
+    print ('   Freezing from layer 0 to ' + str(freeze_layers_from))
+
+    # Freeze layers
+    for layer in model.layers[:freeze_layers_from]:
+        layer.trainable = False
+    for layer in model.layers[freeze_layers_from:]:
+        layer.trainable = True
 
 
 if __name__ == '__main__':
     print ('BUILD')
-    model = build_unet(img_shape=(256, 512, 3), n_classes=11)
+    model = build_unet(img_shape=(256, 512, 3), nclasses=11)
     print ('COMPILING')
     model.compile(loss="binary_crossentropy", optimizer="rmsprop")
     model.summary()

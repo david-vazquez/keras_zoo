@@ -17,6 +17,7 @@ dim_ordering = K.image_dim_ordering()
 # Original caffe code: https://github.com/shelhamer/fcn.berkeleyvision.org
 # Adapted from: MILA internal code
 
+
 def build_fcn8(img_shape=(3, None, None), nclasses=8, l2_reg=0.,
                init='glorot_uniform', path_weights=None,
                freeze_layers_from=None):
@@ -95,7 +96,6 @@ def build_fcn8(img_shape=(3, None, None), nclasses=8, l2_reg=0.,
     score2 = Deconvolution2D(nclasses, 4, 4, score_fr._keras_shape, init,
                              'linear', border_mode='valid', subsample=(2, 2),
                              name='score2', W_regularizer=l2(l2_reg))(score_fr)
-
 
     score_pool4_crop = CropLayer2D(score2,
                                    name='score_pool4_crop')(score_pool4)
