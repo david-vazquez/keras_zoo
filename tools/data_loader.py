@@ -2,7 +2,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 import skimage.io as io
-from skimage.color import rgb2gray
+from skimage.color import rgb2gray, gray2rgb
 import skimage.transform
 import numpy as np
 from numpy import ma
@@ -147,8 +147,10 @@ def load_img(path, grayscale=False, resize=None, order=1):
                                        preserve_range=True)
         # print('Final resize: ' + str(img.shape))
 
-    # Convert to grayscale
-    if grayscale:
+    # Color conversion
+    if len(img.shape)==2 and not grayscale:
+        img = gray2rgb(img)
+    elif len(img.shape)>2 and img.shape[2]==3 and grayscale:
         img = rgb2gray(img)
 
     # Return image
@@ -867,7 +869,7 @@ class DirectoryIterator(Iterator):
             if self.has_gt_image:
                 # Load GT image
                 gt_img = load_img(os.path.join(self.gt_directory, fname),
-                                  grayscale=False,
+                                  grayscale=True,
                                   resize=self.resize, order=0)
                 y = img_to_array(gt_img, dim_ordering=self.dim_ordering)
             else:
