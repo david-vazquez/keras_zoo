@@ -142,11 +142,6 @@ def build_unet(img_shape=(3, None, None), nclasses=8, l2_reg=0.,
     return model
 
 
-def custom_concat_shape(tensors):
-    t1, t2 = tensors
-    return t1
-
-
 # Freeze layers for finetunning
 def freeze_layers(model, freeze_layers_from):
     # Freeze the VGG part only
