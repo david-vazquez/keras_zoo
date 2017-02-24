@@ -1,4 +1,5 @@
 # Dataset
+problem_type                 = 'segmentation'  # ['classification' | 'detection' | 'segmentation']
 dataset_name                 = 'cityscapes'    # Dataset name
 dataset_name2                = None            # Second dataset name. None if not Domain Adaptation
 perc_mb2                     = None            # Percentage of data from the second dataset in each minibatch
@@ -8,7 +9,7 @@ model_name                   = 'resnetFCN'        # Model to use ['fcn8' | 'segn
 freeze_layers_from           = None            # Freeze layers from 0 to this layer during training (Useful for finetunning) [None | 'base_model' | Layer_id]
 show_model                   = False           # Show the architecture layers
 load_imageNet                = False           # Load Imagenet weights and normalize following imagenet procedure
-load_pretrained              = False           # Load a pretrained model for doing finetuning
+load_pretrained              = True           # Load a pretrained model for doing finetuning
 weights_file                 = 'weights.hdf5'  # Training weight file name
 # weights_file                 = '/datatmp/Experiments/synthia_audi_full/exp1_copy/weights.hdf5'  # Training weight file name
 #weights_file                 = '/datatmp/Experiments/cityscapes/exp1/weights.hdf5'  # Training weight file name

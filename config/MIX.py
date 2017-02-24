@@ -1,4 +1,5 @@
 # Dataset
+problem_type                 = 'segmentation'  # ['classification' | 'detection' | 'segmentation']
 dataset_name                 = 'cityscapes'        # Dataset name
 dataset_name2                = 'synthia_audi_full' # Second dataset name. None if not Domain Adaptation
 perc_mb2                     = 0.6                 # Percentage of data from the second dataset in each minibatch

@@ -1,4 +1,5 @@
 # Dataset
+problem_type                 = 'segmentation'  # ['classification' | 'detection' | 'segmentation']
 dataset_name                 = 'TT100K_classif'# Dataset name
 dataset_name2                = None            # Second dataset name. None if not Domain Adaptation
 perc_mb2                     = None            # Percentage of data from the second dataset in each minibatch
