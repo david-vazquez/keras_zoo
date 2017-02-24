@@ -7,6 +7,7 @@ from skimage.color import rgb2gray
 import skimage.transform
 import numpy as np
 from numpy import ma
+from numpy.linalg import inv
 from six.moves import range
 import os
 import SimpleITK as sitk
@@ -22,7 +23,7 @@ from keras.preprocessing.image import (Iterator,
                                        random_channel_shift)
 
 from tools.save_images import save_img2
-
+from tools.yolo_utils import yolo_build_gt_batch
 
 # Pad image
 def pad_image(x, pad_amount, mode='reflect', constant=0.):
@@ -214,6 +215,7 @@ class ImageDataGenerator(object):
                  warp_sigma=0.1,
                  warp_grid_size=3,
                  dim_ordering='default',
+                 class_mode='categorical',
                  rgb_mean=None,
                  rgb_std=None,
                  crop_size=None):
@@ -261,6 +263,15 @@ class ImageDataGenerator(object):
             raise Exception('zoom_range should be a float or '
                             'a tuple or list of two floats. '
                             'Received arg: ', zoom_range)
+
+        # Check class mode
+        if class_mode not in {'categorical', 'binary', 'sparse',
+                              'segmentation', 'detection', None}:
+            raise ValueError('Invalid class_mode:', class_mode,
+                             '; expected one of "categorical", '
+                             '"binary", "sparse", "segmentation", "detection" or None.')
+        self.class_mode = class_mode
+        self.has_gt_image = True if self.class_mode == 'segmentation' else False
 
     def flow(self, X, y=None, batch_size=32, shuffle=True, seed=None,
              save_to_dir=None, save_prefix='', save_format='jpeg'):
@@ -469,8 +480,36 @@ class ImageDataGenerator(object):
             x = apply_transform(x, transform_matrix, img_channel_index,
                                 fill_mode=self.fill_mode, cval=self.cval)
             if y is not None:
-                y = apply_transform(y, transform_matrix, img_channel_index,
-                                    fill_mode=self.fill_mode, cval=self.void_label)
+                if self.has_gt_image:
+                    y = apply_transform(y, transform_matrix, img_channel_index,
+                                        fill_mode=self.fill_mode, cval=self.void_label)
+                elif self.class_mode == 'detection':
+                    # convert relative coordinates x,y,w,h to absolute x1,y1,x2,y2
+                    b = np.copy(y[:,1:5])
+                    b[:,0] = y[:,1]*w - y[:,3]*w/2
+                    b[:,1] = y[:,2]*h - y[:,4]*h/2
+                    b[:,2] = y[:,1]*w + y[:,3]*w/2
+                    b[:,3] = y[:,2]*h + y[:,4]*h/2
+
+                    # point transformation is the inverse of image transformation
+                    p_transform_matrix = inv(transform_matrix)
+                    for ii in range(b.shape[0]):
+                        x1,y1,x2,y2 = b.astype(int)[ii]
+                        # get the four edge points of the bounding box
+                        v1 = np.array([y1,x1,1])
+                        v2 = np.array([y2,x2,1]) 
+                        v3 = np.array([y2,x1,1])
+                        v4 = np.array([y1,x2,1])
+                        # transform the 4 points
+                        v1 = np.dot(p_transform_matrix, v1)
+                        v2 = np.dot(p_transform_matrix, v2)
+                        v3 = np.dot(p_transform_matrix, v3)
+                        v4 = np.dot(p_transform_matrix, v4)
+                        # compute the new bounding box edges
+                        b[ii,0] = np.min([v1[1],v2[1],v3[1],v4[1]]) 
+                        b[ii,1] = np.min([v1[0],v2[0],v3[0],v4[0]])
+                        b[ii,2] = np.max([v1[1],v2[1],v3[1],v4[1]])
+                        b[ii,3] = np.max([v1[0],v2[0],v3[0],v4[0]]) 
 
         if self.channel_shift_range != 0:
             x = random_channel_shift(x, self.channel_shift_range,
@@ -480,13 +519,19 @@ class ImageDataGenerator(object):
             if np.random.random() < 0.5:
                 x = flip_axis(x, img_col_index)
                 if y is not None:
-                    y = flip_axis(y, img_col_index)
+                    if self.has_gt_image:
+                        y = flip_axis(y, img_col_index)
+                    elif self.class_mode == 'detection':
+                        b[:,0],b[:,2] = w - b[:,2], w - b[:,0]
 
         if self.vertical_flip:
             if np.random.random() < 0.5:
                 x = flip_axis(x, img_row_index)
                 if y is not None:
-                    y = flip_axis(y, img_row_index)
+                    if self.has_gt_image:
+                        y = flip_axis(y, img_row_index)
+                    elif self.class_mode == 'detection':
+                        b[:,1],b[:,3] = h - b[:,3], h - b[:,1]
 
         if self.spline_warp:
             warp_field = gen_warp_field(shape=x.shape[-2:],
@@ -497,15 +542,22 @@ class ImageDataGenerator(object):
                            fill_mode=self.fill_mode, fill_constant=self.cval)
 
             if y is not None:
-                y = np.round(apply_warp(y, warp_field,
-                                        interpolator=sitk.sitkNearestNeighbor,
-                                        fill_mode=self.fill_mode,
-                                        fill_constant=self.void_label))
+                if self.has_gt_image:
+                    y = np.round(apply_warp(y, warp_field,
+                                            interpolator=sitk.sitkNearestNeighbor,
+                                            fill_mode=self.fill_mode,
+                                            fill_constant=self.void_label))
+                elif self.class_mode == 'detection':
+                    raise ValueError('Elastic deformation is not supported for class_mode:', self.class_mode)
 
         # Crop
         # TODO: tf compatible???
         crop = list(self.crop_size) if self.crop_size else None
         if crop:
+            #TODO implement crop data augmentation when self.class_mode == 'detection'
+            if self.class_mode == 'detection':
+                raise ValueError('Crop is not supported for class_mode:', self.class_mode)
+
             # print ('X before: ' + str(x.shape))
             # print ('Y before: ' + str(y.shape))
             # print ('Crop_size: ' + str(self.crop_size))
@@ -545,18 +597,41 @@ class ImageDataGenerator(object):
             if self.dim_ordering == 'th':
                 x = x[..., :, top:top+crop[0], left:left+crop[1]]
                 if y is not None:
-                    y = y[..., :, top:top+crop[0], left:left+crop[1]]
+                    if self.has_gt_image:
+                        y = y[..., :, top:top+crop[0], left:left+crop[1]]
+                    #elif self.class_mode == 'detection':
+                    #TODO implement crop data augmentation when self.class_mode == 'detection'
             else:
                 x = x[..., top:top+crop[0], left:left+crop[1], :]
                 if y is not None:
-                    y = y[..., top:top+crop[0], left:left+crop[1], :]
+                    if self.has_gt_image:
+                        y = y[..., top:top+crop[0], left:left+crop[1], :]
+                    #elif self.class_mode == 'detection':
+                    #TODO implement crop data augmentation when self.class_mode == 'detection'
 
             # print ('X after: ' + str(x.shape))
             # print ('Y after: ' + str(y.shape))
 
+        if self.class_mode == 'detection':
+            # clamp to valid coordinate values
+            b[:,0] = np.clip( b[:,0] , 0 , w )
+            b[:,1] = np.clip( b[:,1] , 0 , h )
+            b[:,2] = np.clip( b[:,2] , 0 , w )
+            b[:,3] = np.clip( b[:,3] , 0 , h )
+            # convert back from absolute x1,y1,x2,y2 coordinates to relative x,y,w,h
+            y[:,1] = (b[:,0] + (b[:,2]-b[:,0])/2 ) / w
+            y[:,2] = (b[:,1] + (b[:,3]-b[:,1])/2 ) / h
+            y[:,3] = (b[:,2]-b[:,0]) / w
+            y[:,4] = (b[:,3]-b[:,1]) / h
+            #reject regions that are too small
+            y = y[y[:,3]>0.005]
+            y = y[y[:,4]>0.005]
+
         # TODO:
         # channel-wise normalization
         # barrel/fisheye
+        # hsv random shifts
+        # blur
         return x, y
 
     def fit(self, X, augment=False, rounds=1, seed=None):
@@ -863,8 +938,7 @@ class DirectoryIterator(Iterator):
             if self.has_gt_image:
                 batch_y = np.zeros((current_batch_size,) + self.gt_image_shape)
             if self.class_mode == 'detection':
-                # TODO yolo and ssd expect different batch_y formats
-                batch_y = np.zeros((current_batch_size, 5, self.gt_image_shape[1]/32, self.gt_image_shape[2]/32))
+                batch_y = []
 
         # Build batch of image data
         for i, j in enumerate(index_array):
@@ -892,28 +966,16 @@ class DirectoryIterator(Iterator):
                 gt = np.loadtxt(label_path)
                 if len(gt.shape) == 1:
                     gt = gt[np.newaxis,]
-                #TODO shuffle gt boxes order
-                y = np.zeros((5, self.gt_image_shape[1]/32, self.gt_image_shape[2]/32))
-                y[0,:,:] = -1 # indicates nothing on this position
-
-                w = self.gt_image_shape[2]/32
-                h = self.gt_image_shape[1]/32
-                max_truth_boxes = w * h
-
-                t_ind = 0
-                for t in range(min(gt.shape[0],max_truth_boxes)):
-                    if gt[t,1] <= 0. or gt[t,1] >= 1. or gt[t,2] <= 0. or gt[t,2] >= 1.:
-                        warnings.warn('ImageDataGenerator found invalid annotation '
-                                      'on GT file '+label_path)
-                        continue
-                    t_i = t_ind%w
-                    t_j = t_ind/w
-                    y[0,t_j,t_i] = gt[t,0] # object class
-                    y[1,t_j,t_i] = gt[t,1] # x coordinate
-                    y[2,t_j,t_i] = gt[t,2] # y coordinate
-                    y[3,t_j,t_i] = gt[t,3] # width
-                    y[4,t_j,t_i] = gt[t,4] # height
-                    t_ind += 1
+                y = gt.copy()
+                y = y[((y[:,1] > 0.) & (y[:,1] < 1.))]
+                y = y[((y[:,2] > 0.) & (y[:,2] < 1.))]
+                y = y[((y[:,3] > 0.) & (y[:,3] < 1.))]
+                y = y[((y[:,4] > 0.) & (y[:,4] < 1.))]
+                if (y.shape != gt.shape):
+                    warnings.warn('DirectoryIterator: found an invalid annotation '
+                                  'on GT file '+label_path)
+                # shuffle gt boxes order
+                np.random.shuffle(y)
 
 
             # Standarize image
@@ -925,12 +987,16 @@ class DirectoryIterator(Iterator):
             # Add images to batches
             if current_batch_size > 1:
                 batch_x[i] = x
-                if self.has_gt_image or self.class_mode == 'detection':
+                if self.has_gt_image:
                     batch_y[i] = y
+                elif self.class_mode == 'detection':
+                    batch_y.append(y)
             else:
                 batch_x = np.expand_dims(x, axis=0)
-                if self.has_gt_image or self.class_mode == 'detection':
+                if self.has_gt_image:
                     batch_y = np.expand_dims(y, axis=0)
+                elif self.class_mode == 'detection':
+                    batch_y.append(y)
 
         # optionally save augmented images to disk for debugging purposes
         if self.save_to_dir:
@@ -963,6 +1029,10 @@ class DirectoryIterator(Iterator):
             batch_y = np.zeros((len(batch_x), self.nb_class), dtype='float32')
             for i, label in enumerate(self.classes[index_array]):
                 batch_y[i, label] = 1.
+        elif self.class_mode == 'detection':
+            # YOLOLoss expects a particular batch_y format and shape
+            batch_y = yolo_build_gt_batch(batch_y, self.image_shape) 
+            # TODO other detection networks may expect a different batch_y format and shape
         elif self.class_mode == None:
             return batch_x
 

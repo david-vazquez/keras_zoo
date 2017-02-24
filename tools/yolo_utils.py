@@ -1,4 +1,5 @@
 import numpy as np
+import warnings
 
 """ YOLO regions utilities """
 
@@ -170,6 +171,30 @@ def yolo_draw_detections(impath,boxes,probs,thresh,labels):
     cv2.imshow('image',im)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+
+def yolo_build_gt_batch(batch_gt,image_shape):
+
+    batch_size = len(batch_gt)
+    batch_y = np.zeros((batch_size, 5, image_shape[1]/32, image_shape[2]/32))
+    batch_y[:,0,:,:] = -1 # indicates nothing on this position
+
+    h = image_shape[1]/32
+    w = image_shape[2]/32
+    max_truth_boxes = w * h
+
+    for i,gt in enumerate(batch_gt):
+        t_ind = 0
+        for t in range(min(gt.shape[0],max_truth_boxes)):
+            t_i = t_ind%w
+            t_j = t_ind/w
+            batch_y[i,0,t_j,t_i] = gt[t,0] # object class
+            batch_y[i,1,t_j,t_i] = gt[t,1] # x coordinate
+            batch_y[i,2,t_j,t_i] = gt[t,2] # y coordinate
+            batch_y[i,3,t_j,t_i] = gt[t,3] # width
+            batch_y[i,4,t_j,t_i] = gt[t,4] # height
+            t_ind += 1
+
+    return batch_y
 
 
 """ Uitlities to convert Darknet models' weights into keras hdf5 format """
