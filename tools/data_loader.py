@@ -471,7 +471,7 @@ class ImageDataGenerator(object):
             zoom_matrix = np.array([[zx, 0, 0],
                                     [0, zy, 0],
                                     [0, 0, 1]])
-# Broadcast the shape of mean and std
+
             transform_matrix = np.dot(np.dot(np.dot(rotation_matrix,
                                                     translation_matrix),
                                              shear_matrix), zoom_matrix)
@@ -625,7 +625,7 @@ class ImageDataGenerator(object):
             y[:,2] = (b[:,1] + (b[:,3]-b[:,1])/2 ) / h
             y[:,3] = (b[:,2]-b[:,0]) / w
             y[:,4] = (b[:,3]-b[:,1]) / h
-            #reject regions that are too small
+            # reject regions that are too small
             y = y[y[:,3]>0.005]
             y = y[y[:,4]>0.005]
 
