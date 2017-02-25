@@ -1008,7 +1008,7 @@ class DirectoryIterator(Iterator):
                 if self.has_gt_image:
                     batch_y = np.expand_dims(y, axis=0)
                 elif self.class_mode == 'detection':
-                    batch_y.append(y)
+                    batch_y = [y]
 
         # optionally save augmented images to disk for debugging purposes
         if self.save_to_dir:
