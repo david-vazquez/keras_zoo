@@ -556,10 +556,6 @@ class ImageDataGenerator(object):
         # TODO: tf compatible???
         crop = list(self.crop_size) if self.crop_size else None
         if crop:
-            #TODO implement crop data augmentation when self.class_mode == 'detection'
-            if self.class_mode == 'detection':
-                raise ValueError('Crop is not supported for class_mode:', self.class_mode)
-
             # print ('X before: ' + str(x.shape))
             # print ('Y before: ' + str(y.shape))
             # print ('Crop_size: ' + str(self.crop_size))
@@ -578,8 +574,17 @@ class ImageDataGenerator(object):
             if h < crop[0] or w < crop[1]:
                 x = np.lib.pad(x, ((0, 0), (pad_h1, pad_h2), (pad_w1, pad_w2)),
                                'constant')
-                y = np.lib.pad(y, ((0, 0), (pad_h1, pad_h2), (pad_w1, pad_w2)),
-                               'constant', constant_values=self.void_label)
+                if y is not None:
+                    if self.has_gt_image:
+                        y = np.lib.pad(y, ((0, 0), (pad_h1, pad_h2), (pad_w1, pad_w2)),
+                                       'constant', constant_values=self.void_label)
+                    elif self.class_mode == 'detection':
+                        b[:,0] = b[:,0] + pad_w1
+                        b[:,1] = b[:,1] + pad_h1
+                        b[:,2] = b[:,2] + pad_w1
+                        b[:,3] = b[:,3] + pad_h1
+
+
                 h, w = x.shape[img_row_index], x.shape[img_col_index]
                 # print ('New size X: ' + str(x.shape))
                 # print ('New size Y: ' + str(y.shape))
@@ -601,15 +606,17 @@ class ImageDataGenerator(object):
                 if y is not None:
                     if self.has_gt_image:
                         y = y[..., :, top:top+crop[0], left:left+crop[1]]
-                    #elif self.class_mode == 'detection':
-                    #TODO implement crop data augmentation when self.class_mode == 'detection'
             else:
                 x = x[..., top:top+crop[0], left:left+crop[1], :]
                 if y is not None:
                     if self.has_gt_image:
                         y = y[..., top:top+crop[0], left:left+crop[1], :]
-                    #elif self.class_mode == 'detection':
-                    #TODO implement crop data augmentation when self.class_mode == 'detection'
+
+            if self.class_mode == 'detection':
+                b[:,0] = b[:,0] - left
+                b[:,1] = b[:,1] - top
+                b[:,2] = b[:,2] - left
+                b[:,3] = b[:,3] - top
 
             # print ('X after: ' + str(x.shape))
             # print ('Y after: ' + str(y.shape))
