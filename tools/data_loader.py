@@ -411,6 +411,16 @@ class ImageDataGenerator(object):
         img_col_index = self.col_index - 1
         img_channel_index = self.channel_index - 1
 
+        # prepare the data if GT is detection
+        if self.class_mode == 'detection':
+            h, w = x.shape[img_row_index], x.shape[img_col_index]
+            # convert relative coordinates x,y,w,h to absolute x1,y1,x2,y2
+            b = np.copy(y[:,1:5])
+            b[:,0] = y[:,1]*w - y[:,3]*w/2
+            b[:,1] = y[:,2]*h - y[:,4]*h/2
+            b[:,2] = y[:,1]*w + y[:,3]*w/2
+            b[:,3] = y[:,2]*h + y[:,4]*h/2
+
         # use composition of homographies to generate final transform that
         # needs to be applied
         need_transform = False
@@ -486,13 +496,6 @@ class ImageDataGenerator(object):
                     y = apply_transform(y, transform_matrix, img_channel_index,
                                         fill_mode=self.fill_mode, cval=self.void_label)
                 elif self.class_mode == 'detection':
-                    # convert relative coordinates x,y,w,h to absolute x1,y1,x2,y2
-                    b = np.copy(y[:,1:5])
-                    b[:,0] = y[:,1]*w - y[:,3]*w/2
-                    b[:,1] = y[:,2]*h - y[:,4]*h/2
-                    b[:,2] = y[:,1]*w + y[:,3]*w/2
-                    b[:,3] = y[:,2]*h + y[:,4]*h/2
-
                     # point transformation is the inverse of image transformation
                     p_transform_matrix = inv(transform_matrix)
                     for ii in range(b.shape[0]):
