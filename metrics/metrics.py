@@ -112,6 +112,7 @@ def IoU(n_classes, void_labels):
 
 from tools.yolo_utils import logistic_activate,logistic_gradient,yolo_activate_regions
 from tools.yolo_utils import yolo_delta_region_box,yolo_box_iou,yolo_get_region_box 
+from tools.yolo_utils import yolo_get_region_boxes,yolo_do_nms_sort
 
 def YOLOLoss(input_shape=(3,640,640),num_classes=45,priors=[[0.25,0.25], [0.5,0.5], [1.0,1.0], [1.7,1.7], [2.5,2.5]],max_truth_boxes=30,thresh=0.6,object_scale=5.0,noobject_scale=1.0,coord_scale=1.0,class_scale=1.0):
 
@@ -258,3 +259,65 @@ def YOLOLoss_np(y_true, y_pred, num_classes, priors, max_truth_boxes, thresh,
 
     return delta # return the gradient (the actual loss is just reduce_sum(square(delta)))
 
+
+"""YOLO f-score detection metric"""
+
+def YOLOFscore(input_shape=(3,640,640),num_classes=45,priors=[[0.25,0.25], [0.5,0.5], [1.0,1.0], [1.7,1.7], [2.5,2.5]],max_truth_boxes=30,thresh=0.6,nms_thresh=0.3):
+
+  # Def custom metric using numpy
+  def _YOLOFscore(y_true, y_pred, name=None):
+    with ops.name_scope( name, "YOLOFscore", [y_true,y_pred] ) as name:
+      fscore = tf.py_func(YOLOFscore_np,
+                          [y_true,y_pred,num_classes,np.array(priors),
+                           max_truth_boxes,thresh,nms_thresh],
+                          [tf.float32], name=name)
+    return tf.reduce_mean(fscore[0])
+
+  return _YOLOFscore
+
+
+def YOLOFscore_np(y_true, y_pred, num_classes, priors, max_truth_boxes, thresh, nms_thresh):
+    batch_size = y_pred.shape[0]
+    fscore = np.zeros(batch_size, dtype='f')
+    num_priors = priors.shape[0]
+    num_coords  = 4
+    data_size = num_coords+num_classes+1
+
+    y_pred = yolo_activate_regions(y_pred, num_priors, num_classes)
+    boxes,probs = yolo_get_region_boxes(y_pred, priors, num_classes, thresh)
+    boxes,probs = yolo_do_nms_sort(boxes, probs, num_classes, nms_thresh)
+
+
+    # for each image in batch
+    for i in range(batch_size):
+        b = boxes[i,:,:]
+        p = probs[i,:,:]
+        num_boxes   = b.shape[0]
+        num_classes = p.shape[1]
+        # put GT boxes for this image in a list
+        gt_boxes = []
+        for h_i in range(y_true.shape[2]):
+          for w_i in range(y_true.shape[3]):
+            if y_true[i,0,h_i,w_i] >= 0:
+              gt_boxes.append(y_true[i,:,h_i,w_i])
+        ok    = 0.
+        total = 0.
+        # for each detected bounding box in this image, find the class with maximum prob
+        for j in range(num_boxes):
+            max_class = np.argmax(p[j,:])
+            pb = p[j,max_class]
+            if(pb > thresh):
+                total += 1.
+                bb = b[j,:]
+                # count as TP if the box overlaps more than 50% with a GT object and the class is correct
+                for gt in gt_boxes:
+                    if gt[0] == max_class and yolo_box_iou(bb,gt[1:5]) > 0.5:
+                        ok += 1.
+        recall = ok / len(gt_boxes)
+        precision = 0.
+        if total > 0.:
+          precision = ok / total
+        if (recall+precision) > 0:
+          fscore[i] = 2 * ((recall*precision) / (recall+precision))
+
+    return fscore

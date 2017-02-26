@@ -1,7 +1,7 @@
 import os
 
 # Keras imports
-from metrics.metrics import cce_flatt, IoU, YOLOLoss
+from metrics.metrics import cce_flatt, IoU, YOLOLoss, YOLOFscore
 from keras import backend as K
 from keras.utils.visualize_util import plot
 
@@ -51,10 +51,9 @@ class Model_Factory():
             in_shape = (cf.dataset.n_channels,
                         cf.target_size_train[0],
                         cf.target_size_train[1])
-            # TODO yolo and ssd have different losses
+            # TODO different detection nets may have different losses and metrics
             loss = YOLOLoss(in_shape, cf.dataset.n_classes, cf.dataset.priors)
-            # TODO implement detection mAP or f-score metric
-            metrics = []
+            metrics = [YOLOFscore(in_shape, cf.dataset.n_classes, cf.dataset.priors)]
         elif cf.dataset.class_mode == 'segmentation':
             if K.image_dim_ordering() == 'th':
                 if variable_input_size:
