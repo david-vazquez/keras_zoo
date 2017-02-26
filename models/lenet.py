@@ -1,6 +1,7 @@
 from keras.models import Model, Sequential
 from keras.layers import Dense, Activation, Flatten
 from keras.layers.convolutional import Convolution2D, MaxPooling2D
+from keras.regularizers import l2
 
 # paper: yann.lecun.com/exdb/publis/pdf/lecun-01a.pdf
 def build_lenet(img_shape=(1, 32, 32), n_classes=10, l2_reg=0.):

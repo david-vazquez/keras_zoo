@@ -4,6 +4,7 @@ from keras import backend as K
 from keras.models import Model
 from keras.layers import Input, merge, Dense, Dropout, Activation, Flatten
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
+from keras.regularizers import l2
 
 # Paper: https://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional-neural-networks.pdf
 # Caffe code: https://github.com/BVLC/caffe/tree/master/models/bvlc_alexnet
