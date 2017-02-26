@@ -271,7 +271,7 @@ def YOLOFscore(input_shape=(3,640,640),num_classes=45,priors=[[0.25,0.25], [0.5,
                           [y_true,y_pred,num_classes,np.array(priors),
                            max_truth_boxes,thresh,nms_thresh],
                           [tf.float32], name=name)
-    return tf.reduce_mean(fscore[0])
+    return {'fscore':tf.reduce_mean(fscore[0])}
 
   return _YOLOFscore
 
@@ -300,6 +300,7 @@ def YOLOFscore_np(y_true, y_pred, num_classes, priors, max_truth_boxes, thresh, 
           for w_i in range(y_true.shape[3]):
             if y_true[i,0,h_i,w_i] >= 0:
               gt_boxes.append(y_true[i,:,h_i,w_i])
+        num_gt = len(gt_boxes)
         ok    = 0.
         total = 0.
         # for each detected bounding box in this image, find the class with maximum prob
@@ -310,10 +311,12 @@ def YOLOFscore_np(y_true, y_pred, num_classes, priors, max_truth_boxes, thresh, 
                 total += 1.
                 bb = b[j,:]
                 # count as TP if the box overlaps more than 50% with a GT object and the class is correct
-                for gt in gt_boxes:
+                for idx,gt in enumerate(gt_boxes):
                     if gt[0] == max_class and yolo_box_iou(bb,gt[1:5]) > 0.5:
                         ok += 1.
-        recall = ok / len(gt_boxes)
+                        gt_boxes = gt_boxes[0:idx]+gt_boxes[idx+1:]
+                        break
+        recall = ok / num_gt
         precision = 0.
         if total > 0.:
           precision = ok / total
