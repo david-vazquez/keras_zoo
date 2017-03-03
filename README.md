@@ -60,7 +60,7 @@ All the parameters of the experiment are defined at config/dataset.py where data
 
 To train/test a model in Theano, use the command: `THEANO_FLAGS='device=cuda0,floatX=float32,lib.cnmem=0.95' python train.py -c config/dataset.py -e expName` where dataset is the name of the dataset you want to use and expName the name of the experiment.
 
-To train/test a model in TensorFlow, use the command: `CUDA_VISIBLE_DEVICES=0' python train.py -c config/dataset.py -e expName` where dataset is the name of the dataset you want to use and expName the name of the experiment.
+To train/test a model in TensorFlow, use the command: `CUDA_VISIBLE_DEVICES=0 python train.py -c config/dataset.py -e expName -s SharedPath -l LocalPath` where dataset is the name of the dataset you want to use and expName the name of the experiment, SharedPath points to the folder in which the shared path is (same for LocalPath).
 
 All the logs of the experiments are stored in the result folder of the experiment.
 
