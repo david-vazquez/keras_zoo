@@ -126,7 +126,7 @@ class Model_Factory():
         elif cf.model_name == 'resnetFCN':
             model = build_resnetFCN(in_shape, cf.dataset.n_classes, cf.weight_decay,
                                     freeze_layers_from=cf.freeze_layers_from,
-                                    path_weights=None)
+                                    path_weights=cf.load_imageNet)
         elif cf.model_name == 'densenetFCN':
             model = build_densenetFCN(in_shape, cf.dataset.n_classes, cf.weight_decay,
                                       freeze_layers_from=cf.freeze_layers_from,

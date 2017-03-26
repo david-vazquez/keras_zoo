@@ -13,7 +13,7 @@ load_pretrained              = True           # Load a pretrained model for doin
 weights_file                 = 'weights.hdf5'  # Training weight file name
 
 # Parameters
-train_model                  = True            # Train the model
+train_model                  = False            # Train the model
 test_model                   = True           # Test the model
 pred_model                   = False            # Predict using the model
 
@@ -25,9 +25,9 @@ debug_images_test            = -1              # N images for testing in debug m
 debug_n_epochs               = 1000               # N of training epochs in debug mode
 
 # Batch sizes
-batch_size_train             = 10              # Batch size during training
-batch_size_valid             = 10              # Batch size during validation
-batch_size_test              = 10              # Batch size during testing
+batch_size_train             = 8              # Batch size during training
+batch_size_valid             = 5              # Batch size during validation
+batch_size_test              = 5              # Batch size during testing
 crop_size_train              = (224, 224)      # Crop size during training (Height, Width) or None
 crop_size_valid              = None            # Crop size during validation
 crop_size_test               = None            # Crop size during testing
