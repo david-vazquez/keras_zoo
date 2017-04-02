@@ -1,23 +1,21 @@
+# Python imports
+import numpy as np
+
 # Keras imports
 from keras.models import Model
 from keras.layers import Input
-from keras.layers.convolutional import (Convolution2D, AtrousConvolution2D,
-                                        MaxPooling2D, ZeroPadding2D,
-                                        UpSampling2D)
+from keras.layers.convolutional import (Convolution2D, AtrousConvolution2D)
 from keras.layers.normalization import BatchNormalization
 from keras.layers.core import Activation, Dropout
 from keras.layers import merge
 from keras.regularizers import l2
-from layers.deconv import Deconvolution2D
 from keras import initializations
 
-import numpy as np
-
-# Paper: https://arxiv.org/abs/1611.10080
-# Original code in Mxnet: https://github.com/itijyou/ademxapp
-
 # Custom layers import
-from layers.ourlayers import (CropLayer2D, NdSoftmax, DePool2D)
+from layers.ourlayers import (CropLayer2D, NdSoftmax)
+from layers.deconv import Deconvolution2D
+from initializations.initializations import bilinear_init
+from tools.numpy2keras import load_numpy
 
 # Keras dim orders
 from keras import backend as K
@@ -26,6 +24,10 @@ if dim_ordering == 'th':
     channel_idx = 1
 else:
     channel_idx = 3
+
+
+# Paper: https://arxiv.org/abs/1611.10080
+# Original code in Mxnet: https://github.com/itijyou/ademxapp
 
 
 # Create a convolution block: BN - RELU - CONV
@@ -67,14 +69,15 @@ def create_block_n(inputs, n_filters, filter_size, strides, dropouts,
     # Create residual block - Save the shortcut from the first one
     name = name+"_branch2"
     shortcut0, last_layer = bn_relu_conv(inputs, n_filters[0], filter_size[0],
-        strides[0], dropouts[0], False, dilations0 if filter_size[0]>1 else 1,
-        name=name+"a", l2_reg=l2_reg)
+                                         strides[0], dropouts[0], False,
+                                         dilations0 if filter_size[0]>1 else 1,
+                                         name=name+"a", l2_reg=l2_reg)
 
     for i in range(1, len(n_filters)):
         last_layer = bn_relu_conv(last_layer, n_filters[i], filter_size[i],
-            strides[i], dropouts[i], False,
-            dilations[i] if filter_size[i]>1 else 1, name=name+"b"+str(i),
-            l2_reg=l2_reg)[1]
+                                  strides[i], dropouts[i], False,
+                                  dilations[i] if filter_size[i] > 1 else 1,
+                                  name=name+"b"+str(i), l2_reg=l2_reg)[1]
 
     # Define shortcut
     if dim_match:
@@ -107,11 +110,11 @@ def create_body(inputs, blocks, n_filters, dilations, strides, dropouts,
     for i in range(len(blocks)):
         kernel_size = [3, 3] if len(n_filters[i]) == 2 else [1, 3, 1]
         for j in range(blocks[i]):
-            name = str(i+1)+'a' if j==0 else str(i+1)+'b'+str(j)
+            name = str(i+1)+'a' if j == 0 else str(i+1)+'b'+str(j)
             inputs = create_block_n(inputs, n_filters[i], kernel_size,
                                     strides[i], dropouts[i], dilations[i],
-                                    name=name, dim_match=j>0, plus_lvl=34+cont,
-                                    l2_reg=l2_reg)
+                                    name=name, dim_match=(j > 0),
+                                    plus_lvl=34+cont, l2_reg=l2_reg)
             cont = cont+1
 
     return inputs
@@ -134,8 +137,7 @@ def create_classifier(body, data, n_classes, l2_reg=0.):
                               atrous_rate=(12, 12), border_mode='same',
                               name=name, W_regularizer=l2(l2_reg))(top)
 
-    # TODO: Init bilinear
-    top = Deconvolution2D(n_classes, 16, 16, top._keras_shape, 'glorot_uniform',
+    top = Deconvolution2D(n_classes, 16, 16, top._keras_shape, bilinear_init,
                           'linear', border_mode='valid', subsample=(8, 8),
                           bias=False, name="upscaling_"+str(n_classes),
                           W_regularizer=l2(l2_reg))(top)
@@ -188,7 +190,7 @@ def build_resnetFCN(img_shape=(3, None, None), n_classes=8, l2_reg=0.,
 
     # Load pretrained Model
     if path_weights:
-        load_caffe(model, n_classes=n_classes)
+        model = load_numpy(model, path_weights="weights/resnetFCN.npy")
 
     # Freeze some layers
     if freeze_layers_from is not None:
@@ -202,7 +204,7 @@ def freeze_layers(model, freeze_layers_from):
     # Freeze the VGG part only
     if freeze_layers_from == 'base_model':
         print ('   Freezing base model layers')
-        freeze_layers_from = 23
+        freeze_layers_from = 135
 
     # Show layers (Debug pruposes)
     for i, layer in enumerate(model.layers):
@@ -214,80 +216,6 @@ def freeze_layers(model, freeze_layers_from):
         layer.trainable = False
     for layer in model.layers[freeze_layers_from:]:
         layer.trainable = True
-
-
-def rot90(W):
-    for i in range(W.shape[0]):
-        for j in range(W.shape[1]):
-            W[i, j] = np.rot90(W[i, j], 2)
-    return W
-
-
-
-# Load caffe weights
-def load_caffe(model, path_prototxt='weights/resnetFCN.prototxt',
-               path_weights='weights/resnetFCN.caffemodel', n_classes=10):
-    print (' > Loading the caffe weights...')
-
-    # Load weights
-    weights_numpy = np.load("weights/resnetFCN.npy")
-    weights_numpy = weights_numpy[()]
-
-    # Show loaded layer names
-    for key, value in weights_numpy.items():
-        print(key)
-
-    # Iterate over model layers
-    for layer in model.layers:
-        # Get layer weights
-        layer_weights = layer.get_weights()
-        n_params = len(layer_weights)
-        print(' > name:{} - type:{} - n_params:{}'.format(layer.name, layer.__class__.__name__, n_params))
-
-        # Check if this layer actualy has weights
-        if n_params > 0:
-            # Check if these weights are also in the numpy weights
-            if (layer.name in weights_numpy):
-                # Get this layer weights
-                layer_weights_numpy = weights_numpy[layer.name]
-                n_params_numpy = len(layer_weights_numpy)
-
-                # Check that the model and numpy weights has the same number of params
-                if (n_params_numpy != n_params):
-                    raise ValueError('Number of parameters in layer {} is different for caffe ({}) and Keras({})'.format(layer.name, n_params_numpy, n_params))
-
-                # Check that all the params have the same shape
-                for i in range(n_params_numpy):
-                    if (layer_weights_numpy[i].shape != layer_weights[i].shape):
-                        print('Weight shape of parameter number {} in layer {} is different for caffe ({}) and Keras({})'.format(i, layer.name, layer_weights_numpy[i].shape, layer_weights[i].shape))
-
-                    #print('Caffe weights: ' + str(layer_weights_numpy[i].shape))
-
-                # for i in range(n_params_numpy):
-                #     print('Caffe weights: ' + str(layer_weights_numpy[i].shape))
-            else:
-                print ('ERROR: ' + layer.name + ' not in caffe weights')
-        # for i in range(n_params):
-        #     print('Keras weights: ' + str(layer_weights[i].shape))
-    exit()
-
-    # print (weights)
-
-    # # print(net_caffe.params)
-    # for name, layer in layers_caffe.items():
-    #     layer_type = layer.type
-    #     print ('Layer name: {},  type: {}, n_blobs: {}'.format(name, layer_type, len(layer.blobs)))
-    #     for blob in layer.blobs:
-    #         print (blob)
-    #         print (blob.data.shape)
-    #     if type not in {'Split', 'Scale'}:
-    #         # print (layer.blobs.data.shape)
-    #         # W = layer.blobs[0].data
-    #         # b = layer.blobs[1].data
-    #         W = layer.params[0].data
-    #         b = layer.params[1].data
-    #         print (W)
-    #         print (b)
 
 
 if __name__ == '__main__':

@@ -103,11 +103,13 @@ def main():
     shared_dataset_path = os.path.join(shared_path, 'Datasets')
     experiments_path = os.path.join(local_path, getuser(), 'Experiments')
     shared_experiments_path = os.path.join(shared_path, getuser(), 'Experiments')
+    usr_path = os.path.join('/home/', getuser())
 
     # Load configuration files
     configuration = Configuration(arguments.config_path, arguments.exp_name,
                                   dataset_path, shared_dataset_path,
-                                  experiments_path, shared_experiments_path)
+                                  experiments_path, shared_experiments_path,
+                                  usr_path)
     cf = configuration.load()
 
     # Train /test/predict with the network, depending on the configuration

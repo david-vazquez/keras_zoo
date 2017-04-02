@@ -1,13 +1,13 @@
 # Dataset
 problem_type                 = 'segmentation'  # ['classification' | 'detection' | 'segmentation']
-dataset_name                 = 'audi'          # Dataset name
+dataset_name                 = 'synthia_rand_cityscapes'  # Dataset name
 dataset_name2                = None            # Second dataset name. None if not Domain Adaptation
 perc_mb2                     = None            # Percentage of data from the second dataset in each minibatch
 
 # Model
-model_name                   = 'resnetFCN'     # Model to use ['fcn8' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19' | 'resnet50' | 'InceptionV3']
+model_name                   = 'resnetFCN'     # Model to use ['fcn8' | 'segnet_basic' | 'segnet_vgg' | 'resnetFCN' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19' | 'resnet50' | 'InceptionV3']
 freeze_layers_from           = None            # Freeze layers from 0 to this layer during training (Useful for finetunning) [None | 'base_model' | Layer_id]
-show_model                   = True            # Show the architecture layers
+show_model                   = False           # Show the architecture layers
 load_imageNet                = True            # Load Imagenet weights and normalize following imagenet procedure
 load_pretrained              = False           # Load a pretrained model for doing finetuning
 weights_file                 = 'weights.hdf5'  # Training weight file name
@@ -44,21 +44,22 @@ seed_valid                   = 1924            # Random seed for the validation 
 seed_test                    = 1924            # Random seed for the testing shuffle
 
 # Training parameters
-optimizer                    = 'adam'          # Optimizer
+optimizer                    = 'rmsprop'       # Optimizer
 learning_rate                = 0.0001          # Training learning rate
-weight_decay                 = 0.0005          # Weight decay or L2 parameter norm penalty
+weight_decay                 = 0.              # Weight decay or L2 parameter norm penalty
 n_epochs                     = 1000            # Number of epochs during training
 
 # Callback save results
 save_results_enabled         = True            # Enable the Callback
-save_results_nsamples        = 2               # Number of samples to save
-save_results_batch_size      = 2               # Size of the batch
+save_results_nsamples        = 5               # Number of samples to save
+save_results_batch_size      = 5               # Size of the batch
+save_results_n_legend_rows   = 1               # Number of rows when showwing the legend
 
 # Callback early stoping
 earlyStopping_enabled        = True            # Enable the Callback
 earlyStopping_monitor        = 'val_jaccard'   # Metric to monitor
 earlyStopping_mode           = 'max'           # Mode ['max' | 'min']
-earlyStopping_patience       = 10              # Max patience for the early stopping
+earlyStopping_patience       = 50              # Max patience for the early stopping
 earlyStopping_verbose        = 0               # Verbosity of the early stopping
 
 # Callback model check point
@@ -67,25 +68,32 @@ checkpoint_monitor           = 'val_jaccard'   # Metric to monitor
 checkpoint_mode              = 'max'           # Mode ['max' | 'min']
 checkpoint_save_best_only    = True            # Save best or last model
 checkpoint_save_weights_only = True            # Save only weights or also model
-checkpoint_verbose           = 0              # Verbosity of the checkpoint
+checkpoint_verbose           = 0               # Verbosity of the checkpoint
 
 # Callback plot
-plotHist_enabled             = True            # Enable the Callback
+plotHist_enabled             = True           # Enable the Callback
 plotHist_verbose             = 0               # Verbosity of the callback
 
 # Callback learning rate scheduler
 LRScheduler_enabled          = True             # Enable the Callback
 LRScheduler_batch_epoch      = 'batch'          # Schedule the LR each 'batch' or 'epoch'
-LRScheduler_type             = 'poly'           # Type of scheduler ['linear' | 'step' | 'square' | 'sqrt' | 'poly']
-LRScheduler_M                = 750000           # Number of iterations/epochs expected until convergence
+LRScheduler_type             = 'poly'         # Type of scheduler ['linear' | 'step' | 'square' | 'sqrt' | 'poly']
+LRScheduler_M                = 75000            # Number of iterations/epochs expected until convergence
 LRScheduler_decay            = 0.1              # Decay for 'step' method
 LRScheduler_S                = 10000            # Step for the 'step' method
 LRScheduler_power            = 0.9              # Power for te poly method
 
+# Callback TensorBoard
+TensorBoard_enabled          = True             # Enable the Callback
+TensorBoard_histogram_freq   = 1                # Frequency (in epochs) at which to compute activation histograms for the layers of the model. If set to 0, histograms won't be computed.
+TensorBoard_write_graph      = True             # Whether to visualize the graph in Tensorboard. The log file can become quite large when write_graph is set to True.
+TensorBoard_write_images     = False            # Whether to write model weights to visualize as image in Tensorboard.
+TensorBoard_logs_folder      = None             #
+
 # Data augmentation for training and normalization
 norm_imageNet_preprocess           = True  # Normalize following imagenet procedure
-norm_fit_dataset                   = True   # If True it recompute std and mean from images. Either it uses the std and mean set at the dataset config file
-norm_rescale                       = 1  # 1/255. # Scalar to divide and set range 0-1
+norm_fit_dataset                   = False   # If True it recompute std and mean from images. Either it uses the std and mean set at the dataset config file
+norm_rescale                       = 1 # 1/255. # Scalar to divide and set range 0-1
 norm_featurewise_center            = False   # Substract mean - dataset
 norm_featurewise_std_normalization = False   # Divide std - dataset
 norm_samplewise_center             = False  # Substract mean - sample

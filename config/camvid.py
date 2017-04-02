@@ -6,9 +6,9 @@ perc_mb2                     = None            # Percentage of data from the sec
 
 # Model
 model_name                   = 'resnetFCN'          # Model to use ['fcn8' | 'segnet_basic' | 'segnet_vgg' | 'resnetFCN' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19' | 'resnet50' | 'InceptionV3']
-freeze_layers_from           = None            # Freeze layers from 0 to this layer during training (Useful for finetunning) [None | 'base_model' | Layer_id]
+freeze_layers_from           = None #'base_model'            # Freeze layers from 0 to this layer during training (Useful for finetunning) [None | 'base_model' | Layer_id]
 show_model                   = True            # Show the architecture layers
-load_imageNet                = True           # Load Imagenet weights and normalize following imagenet procedure
+load_imageNet                = False           # Load Imagenet weights and normalize following imagenet procedure
 load_pretrained              = False           # Load a pretrained model for doing finetuning
 weights_file                 = 'weights.hdf5'  # Training weight file name
 
@@ -28,7 +28,7 @@ debug_n_epochs               = 2               # N of training epochs in debug m
 batch_size_train             = 2               # Batch size during training
 batch_size_valid             = 10              # Batch size during validation
 batch_size_test              = 30              # Batch size during testing
-crop_size_train              = (256, 256)      # Crop size during training (Height, Width) or None
+crop_size_train              = None # (256, 256)      # Crop size during training (Height, Width) or None
 crop_size_valid              = None            # Crop size during validation
 crop_size_test               = None            # Crop size during testing
 resize_train                 = None            # Resize the image during training (Height, Width) or None
@@ -44,7 +44,7 @@ seed_valid                   = 1924            # Random seed for the validation 
 seed_test                    = 1924            # Random seed for the testing shuffle
 
 # Training parameters
-optimizer                    = 'rmsprop'       # Optimizer
+optimizer                    = 'adam'       # Optimizer
 learning_rate                = 0.0001          # Training learning rate
 weight_decay                 = 0.              # Weight decay or L2 parameter norm penalty
 n_epochs                     = 1000            # Number of epochs during training
@@ -71,13 +71,29 @@ checkpoint_save_weights_only = True            # Save only weights or also model
 checkpoint_verbose           = 0               # Verbosity of the checkpoint
 
 # Callback plot
-plotHist_enabled             = False           # Enable the Callback
+plotHist_enabled             = True           # Enable the Callback
 plotHist_verbose             = 0               # Verbosity of the callback
 
+# Callback learning rate scheduler
+LRScheduler_enabled          = False             # Enable the Callback
+LRScheduler_batch_epoch      = 'batch'          # Schedule the LR each 'batch' or 'epoch'
+LRScheduler_type             = 'linear'         # Type of scheduler ['linear' | 'step' | 'square' | 'sqrt' | 'poly']
+LRScheduler_M                = 75000            # Number of iterations/epochs expected until convergence
+LRScheduler_decay            = 0.1              # Decay for 'step' method
+LRScheduler_S                = 10000            # Step for the 'step' method
+LRScheduler_power            = 0.9              # Power for te poly method
+
+# Callback TensorBoard
+TensorBoard_enabled          = True             # Enable the Callback
+TensorBoard_logs_folder      = None             # Logs folder. If None it would make /home/youruser/TensorBoardLogs/. Either put a regular path.
+TensorBoard_histogram_freq   = 1                # Frequency (in epochs) at which to compute activation histograms for the layers of the model. If set to 0, histograms won't be computed.
+TensorBoard_write_graph      = True             # Whether to visualize the graph in Tensorboard. The log file can become quite large when write_graph is set to True.
+TensorBoard_write_images     = False            # Whether to write model weights to visualize as image in Tensorboard.
+
 # Data augmentation for training and normalization
-norm_imageNet_preprocess           = False  # Normalize following imagenet procedure
-norm_fit_dataset                   = True   # If True it recompute std and mean from images. Either it uses the std and mean set at the dataset config file
-norm_rescale                       = 1/255. # Scalar to divide and set range 0-1
+norm_imageNet_preprocess           = True  # Normalize following imagenet procedure
+norm_fit_dataset                   = False   # If True it recompute std and mean from images. Either it uses the std and mean set at the dataset config file
+norm_rescale                       = 1 #1/255. # Scalar to divide and set range 0-1
 norm_featurewise_center            = False   # Substract mean - dataset
 norm_featurewise_std_normalization = False   # Divide std - dataset
 norm_samplewise_center             = False  # Substract mean - sample

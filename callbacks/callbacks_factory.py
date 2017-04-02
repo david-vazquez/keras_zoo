@@ -1,8 +1,11 @@
 import math
 import os
 
-from keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger
-from callbacks import (History_plot, Jacc_new, Save_results)
+from keras.callbacks import (EarlyStopping, ModelCheckpoint, CSVLogger,
+                             LearningRateScheduler, TensorBoard)
+
+from callbacks import (History_plot, Jacc_new, Save_results,
+                       LearningRateSchedulerBatch, Scheduler)
 
 
 # Create callbacks
@@ -58,6 +61,32 @@ class Callbacks_Factory():
         # Save the log
         cb += [CSVLogger(os.path.join(cf.savepath, 'logFile.csv'),
                          separator=',', append=False)]
+
+        # Learning rate scheduler
+        if cf.LRScheduler_enabled:
+            print('   Learning rate cheduler by batch')
+            scheduler = Scheduler(cf.LRScheduler_type, cf.learning_rate,
+                                  cf.LRScheduler_M, cf.LRScheduler_decay,
+                                  cf.LRScheduler_S, cf.LRScheduler_power)
+
+            if cf.LRScheduler_batch_epoch == 'batch':
+                cb += [LearningRateSchedulerBatch(scheduler.scheduler_function)]
+            elif cf.LRScheduler_batch_epoch == 'epoch':
+                cb += [LearningRateScheduler(scheduler.scheduler_function)]
+            else:
+                raise ValueError('Unknown scheduler mode: ' + LRScheduler_batch_epoch)
+
+        # TensorBoard callback
+        if cf.TensorBoard_enabled:
+            print('   Tensorboard')
+            if cf.TensorBoard_logs_folder is None:
+                log_dir = os.path.join(cf.usr_path, 'TensorBoardLogs')
+            if not os.path.exists(log_dir):
+                os.makedirs(log_dir)
+            cb += [TensorBoard(log_dir=log_dir,
+                               histogram_freq=cf.TensorBoard_histogram_freq,
+                               write_graph=cf.TensorBoard_write_graph,
+                               write_images=cf.TensorBoard_write_images)]
 
         # Output the list of callbacks
         return cb
