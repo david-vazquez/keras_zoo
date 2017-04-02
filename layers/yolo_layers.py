@@ -288,7 +288,10 @@ class Reorg(Layer):
 
         tmp4 = tf.strided_slice(data,[0,0,1,1],[1024,tf.to_int32(data.get_shape()[1]),tf.to_int32(data.get_shape()[2]),tf.to_int32(data.get_shape()[3])],[1,1,2,2])
 
-        return tf.concat(1,[tmp1, tmp2, tmp3, tmp4])
+        if int(tf.__version__[0]) < 1:
+            return tf.concat(1,[tmp1, tmp2, tmp3, tmp4])
+        else:
+            return tf.concat([tmp1, tmp2, tmp3, tmp4],1)
 
     def get_output_shape_for(self, input_shape):
         return (input_shape[0], input_shape[1]*4, input_shape[2]/2, input_shape[3]/2)

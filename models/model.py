@@ -1,17 +1,18 @@
+# import os
 import math
 import time
 import numpy as np
 from keras.engine.training import GeneratorEnqueuer
-#from model_factory import Model_Factory
 from tools.save_images import save_img3
+# from tools.yolo_utils import *
 
 
-"""
-Interface for normal (one net) models and adversarial models. Objects of
-classes derived from Model are returned by method make() of the Model_Factory
-class.
-"""
 class Model():
+    """
+    Interface for normal (one net) models and adversarial models. Objects of
+    classes derived from Model are returned by method make() of the
+    Model_Factory class.
+    """
     def train(self, train_gen, valid_gen, cb):
         pass
 
@@ -22,15 +23,14 @@ class Model():
         pass
 
 
-"""
-Wraper of regular models like FCN, SegNet etc consisting of a one Keras model.
-But not GANs, which are made of two networks and have a different training
-strategy.
-In this class we implement the train(), test() and predict() methods common to
-all of them.
-"""
 # TODO: Better call it Regular_Model ?
 class One_Net_Model(Model):
+    """
+    Wraper of regular models like FCN, SegNet etc consisting of a one Keras
+    model. But not GANs, which are made of two networks and have a different
+    training strategy. In this class we implement the train(), test() and
+    predict() methods common to all of them.
+    """
     def __init__(self, model, cf, optimizer):
         self.cf = cf
         self.optimizer = optimizer
@@ -48,9 +48,9 @@ class One_Net_Model(Model):
                                             validation_data=valid_gen,
                                             nb_val_samples=self.cf.dataset.n_images_valid,
                                             class_weight=None,
-                                            max_q_size=10,
-                                            nb_worker=1,
-                                            pickle_safe=False)
+                                            max_q_size=self.cf.max_q_size,
+                                            nb_worker=self.cf.workers,
+                                            pickle_safe=True)
             print('   Training finished.')
 
             return hist
@@ -62,11 +62,10 @@ class One_Net_Model(Model):
         if self.cf.pred_model:
             print('\n > Predicting the model...')
             # Load best trained model
-            # self.model.load_weights(os.path.join(self.cf.savepath, "weights.hdf5"))
             self.model.load_weights(self.cf.weights_file)
 
             # Create a data generator
-            data_gen_queue, _stop, _generator_threads = GeneratorEnqueuer(self.test_gen, max_q_size=1)
+            data_gen_queue, _stop, _generator_threads = GeneratorEnqueuer(self.test_gen, max_q_size=cf.max_q_size)
 
             # Process the dataset
             start_time = time.time()
@@ -88,7 +87,8 @@ class One_Net_Model(Model):
                                              y_true.shape[3]))
 
                 save_img3(x_true, y_true, y_pred, self.cf.savepath, 0,
-                          self.cf.dataset.color_map, self.cf.dataset.classes, tag+str(_), self.cf.dataset.void_class)
+                          self.cf.dataset.color_map, self.cf.dataset.classes,
+                          tag+str(_), self.cf.dataset.void_class)
 
             # Stop data generator
             _stop.set()
@@ -109,26 +109,30 @@ class One_Net_Model(Model):
             start_time = time.time()
             test_metrics = self.model.evaluate_generator(test_gen,
                                                          self.cf.dataset.n_images_test,
-                                                         max_q_size=10,
-                                                         nb_worker=1,
-                                                         pickle_safe=False)
+                                                         max_q_size=self.cf.max_q_size,
+                                                         nb_worker=self.cf.workers,
+                                                         pickle_safe=True)
             total_time = time.time() - start_time
             fps = float(self.cf.dataset.n_images_test) / total_time
             s_p_f = total_time / float(self.cf.dataset.n_images_test)
             print ('   Testing time: {}. FPS: {}. Seconds per Frame: {}'.format(total_time, fps, s_p_f))
 
-            # Compute Jaccard per class
-            metrics_dict = dict(zip(self.model.metrics_names, test_metrics))
-            I = np.zeros(self.cf.dataset.n_classes)
-            U = np.zeros(self.cf.dataset.n_classes)
-            jacc_percl = np.zeros(self.cf.dataset.n_classes)
-            for i in range(self.cf.dataset.n_classes):
-                I[i] = metrics_dict['I'+str(i)]
-                U[i] = metrics_dict['U'+str(i)]
-                jacc_percl[i] = I[i] / U[i]
-                print ('   {:2d} ({:^15}): Jacc: {:6.2f}'.format(i,
-                                                                 self.cf.dataset.classes[i],
-                                                                 jacc_percl[i]*100))
-            # Compute jaccard mean
-            jacc_mean = np.nanmean(jacc_percl)
-            print ('   Jaccard mean: {}'.format(jacc_mean))
+            if self.cf.problem_type == 'detection':
+                raise ValueError('Copy from master repository')
+
+            elif self.cf.problem_type == 'segmentation':
+                # Compute Jaccard per class
+                metrics_dict = dict(zip(self.model.metrics_names, test_metrics))
+                I = np.zeros(self.cf.dataset.n_classes)
+                U = np.zeros(self.cf.dataset.n_classes)
+                jacc_percl = np.zeros(self.cf.dataset.n_classes)
+                for i in range(self.cf.dataset.n_classes):
+                    I[i] = metrics_dict['I'+str(i)]
+                    U[i] = metrics_dict['U'+str(i)]
+                    jacc_percl[i] = I[i] / U[i]
+                    print ('   {:2d} ({:^15}): Jacc: {:6.2f}'.format(i,
+                                                                     self.cf.dataset.classes[i],
+                                                                     jacc_percl[i]*100))
+                # Compute jaccard mean
+                jacc_mean = np.nanmean(jacc_percl)
+                print ('   Jaccard mean: {}'.format(jacc_mean))

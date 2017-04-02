@@ -1,5 +1,6 @@
 from keras.optimizers import (RMSprop, Adam, SGD)
 
+
 # Create the optimizer
 class Optimizer_Factory():
     def __init__(self):
@@ -19,7 +20,7 @@ class Optimizer_Factory():
             opt = SGD(lr=cf.learning_rate, momentum=0.9, nesterov=True)
 
         else:
-            raise ValueError('Unknown optimizer')
+            raise ValueError("Unknown optimizer. Valid optimizer arguments are: 'rmsprop', 'adam' and 'sgd'.")
 
         # Return the optimizer
         return opt

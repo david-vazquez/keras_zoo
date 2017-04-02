@@ -1,11 +1,11 @@
 # Dataset
 problem_type                 = 'segmentation'  # ['classification' | 'detection' | 'segmentation']
-dataset_name                 = 'audi'          # Dataset name
+dataset_name                 = 'delete_synthia_audi_full'  # Dataset name
 dataset_name2                = None            # Second dataset name. None if not Domain Adaptation
 perc_mb2                     = None            # Percentage of data from the second dataset in each minibatch
 
 # Model
-model_name                   = 'resnetFCN'     # Model to use ['fcn8' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19' | 'resnet50' | 'InceptionV3']
+model_name                   = 'resnetFCN'     # Model to use ['fcn8' | 'segnet_basic' | 'segnet_vgg' | 'resnetFCN' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19' | 'resnet50' | 'InceptionV3']
 freeze_layers_from           = None            # Freeze layers from 0 to this layer during training (Useful for finetunning) [None | 'base_model' | Layer_id]
 show_model                   = True            # Show the architecture layers
 load_imageNet                = True            # Load Imagenet weights and normalize following imagenet procedure
@@ -18,10 +18,10 @@ test_model                   = True            # Test the model
 pred_model                   = False           # Predict using the model
 
 # Debug
-debug                        = False            # Use only few images for debuging
-debug_images_train           = 20              # N images for training in debug mode (-1 means all)
-debug_images_valid           = 20              # N images for validation in debug mode (-1 means all)
-debug_images_test            = 20              # N images for testing in debug mode (-1 means all)
+debug                        = True            # Use only few images for debuging
+debug_images_train           = 50              # N images for training in debug mode (-1 means all)
+debug_images_valid           = 50              # N images for validation in debug mode (-1 means all)
+debug_images_test            = 50              # N images for testing in debug mode (-1 means all)
 debug_n_epochs               = 2               # N of training epochs in debug mode
 
 # Batch sizes
@@ -91,11 +91,11 @@ TensorBoard_write_graph      = True            # Whether to visualize the graph 
 TensorBoard_write_images     = False           # Whether to write model weights to visualize as image in Tensorboard.
 
 # Data augmentation for training and normalization
-norm_imageNet_preprocess           = False     # Normalize following imagenet procedure
-norm_fit_dataset                   = False      # If True it recompute std and mean from images. Either it uses the std and mean set at the dataset config file
-norm_rescale                       = 1/255.    # Scalar to divide and set range 0-1
-norm_featurewise_center            = True      # Substract mean - dataset
-norm_featurewise_std_normalization = True      # Divide std - dataset
+norm_imageNet_preprocess           = False      # Normalize following imagenet procedure
+norm_fit_dataset                   = True     # If True it recompute std and mean from images. Either it uses the std and mean set at the dataset config file
+norm_rescale                       = 1/255.         # Scalar to divide and set range 0-1
+norm_featurewise_center            = True     # Substract mean - dataset
+norm_featurewise_std_normalization = True     # Divide std - dataset
 norm_samplewise_center             = False     # Substract mean - sample
 norm_samplewise_std_normalization  = False     # Divide std - sample
 norm_gcn                           = False     # Global contrast normalization

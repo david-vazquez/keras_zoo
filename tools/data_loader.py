@@ -130,7 +130,8 @@ def list_subdirs(directory):
 
 
 # Checks if a file is an image
-def has_valid_extension(fname, white_list_formats = {'png', 'jpg', 'jpeg', 'bmp', 'tif'}):
+def has_valid_extension(fname, white_list_formats={'png', 'jpg', 'jpeg',
+                        'bmp', 'tif'}):
     for extension in white_list_formats:
         if fname.lower().endswith('.' + extension):
             return True
@@ -150,9 +151,9 @@ def load_img(path, grayscale=False, resize=None, order=1):
         # print('Final resize: ' + str(img.shape))
 
     # Color conversion
-    if len(img.shape)==2 and not grayscale:
+    if len(img.shape) == 2 and not grayscale:
         img = gray2rgb(img)
-    elif len(img.shape)>2 and img.shape[2]==3 and grayscale:
+    elif len(img.shape) > 2 and img.shape[2] == 3 and grayscale:
         img = rgb2gray(img)
 
     # Return image
@@ -324,23 +325,6 @@ class ImageDataGenerator(object):
             batch_size2=batch_size2)
 
     def standardize(self, x, y=None):
-        # if self.imageNet:
-        #     if self.dim_ordering == 'th':
-        #         # 'RGB'->'BGR'
-        #         x = x[::-1, :, :]
-        #         # Zero-center by mean pixel
-        #         x[0, :, :] -= 103.939
-        #         x[1, :, :] -= 116.779
-        #         x[2, :, :] -= 123.68
-        #     else:
-        #         # 'RGB'->'BGR'
-        #         x = x[:, :, ::-1]
-        #         # Zero-center by mean pixel
-        #         x[:, :, 0] -= 103.939
-        #         x[:, :, 1] -= 116.779
-        #         x[:, :, 2] -= 123.68
-        #     return x
-
         if self.imageNet:
             if self.dim_ordering == 'th':
                 # 'RGB'->'BGR'
@@ -352,16 +336,33 @@ class ImageDataGenerator(object):
             else:
                 # 'RGB'->'BGR'
                 x = x[:, :, ::-1]
-                x *= 1/255.
                 # Zero-center by mean pixel
-                x[:, :, 0] -= 0.485
-                x[:, :, 1] -= 0.456
-                x[:, :, 2] -= 0.406
-                # STD
-                x[:, :, 0] /= 0.229
-                x[:, :, 1] /= 0.224
-                x[:, :, 2] /= 0.225
+                x[:, :, 0] -= 103.939
+                x[:, :, 1] -= 116.779
+                x[:, :, 2] -= 123.68
             return x
+
+        # if self.imageNet:
+        #     if self.dim_ordering == 'th':
+        #         # 'RGB'->'BGR'
+        #         x = x[::-1, :, :]
+        #         # Zero-center by mean pixel
+        #         x[0, :, :] -= 103.939
+        #         x[1, :, :] -= 116.779
+        #         x[2, :, :] -= 123.68
+        #     else:
+        #         # 'RGB'->'BGR'
+        #         x = x[:, :, ::-1]
+        #         x *= 1/255.
+        #         # Zero-center by mean pixel
+        #         x[:, :, 0] -= 0.485
+        #         x[:, :, 1] -= 0.456
+        #         x[:, :, 2] -= 0.406
+        #         # STD
+        #         x[:, :, 0] /= 0.229
+        #         x[:, :, 1] /= 0.224
+        #         x[:, :, 2] /= 0.225
+        #     return x
 
         # x is a single image, so it doesn't have image number at index 0
         img_channel_index = self.channel_index - 1
@@ -370,7 +371,7 @@ class ImageDataGenerator(object):
             x *= self.rescale
 
         if self.gcn:
-            x_before = x.copy()
+            # x_before = x.copy()
             # Compute the void mask
             mask = np.ones_like(y).astype('int32')
             mask[y == self.void_label] = 0.
@@ -390,7 +391,6 @@ class ImageDataGenerator(object):
 
             # Set void pixels to 0
             x = x*mask
-
 
         if self.samplewise_center:
             x -= np.mean(x, axis=img_channel_index, keepdims=True)
@@ -485,7 +485,6 @@ class ImageDataGenerator(object):
             zx, zy = np.random.uniform(self.zoom_range[0],
                                        self.zoom_range[1], 2)
             need_transform = True
-
 
         if need_transform:
             rotation_matrix = np.array([[np.cos(theta), -np.sin(theta), 0],
@@ -660,7 +659,9 @@ class ImageDataGenerator(object):
             # reject regions that are too small
             y = y[y[:,3]>0.005]
             y = y[y[:,4]>0.005]
-
+	    if y.shape[0] == 0:
+                warnings.warn('DirectoryIterator: your data augmentation strategy '
+                              'is is moving all the boxes out of the image ')
         # TODO:
         # channel-wise normalization
         # barrel/fisheye
@@ -762,7 +763,8 @@ class ImageDataGenerator(object):
             sum, n = 0, 0
             for file_name in file_names:
                 # Load image and reshape as a vector
-                x = io.imread(file_name)
+                x = load_img(file_name, grayscale=False, resize=None, order=1)
+                # x = io.imread(file_name)
                 if self.rescale:
                     x = x*self.rescale
                 x = x.reshape((x.shape[0]*x.shape[1], x.shape[2]))
@@ -1005,12 +1007,11 @@ class DirectoryIterator(Iterator):
                 y = y[((y[:,2] > 0.) & (y[:,2] < 1.))]
                 y = y[((y[:,3] > 0.) & (y[:,3] < 1.))]
                 y = y[((y[:,4] > 0.) & (y[:,4] < 1.))]
-                if (y.shape != gt.shape):
+                if (y.shape != gt.shape) or (y.shape[0] == 0):
                     warnings.warn('DirectoryIterator: found an invalid annotation '
                                   'on GT file '+label_path)
                 # shuffle gt boxes order
                 np.random.shuffle(y)
-
 
             # Standarize image
             x = self.image_data_generator.standardize(x, y)
@@ -1064,10 +1065,10 @@ class DirectoryIterator(Iterator):
             for i, label in enumerate(self.classes[index_array]):
                 batch_y[i, label] = 1.
         elif self.class_mode == 'detection':
+	    # TODO detection: check model, other networks may expect a different batch_y format and shape
             # YOLOLoss expects a particular batch_y format and shape
-            batch_y = yolo_build_gt_batch(batch_y, self.image_shape)
-            # TODO other detection networks may expect a different batch_y format and shape
-        elif self.class_mode == None:
+            batch_y = yolo_build_gt_batch(batch_y, self.image_shape, self.nb_class)
+        elif self.class_mode is None:
             return batch_x
 
         return batch_x, batch_y

@@ -180,7 +180,7 @@ def build_resnetFCN(img_shape=(3, None, None), n_classes=8, l2_reg=0.,
 
     # Regularization warning
     if l2_reg > 0.:
-        print ("Regularizing the weights: " + str(l2_reg))
+        print ("   Regularizing the weights: " + str(l2_reg))
 
     # Input layer
     inputs = Input(img_shape)

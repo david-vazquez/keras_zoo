@@ -134,7 +134,6 @@ class Jacc_new(Callback):
         self.jacc = np.nanmean(self.jacc_percl)
         logs['jaccard'] = self.jacc
 
-
     def on_epoch_end(self, epoch, logs={}):
         for i in range(self.n_classes):
             self.I[i] = logs['I'+str(i)]
@@ -153,12 +152,11 @@ class Jacc_new(Callback):
         logs['val_jaccard'] = self.val_jacc
 
 
-
 # Save the image results
 class Save_results(Callback):
     def __init__(self, n_classes, void_label, save_path,
                  generator, epoch_length, color_map, classes, tag,
-                 n_legend_rows=1, *args):
+                 n_legend_rows=1, nb_worker=5, max_q_size=10, *args):
         super(Callback, self).__init__()
         self.n_classes = n_classes
         self.void_label = void_label
@@ -169,12 +167,15 @@ class Save_results(Callback):
         self.classes = classes
         self.n_legend_rows = n_legend_rows
         self.tag = tag
+        self.nb_worker = nb_worker
+        self.max_q_size = max_q_size
 
     def on_epoch_end(self, epoch, logs={}):
 
         # Create a data generator
-        enqueuer = GeneratorEnqueuer(self.generator, pickle_safe=False)
-        enqueuer.start(nb_worker=1, max_q_size=1, wait_time=0.05)
+        enqueuer = GeneratorEnqueuer(self.generator, pickle_safe=True)
+        enqueuer.start(nb_worker=self.nb_worker, max_q_size=self.max_q_size,
+                       wait_time=0.05)
 
         # Process the dataset
         for _ in range(self.epoch_length):
@@ -187,7 +188,6 @@ class Save_results(Callback):
                     break
                 else:
                     time.sleep(0.05)
-            #data = data_gen_queue.get()
             x_true = data[0]
             y_true = data[1].astype('int32')
 
@@ -205,8 +205,8 @@ class Save_results(Callback):
                                              y_true.shape[2]))
             # Save output images
             save_img3(x_true, y_true, y_pred, self.save_path, epoch,
-                      self.color_map, self.classes, self.tag+str(_), self.void_label,
-                      self.n_legend_rows)
+                      self.color_map, self.classes, self.tag+str(_),
+                      self.void_label, self.n_legend_rows)
 
         # Stop data generator
         if enqueuer is not None:
@@ -290,7 +290,6 @@ class LearningRateSchedulerBatch(Callback):
         if not hasattr(self.model.optimizer, 'lr'):
             raise ValueError('Optimizer must have a "lr" attribute.')
         lr = self.schedule(iteration)
-        #print('   New lr: ' + str(lr))
         if not isinstance(lr, (float, np.float32, np.float64)):
             raise ValueError('The output of the "schedule" function '
                              'should be float.')

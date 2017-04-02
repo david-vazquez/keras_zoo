@@ -104,9 +104,12 @@ def deconv2d(x, kernel, output_shape, strides=(1, 1),
                                     border_mode, strides[2])
 
     # Compose output shape without nones
-    output_shape = tf.pack([shape_b, shape_h, shape_w, shape_c])
-
-    # print('Output Shape: ' + str(output_shape))
+    try:
+        # Uses tf.pack, previous to tensorflow 1.0.0
+        output_shape = tf.pack([shape_b, shape_h, shape_w, shape_c])
+    except AttributeError:
+        # Uses tf.stack in favor of tf.pack, which is deprecated from tensorflow v1.0.0 onwards
+        output_shape = tf.stack([shape_b, shape_h, shape_w, shape_c])
 
     output_shape = _preprocess_deconv_output_shape(x, output_shape,
                                                    dim_ordering)

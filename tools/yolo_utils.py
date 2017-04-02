@@ -1,203 +1,204 @@
 import numpy as np
 import warnings
+import math
+import cv2
 
-""" YOLO regions utilities """
+"""
+    YOLO utitlities
+    code adapted from https://github.com/thtrieu/darkflow/
+                 and  https://pjreddie.com/darknet/yolo/
+"""
 
-def logistic_activate(x):
-  return 1.0/(1.0 + np.exp(-x))
-
-def logistic_gradient(x):
-  return (1-x)*x
-
-def yolo_activate_regions(x,num_boxes,num_classes):
-    num_coords = 4
-    size = num_coords + num_classes + 1
-    batch_size,num_filters,height,width = x.shape
-
-    for b in range(0,batch_size):
-      for k in range(0,num_boxes):
-        # logistic_activate of objectness score
-        index = size*k
-        x[b, index + 4, :, :] = logistic_activate(x[b, index + 4, :, :])
-        # softmax of class prediction
-        e_x = np.exp(x[b, index + 5:index + 5 + num_classes, :, :] -
-                     np.max(x[b, index + 5:index + 5 + num_classes, :, :],axis=0))
-        x[b, index + 5:index + 5 + num_classes, :, :] = e_x/np.sum((e_x),axis=0)
-    return x
-
-def yolo_get_region_box(pred,n,i,j,w,h,priors):
-  b = np.zeros(4)
-  b[0] = (i + logistic_activate(pred[0])) / w
-  b[1] = (j + logistic_activate(pred[1])) / h
-  b[2] = np.exp(pred[2]) * priors[n,0] / w
-  b[3] = np.exp(pred[3]) * priors[n,1] / h
-  return b
-
-def yolo_get_region_boxes(x,priors,num_classes,thresh):
-    num_boxes = len(priors)
-    num_coords = 4
-    batch_size,num_filters,height,width = x.shape
-    boxes = np.zeros((batch_size,num_boxes*height*width,num_coords))
-    probs = np.zeros((batch_size,num_boxes*height*width,num_classes))
-
-    for b in range(0,batch_size):
-      for k in range(0,num_boxes):
-        for row in range(0,height):
-          for col in range(0,width):
-            box_idx    = k*width*height+(row*width+col)
-            coords_idx = k*(num_coords+num_classes+1)
-            # activate of coords, and add prior (biases) w,h
-            boxes[b,box_idx,0] = (col + logistic_activate(x[b,coords_idx+0,row,col])) / width
-            boxes[b,box_idx,1] = (row + logistic_activate(x[b,coords_idx+1,row,col])) / height
-            boxes[b,box_idx,2] = np.exp(x[b,coords_idx+2,row,col]) * priors[k][0] / width
-            boxes[b,box_idx,3] = np.exp(x[b,coords_idx+3,row,col]) * priors[k][1] / height
-            # scale class probs by bbox objectness score
-            scale = x[b,coords_idx+4,row,col]
-            probs[b,box_idx,:] = scale*x[b,coords_idx+5:coords_idx+5+num_classes,row,col]
-            # set to zero probs under threshold
-            probs[b,box_idx,:][probs[b,box_idx,:] < thresh] = 0
-
-    return boxes,probs
-
-def yolo_delta_region_box(delta,truth,pred,n,idx,i,j,w,h,priors,coord_scale):
-  p = yolo_get_region_box(pred,n,i,j,w,h,priors)
-  iou = yolo_box_iou(p,truth)
-
-  tx = (truth[0]*w - i)
-  ty = (truth[1]*h - j)
-  tw = np.log(truth[2]*w / priors[n,0])
-  th = np.log(truth[3]*h / priors[n,1])
-
-  delta[idx[0],idx[1]+0,idx[2],idx[3]] = coord_scale * (tx - logistic_activate(pred[0])) * logistic_gradient(logistic_activate(pred[0]))
-  delta[idx[0],idx[1]+1,idx[2],idx[3]] = coord_scale * (ty - logistic_activate(pred[1])) * logistic_gradient(logistic_activate(pred[1]))
-  delta[idx[0],idx[1]+2,idx[2],idx[3]] = coord_scale * (tw - pred[2])
-  delta[idx[0],idx[1]+3,idx[2],idx[3]] = coord_scale * (th - pred[3])
-  return iou,delta
-
-def yolo_do_nms_sort(boxes,probs,num_classes,nms_thresh):
-    batch_size = boxes.shape[0]
-    total = boxes.shape[1] # 5*13*13 = 845
-
-    for b in range(0,batch_size):
-      for c in range(0,num_classes):
-        idx_sort = np.argsort(probs[b,:,c])[::-1]
-        for idx_a in range(0,total):
-          if probs[b,idx_sort[idx_a],c] == 0: continue
-          box_a = boxes[b,idx_sort[idx_a],:]
-          for idx_b in range(idx_a+1,total):
-            box_b = boxes[b,idx_sort[idx_b],:]
-            if (yolo_box_iou(box_a, box_b) > nms_thresh):
-              probs[b,idx_sort[idx_b],c] = 0
-
-    return boxes,probs
-
-def yolo_overlap(x1,w1,x2,w2):
-    l1 = x1 - w1/2
-    l2 = x2 - w2/2
-    if(l1 > l2):
-        left = l1
-    else:
-        left = l2
-    r1 = x1 + w1/2
-    r2 = x2 + w2/2
-    if(r1 < r2):
-        right = r1
-    else:
-        right = r2
-    return right - left
-
-def yolo_box_intersection(a, b):
-    w = yolo_overlap(a[0], a[2], b[0], b[2])
-    h = yolo_overlap(a[1], a[3], b[1], b[3])
-    if(w < 0 or h < 0):
-         return 0
-    area = w*h
-    return area
-
-def yolo_box_union(a, b):
-    i = yolo_box_intersection(a, b)
-    u = a[2]*a[3] + b[2]*b[3] - i
-    return u
-
-def yolo_box_iou(a, b):
-    return yolo_box_intersection(a, b)/yolo_box_union(a, b)
-
-
-def yolo_draw_detections(impath,boxes,probs,thresh,labels):
-
-    def get_color(c,x,max):
-      colors = ( (1,0,1), (0,0,1),(0,1,1),(0,1,0),(1,1,0),(1,0,0) )
-      ratio = (float(x)/max)*5
-      i = np.floor(ratio)
-      j = np.ceil(ratio)
-      ratio -= i
-      r = (1-ratio) * colors[int(i)][int(c)] + ratio*colors[int(j)][int(c)]
-      return r*255
-
-    num_boxes   = boxes.shape[0]
-    num_classes = probs.shape[1]
-
-    im  = cv2.imread(impath)
-
-    for i in range(num_boxes):
-        #for each box, find the class with maximum prob
-        max_class = np.argmax(probs[i,:])
-        prob = probs[i,max_class]
-        if(prob > thresh):
-            print labels[max_class],": ",prob
-            b = boxes[i,:]
-
-            left  = (b[0]-b[2]/2.)*im.shape[1]
-            right = (b[0]+b[2]/2.)*im.shape[1]
-            top   = (b[1]-b[3]/2.)*im.shape[0]
-            bot   = (b[1]+b[3]/2.)*im.shape[0]
-
-            if(left < 0): left = 0
-            if(right > im.shape[1]-1): right = im.shape[1]-1
-            if(top < 0): top = 0
-            if(bot > im.shape[0]-1): bot = im.shape[0]-1
-
-            offset = max_class*123457 % len(labels)
-            color = (get_color(2,offset,len(labels)),get_color(1,offset,len(labels)),get_color(0,offset,len(labels)))
-            cv2.rectangle(im, (int(left),int(top)), (int(right),int(bot)), color, 4)
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            scale = 0.65
-            thickness = 1
-            size=cv2.getTextSize(labels[max_class], font, scale, thickness)
-            cv2.rectangle(im, (int(left)-4,int(top)-size[0][1]-8), (int(left)+size[0][0]+8,int(top)), color, -1)
-            cv2.putText(im, labels[max_class], (int(left),int(top)-4), font, scale, (0,0,0), thickness, cv2.LINE_AA)
-
-    cv2.imwrite('prediction.jpg',im)
-    cv2.imshow('image',im)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
-def yolo_build_gt_batch(batch_gt,image_shape):
-
-    batch_size = len(batch_gt)
-    batch_y = np.zeros((batch_size, 5, image_shape[1]/32, image_shape[2]/32))
-    batch_y[:,0,:,:] = -1 # indicates nothing on this position
+def yolo_build_gt_batch(batch_gt,image_shape,num_classes,num_priors=5):
 
     h = image_shape[1]/32
     w = image_shape[2]/32
-    max_truth_boxes = w * h
+    c = num_classes
+    b = num_priors  # TODO pass num_priors
+    batch_size = len(batch_gt)
+    batch_y = np.zeros([batch_size,h*w,b,c+4+1+1+2+2])
 
+    cellx = 32
+    celly = 32
     for i,gt in enumerate(batch_gt):
-        t_ind = 0
-        for t in range(min(gt.shape[0],max_truth_boxes)):
-            t_i = t_ind%w
-            t_j = t_ind/w
-            batch_y[i,0,t_j,t_i] = gt[t,0] # object class
-            batch_y[i,1,t_j,t_i] = gt[t,1] # x coordinate
-            batch_y[i,2,t_j,t_i] = gt[t,2] # y coordinate
-            batch_y[i,3,t_j,t_i] = gt[t,3] # width
-            batch_y[i,4,t_j,t_i] = gt[t,4] # height
-            t_ind += 1
+        if gt.shape[0] == 0:
+          # if there are no objects we'll get NaNs on YOLOLoss, set everything to one!
+          # TODO check if the following line harms learning in case of 
+          #      having lots of images with no objects
+          batch_y[i] = np.ones((h*w,b,c+4+1+1+2+2))
+          continue
+        objects = gt.tolist()
+        for obj in objects:
+            centerx = obj[1] * image_shape[2]
+            centery = obj[2] * image_shape[1]
+            cx = centerx / cellx
+            cy = centery / celly
+            obj[1] = cx - np.floor(cx) # centerx
+            obj[2] = cy - np.floor(cy) # centerx
+            obj[3] = np.sqrt(obj[3])
+            obj[4] = np.sqrt(obj[4])
+            obj += [int(np.floor(cy) * w + np.floor(cx))]
+
+        probs = np.zeros([h*w,b,c])
+        confs = np.zeros([h*w,b,1])
+        coord = np.zeros([h*w,b,4])
+        prear = np.zeros([h*w,4])
+
+        for obj in objects:
+            probs[obj[5], :, :] = [[0.]*c] * b
+            probs[obj[5], :, int(obj[0])] = 1.
+            coord[obj[5], :, :] = [obj[1:5]] * b
+            prear[obj[5],0] = obj[1] - obj[3]**2 * .5 * w # xleft
+            prear[obj[5],1] = obj[2] - obj[4]**2 * .5 * h # yup
+            prear[obj[5],2] = obj[1] + obj[3]**2 * .5 * w # xright
+            prear[obj[5],3] = obj[2] + obj[4]**2 * .5 * h # ybot
+            confs[obj[5], :, 0] = [1.] * b
+
+        upleft   = np.expand_dims(prear[:,0:2], 1)
+        botright = np.expand_dims(prear[:,2:4], 1)
+        wh = botright - upleft
+        area = wh[:,:,0] * wh[:,:,1]
+        upleft   = np.concatenate([upleft] * b, 1)
+        botright = np.concatenate([botright] * b, 1)
+        areas = np.concatenate([area] * b, 1)
+
+        batch_y[i,:] = np.concatenate((probs,confs,coord,areas[:,:,np.newaxis],upleft,botright),axis=2)
 
     return batch_y
 
 
-""" Uitlities to convert Darknet models' weights into keras hdf5 format """
+class BoundBox:
+    def __init__(self, classes):
+        self.x, self.y = float(), float()
+        self.w, self.h = float(), float()
+        self.c = float()
+        self.class_num = classes
+        self.probs = np.zeros((classes,))
+
+def overlap(x1,w1,x2,w2):
+    l1 = x1 - w1 / 2.;
+    l2 = x2 - w2 / 2.;
+    left = max(l1, l2)
+    r1 = x1 + w1 / 2.;
+    r2 = x2 + w2 / 2.;
+    right = min(r1, r2)
+    return right - left;
+
+def box_intersection(a, b):
+    w = overlap(a.x, a.w, b.x, b.w);
+    h = overlap(a.y, a.h, b.y, b.h);
+    if w < 0 or h < 0: return 0;
+    area = w * h;
+    return area;
+
+def box_union(a, b):
+    i = box_intersection(a, b);
+    u = a.w * a.h + b.w * b.h - i;
+    return u;
+
+def box_iou(a, b):
+    return box_intersection(a, b) / box_union(a, b);
+
+def prob_compare(box):
+    return box.probs[box.class_num]
+
+def expit(x):
+	return 1. / (1. + np.exp(-x))
+
+def _softmax(x):
+    e_x = np.exp(x - np.max(x))
+    out = e_x / e_x.sum()
+    return out
+
+def yolo_postprocess_net_out(net_out, anchors, labels, threshold, nms_threshold):
+	C = len(labels) 
+        B = len(anchors)
+        net_out = np.transpose(net_out, (1,2,0))
+	H,W = net_out.shape[:2]
+	net_out = net_out.reshape([H, W, B, -1])
+
+	boxes = list()
+	for row in range(H):
+		for col in range(W):
+			for b in range(B):
+				bx = BoundBox(C)
+				bx.x, bx.y, bx.w, bx.h, bx.c = net_out[row, col, b, :5]
+				bx.c = expit(bx.c)
+				bx.x = (col + expit(bx.x)) / W
+				bx.y = (row + expit(bx.y)) / H
+				bx.w = math.exp(bx.w) * anchors[b][0] / W
+				bx.h = math.exp(bx.h) * anchors[b][1] / H
+				classes = net_out[row, col, b, 5:]
+				bx.probs = _softmax(classes) * bx.c
+				bx.probs *= bx.probs > threshold
+				boxes.append(bx)
+
+	# non max suppress boxes
+	for c in range(C):
+		for i in range(len(boxes)):
+			boxes[i].class_num = c
+		boxes = sorted(boxes, key = prob_compare)
+		for i in range(len(boxes)):
+			boxi = boxes[i]
+			if boxi.probs[c] == 0: continue
+			for j in range(i + 1, len(boxes)):
+				boxj = boxes[j]
+				if box_iou(boxi, boxj) >= nms_threshold:
+					boxes[j].probs[c] = 0.
+
+	return boxes
+
+def yolo_draw_detections(boxes, im, anchors, labels, threshold, nms_threshold):
+
+        def get_color(c,x,max):
+          colors = ( (1,0,1), (0,0,1),(0,1,1),(0,1,0),(1,1,0),(1,0,0) )
+          ratio = (float(x)/max)*5
+          i = np.floor(ratio)
+          j = np.ceil(ratio)
+          ratio -= i
+          r = (1-ratio) * colors[int(i)][int(c)] + ratio*colors[int(j)][int(c)]
+          return r*255
+
+	if type(im) is not np.ndarray:
+		imgcv = cv2.imread(im)
+	else: imgcv = im
+	h, w, _ = imgcv.shape
+	for b in boxes:
+		max_indx = np.argmax(b.probs)
+		max_prob = b.probs[max_indx]
+		label = 'object' * int(len(labels) < 2)
+		label += labels[max_indx] * int(len(labels)>1)
+		if max_prob > threshold:
+			left  = int ((b.x - b.w/2.) * w)
+			right = int ((b.x + b.w/2.) * w)
+			top   = int ((b.y - b.h/2.) * h)
+			bot   = int ((b.y + b.h/2.) * h)
+			if left  < 0    :  left = 0
+			if right > w - 1: right = w - 1
+			if top   < 0    :   top = 0
+			if bot   > h - 1:   bot = h - 1
+			thick = int((h+w)/300)
+			mess = '{}'.format(label)
+                        offset = max_indx*123457 % len(labels)
+                        color = (get_color(2,offset,len(labels)),
+                                 get_color(1,offset,len(labels)),
+                                 get_color(0,offset,len(labels)))
+			cv2.rectangle(imgcv,
+				(left, top), (right, bot),
+				color, thick)
+                        font = cv2.FONT_HERSHEY_SIMPLEX
+                        scale = 0.65
+                        thickness = 1
+                        size=cv2.getTextSize(mess, font, scale, thickness)
+                        cv2.rectangle(im, (left-2,top-size[0][1]-4), (left+size[0][0]+4,top), color, -1)
+                        cv2.putText(im, mess, (left+2,top-2), font, scale, (0,0,0), thickness, cv2.LINE_AA)
+	return imgcv
+
+
+""" 
+   Utilities to convert Darknet models' weights into keras hdf5 format
+   code adapted from https://github.com/sunshineatnoon/Darknet.keras
+"""
 
 class dummy_layer:
     def __init__(self,size,c,n,h,w,type):
@@ -536,7 +537,7 @@ def DarknetToKerasTinyYOLO(yoloNet):
             pass
     return model
 
-#if __name__ == '__main__':
+#Example use of Darknet to Keras converter
 #
 #    dummy_model = dummy_TinyYOLO()
 #    dummy_model = ReadYOLONetWeights(dummy_model,'weights/tiny-yolo.weights')

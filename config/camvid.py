@@ -14,7 +14,7 @@ weights_file                 = 'weights.hdf5'  # Training weight file name
 
 # Parameters
 train_model                  = True            # Train the model
-test_model                   = False           # Test the model
+test_model                   = True           # Test the model
 pred_model                   = False           # Predict using the model
 
 # Debug
@@ -27,7 +27,7 @@ debug_n_epochs               = 2               # N of training epochs in debug m
 # Batch sizes
 batch_size_train             = 2               # Batch size during training
 batch_size_valid             = 10              # Batch size during validation
-batch_size_test              = 30              # Batch size during testing
+batch_size_test              = 10              # Batch size during testing
 crop_size_train              = None # (256, 256)      # Crop size during training (Height, Width) or None
 crop_size_valid              = None            # Crop size during validation
 crop_size_test               = None            # Crop size during testing
@@ -42,9 +42,11 @@ shuffle_test                 = False           # Whether to shuffle the testing 
 seed_train                   = 1924            # Random seed for the training shuffle
 seed_valid                   = 1924            # Random seed for the validation shuffle
 seed_test                    = 1924            # Random seed for the testing shuffle
+max_q_size                   = 10              # Maximum size for the data generator queue
+workers                      = 5               # Maximum number of processes to spin up when using process based threading
 
 # Training parameters
-optimizer                    = 'adam'       # Optimizer
+optimizer                    = 'adam'          # Optimizer
 learning_rate                = 0.0001          # Training learning rate
 weight_decay                 = 0.              # Weight decay or L2 parameter norm penalty
 n_epochs                     = 1000            # Number of epochs during training
