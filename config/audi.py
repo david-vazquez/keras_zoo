@@ -8,8 +8,8 @@ perc_mb2                     = None            # Percentage of data from the sec
 model_name                   = 'resnetFCN'     # Model to use ['fcn8' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19' | 'resnet50' | 'InceptionV3']
 freeze_layers_from           = None            # Freeze layers from 0 to this layer during training (Useful for finetunning) [None | 'base_model' | Layer_id]
 show_model                   = True            # Show the architecture layers
-load_imageNet                = True            # Load Imagenet weights and normalize following imagenet procedure
-load_pretrained              = False           # Load a pretrained model for doing finetuning
+load_imageNet                = False            # Load Imagenet weights and normalize following imagenet procedure
+load_pretrained              = True           # Load a pretrained model for doing finetuning
 weights_file                 = 'weights.hdf5'  # Training weight file name
 
 # Parameters
@@ -34,6 +34,8 @@ crop_size_test               = None            # Crop size during testing
 resize_train                 = None            # Resize the image during training (Height, Width) or None
 resize_valid                 = None            # Resize the image during validation
 resize_test                  = None            # Resize the image during testing
+max_q_size                   = 10              # Maximum size for the data generator queue
+workers                      = 5               # Maximum number of processes to spin up when using process based threading
 
 # Data shuffle
 shuffle_train                = True            # Whether to shuffle the training data

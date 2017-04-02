@@ -1,13 +1,10 @@
 # Python import
 import numpy as np
 
-# Keras imports
-from keras.models import Model
-
 
 # Load numpy weights
 def load_numpy(model, path_weights="weights/resnetFCN.npy"):
-    print (' > Loading the numpy weights...')
+    print ('   Loading the numpy weights...')
 
     # Load weights
     weights_numpy = np.load(path_weights)

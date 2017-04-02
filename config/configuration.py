@@ -93,7 +93,7 @@ class Configuration():
             cf.valid_metrics = ['val_loss', 'val_acc', 'val_jaccard']
             cf.best_metric = 'val_jaccard'
             cf.best_type = 'max'
-	elif cf.dataset.class_mode == 'detection':
+        elif cf.dataset.class_mode == 'detection':
             # TODO detection : different nets may have other metrics
             cf.train_metrics = ['loss', 'avg_recall', 'avg_iou']
             cf.valid_metrics = ['val_loss', 'val_avg_recall', 'val_avg_iou']
