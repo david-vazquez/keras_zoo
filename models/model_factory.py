@@ -3,7 +3,7 @@ import os
 # Keras imports
 from metrics.metrics import cce_flatt, IoU, YOLOLoss, YOLOMetrics
 from keras import backend as K
-from keras.utils.visualize_util import plot
+from keras.utils.vis_utils import plot_model
 
 # Classification models
 from models.lenet import build_lenet
@@ -21,7 +21,7 @@ from models.unet import build_unet
 from models.segnet import build_segnet
 from models.resnetFCN import build_resnetFCN
 from models.densenetFCN import build_densenetFCN
-
+from models.densenetFCNtitu import DenseNetFCN
 # Adversarial models
 from models.adversarial_semseg import Adversarial_Semseg
 
@@ -70,7 +70,8 @@ class Model_Factory():
                                 cf.target_size_train[1],
                                 cf.dataset.n_channels)
             loss = cce_flatt(cf.dataset.void_class, cf.dataset.cb_weights)
-            metrics = [IoU(cf.dataset.n_classes, cf.dataset.void_class)]
+            #metrics = [IoU(cf.dataset.n_classes, cf.dataset.void_class)]
+            metrics = []
         else:
             raise ValueError('Unknown problem type')
         return in_shape, loss, metrics
@@ -78,8 +79,8 @@ class Model_Factory():
     # Creates a Model object (not a Keras model)
     def make(self, cf, optimizer=None):
         if cf.model_name in ['lenet', 'alexNet', 'vgg16', 'vgg19', 'resnet50',
-                             'InceptionV3', 'fcn8', 'unet', 'segnet_vgg',
-                             'segnet_basic', 'resnetFCN', 'yolo', 'tiny-yolo']:
+                             'InceptionV3', 'fcn8', 'unet', 'segnet_vgg', 'densenetFCN',
+                             'segnet_basic', 'resnetFCN', 'yolo', 'tiny-yolo', 'densenetFCN_titu']:
             if optimizer is None:
                 raise ValueError('optimizer can not be None')
 
@@ -130,6 +131,11 @@ class Model_Factory():
             model = build_densenetFCN(in_shape, cf.dataset.n_classes, cf.weight_decay,
                                       freeze_layers_from=cf.freeze_layers_from,
                                       path_weights=None)
+        elif cf.model_name == 'densenetFCN_titu':
+            model = DenseNetFCN(in_shape, nb_dense_block=5, growth_rate=16,
+                                      nb_layers_per_block=4, upsampling_type='deconv', 
+                                      classes=cf.dataset.n_classes,
+                                      weight_decay=cf.weight_decay)
         elif cf.model_name == 'lenet':
             model = build_lenet(in_shape, cf.dataset.n_classes, cf.weight_decay)
         elif cf.model_name == 'alexNet':
@@ -175,7 +181,7 @@ class Model_Factory():
         # Show model structure
         if cf.show_model:
             model.summary()
-            plot(model, to_file=os.path.join(cf.savepath, 'model.png'))
+            plot_model(model, to_file=os.path.join(cf.savepath, 'model.png'))
 
         # Output the model
         print ('   Model: ' + cf.model_name)

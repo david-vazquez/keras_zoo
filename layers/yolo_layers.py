@@ -2,9 +2,9 @@ from __future__ import absolute_import
 import functools
 
 from keras import backend as K
-from keras import activations, initializations, regularizers, constraints
+from keras import activations, initializers, regularizers, constraints
 from keras.engine import Layer, InputSpec
-from keras.utils.np_utils import conv_output_length
+from keras.utils.conv_utils import conv_output_length
 
 import tensorflow as tf
 

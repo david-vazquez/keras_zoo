@@ -187,9 +187,9 @@ class ImageDataGenerator(object):
         rescale: rescaling factor. If None or 0, no rescaling is applied,
             otherwise we multiply the data by the value provided (before
             applying any other transformation).
-        dim_ordering: 'th' or 'tf'. In 'th' mode, the channels dimension
-            (the depth) is at index 1, in 'tf' mode it is at index 3.
-            It defaults to the `image_dim_ordering` value found in your
+        data_format: 'channels_last' or 'channels_first'. In 'channels_first' mode, the channels dimension
+            (the depth) is at index 1, in 'channels_last' mode it is at index 3.
+            It defaults to the `data_format` value found in your
             Keras config file at `~/.keras/keras.json`.
             If you never set it, then it will be "th".
     '''
@@ -217,29 +217,29 @@ class ImageDataGenerator(object):
                  spline_warp=False,
                  warp_sigma=0.1,
                  warp_grid_size=3,
-                 dim_ordering='default',
+                 data_format='default',
                  class_mode='categorical',
                  rgb_mean=None,
                  rgb_std=None,
                  crop_size=None):
-        if dim_ordering == 'default':
-            dim_ordering = K.image_dim_ordering()
+        if data_format == 'default':
+            data_format = K.image_data_format()
         self.__dict__.update(locals())
         self.principal_components = None
         # self.rescale = rescale
         self.preprocessing_function = preprocessing_function
         self.cb_weights = None
 
-        if dim_ordering not in {'tf', 'th'}:
-            raise Exception('dim_ordering should be "tf" (channel after row '
-                            'and column) or "th" (channel before row and '
-                            'column). Received arg: ', dim_ordering)
-        self.dim_ordering = dim_ordering
-        if dim_ordering == 'th':
+        if data_format not in {'channels_last', 'channels_first'}:
+            raise Exception('data_format should be "channels_last" (channel after row '
+                            'and column [tf]) or "channels_first" (channel before row and '
+                            'column [th]). Received arg: ', data_format)
+        self.data_format = data_format
+        if data_format == 'channels_first':
             self.channel_index = 1
             self.row_index = 2
             self.col_index = 3
-        if dim_ordering == 'tf':
+        if data_format == 'channels_last':
             self.channel_index = 3
             self.row_index = 1
             self.col_index = 2
@@ -281,7 +281,7 @@ class ImageDataGenerator(object):
         return NumpyArrayIterator(
             X, y, self,
             batch_size=batch_size, shuffle=shuffle, seed=seed,
-            dim_ordering=self.dim_ordering,
+            data_format=self.data_format,
             save_to_dir=save_to_dir, save_prefix=save_prefix,
             save_format=save_format)
 
@@ -297,7 +297,7 @@ class ImageDataGenerator(object):
             directory, self, resize=resize,
             target_size=target_size, color_mode=color_mode,
             classes=classes, class_mode=class_mode,
-            dim_ordering=self.dim_ordering,
+            data_format=self.data_format,
             batch_size=batch_size, shuffle=shuffle, seed=seed,
             gt_directory=gt_directory,
             save_to_dir=save_to_dir, save_prefix=save_prefix,
@@ -316,7 +316,7 @@ class ImageDataGenerator(object):
             directory, self, resize=resize,
             target_size=target_size, color_mode=color_mode,
             classes=classes, class_mode=class_mode,
-            dim_ordering=self.dim_ordering,
+            data_format=self.data_format,
             batch_size=batch_size, shuffle=shuffle, seed=seed,
             gt_directory=gt_directory,
             save_to_dir=save_to_dir, save_prefix=save_prefix,
@@ -326,7 +326,7 @@ class ImageDataGenerator(object):
 
     def standardize(self, x, y=None):
         if self.imageNet:
-            if self.dim_ordering == 'th':
+            if self.data_format == 'channels_first':
                 # 'RGB'->'BGR'
                 x = x[::-1, :, :]
                 # Zero-center by mean pixel
@@ -343,7 +343,7 @@ class ImageDataGenerator(object):
             return x
 
         # if self.imageNet:
-        #     if self.dim_ordering == 'th':
+        #     if self.data_format == 'channels_first':
         #         # 'RGB'->'BGR'
         #         x = x[::-1, :, :]
         #         # Zero-center by mean pixel
@@ -625,7 +625,7 @@ class ImageDataGenerator(object):
                 #print('Data augmentation: Crop width >= image size')
                 left, crop[1] = 0, w
 
-            if self.dim_ordering == 'th':
+            if self.data_format == 'channels_first':
                 x = x[..., :, top:top+crop[0], left:left+crop[1]]
                 if y is not None:
                     if self.has_gt_image:
@@ -690,7 +690,7 @@ class ImageDataGenerator(object):
         if X.shape[self.channel_index] not in {1, 3, 4}:
             raise ValueError(
                 'Expected input to be images (as Numpy array) '
-                'following the dimension ordering convention "' + self.dim_ordering + '" '
+                'following the dimension ordering convention "' + self.data_format + '" '
                 '(channels on axis ' + str(self.channel_index) + '), i.e. expected '
                 'either 1, 3 or 4 channels on axis ' + str(self.channel_index) + '. '
                 'However, it was passed an array with shape ' + str(X.shape) +
@@ -858,14 +858,14 @@ class DirectoryIterator(Iterator):
 
     def __init__(self, directory, image_data_generator,
                  resize=None, target_size=None, color_mode='rgb',
-                 dim_ordering='default',
+                 data_format='default',
                  classes=None, class_mode='categorical',
                  batch_size=32, shuffle=True, seed=None, gt_directory=None,
                  save_to_dir=None, save_prefix='', save_format='jpeg'):
         # Check dim order
-        if dim_ordering == 'default':
-            dim_ordering = K.image_dim_ordering()
-        self.dim_ordering = dim_ordering
+        if data_format == 'default':
+            data_format = K.image_data_format()
+        self.data_format = data_format
 
         self.directory = directory
         self.gt_directory = gt_directory
@@ -887,7 +887,7 @@ class DirectoryIterator(Iterator):
         self.color_mode = color_mode
         if self.color_mode == 'rgb' or self.color_mode == 'bgr':
             self.grayscale = False
-            if self.dim_ordering == 'tf':
+            if self.data_format == 'channels_last':
                 self.image_shape = self.target_size + (3,)
                 self.gt_image_shape = self.target_size + (1,)
             else:
@@ -895,7 +895,7 @@ class DirectoryIterator(Iterator):
                 self.gt_image_shape = (1,) + self.target_size
         else:
             self.grayscale = True
-            if self.dim_ordering == 'tf':
+            if self.data_format == 'channels_last':
                 self.image_shape = self.target_size + (1,)
                 self.gt_image_shape = self.image_shape
             else:
@@ -984,7 +984,7 @@ class DirectoryIterator(Iterator):
             img = load_img(os.path.join(self.directory, fname),
                            grayscale=self.grayscale,
                            resize=self.resize, order=1)
-            x = img_to_array(img, dim_ordering=self.dim_ordering)
+            x = img_to_array(img, data_format=self.data_format)
 
             # Load GT image if segmentation
             if self.has_gt_image:
@@ -992,7 +992,7 @@ class DirectoryIterator(Iterator):
                 gt_img = load_img(os.path.join(self.gt_directory, fname),
                                   grayscale=True,
                                   resize=self.resize, order=0)
-                y = img_to_array(gt_img, dim_ordering=self.dim_ordering)
+                y = img_to_array(gt_img, data_format=self.data_format)
             else:
                 y = None
 
@@ -1051,7 +1051,7 @@ class DirectoryIterator(Iterator):
                               void_label)
 
                 else:
-                    img = array_to_img(batch_x[i], self.dim_ordering,
+                    img = array_to_img(batch_x[i], self.data_format,
                                        scale=True)
                     img.save(os.path.join(self.save_to_dir, fname))
 
@@ -1078,7 +1078,7 @@ class DirectoryIterator2(object):
 
     def __init__(self, directory, image_data_generator,
                  resize=None, target_size=None, color_mode='rgb',
-                 dim_ordering='default',
+                 data_format='default',
                  classes=None, class_mode='categorical',
                  batch_size=32, shuffle=True, seed=None, gt_directory=None,
                  save_to_dir=None, save_prefix='', save_format='jpeg',
@@ -1088,7 +1088,7 @@ class DirectoryIterator2(object):
             directory, image_data_generator, resize=resize,
             target_size=target_size, color_mode=color_mode,
             classes=classes, class_mode=class_mode,
-            dim_ordering=dim_ordering,
+            data_format=data_format,
             batch_size=batch_size, shuffle=shuffle, seed=seed,
             gt_directory=gt_directory,
             save_to_dir=save_to_dir, save_prefix=save_prefix,
@@ -1098,7 +1098,7 @@ class DirectoryIterator2(object):
             directory2, image_data_generator, resize=resize,
             target_size=target_size, color_mode=color_mode,
             classes=classes, class_mode=class_mode,
-            dim_ordering=dim_ordering,
+            data_format=data_format,
             batch_size=batch_size2, shuffle=shuffle, seed=seed,
             gt_directory=gt_directory2,
             save_to_dir=save_to_dir, save_prefix=save_prefix,

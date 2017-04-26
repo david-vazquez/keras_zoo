@@ -1,5 +1,5 @@
 from theano import tensor as T
-from keras.utils.np_utils import conv_input_length
+from keras.utils.conv_utils import conv_input_length
 
 
 def _preprocess_conv2d_input(x, dim_ordering):

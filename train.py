@@ -38,7 +38,7 @@ def process(configuration):
     # Create the callbacks
     print ('\n > Creating callbacks...')
     cb = Callbacks_Factory().make(cf, valid_gen)
-
+    
     try:
         if cf.train_model:
             # Train the model

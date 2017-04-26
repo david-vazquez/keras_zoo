@@ -22,7 +22,7 @@ from keras.layers.core import Activation
 
 from keras import backend as K
 from keras.optimizers import RMSprop
-from keras.utils.visualize_util import plot
+from keras.utils.vis_utils import plot_model
 from metrics.metrics import cce_flatt, IoU
 
 

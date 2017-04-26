@@ -1,6 +1,6 @@
 # Imports
 from keras import backend as K
-dim_ordering = K.image_dim_ordering()
+data_format = K.image_data_format()
 from keras.callbacks import (Callback, Progbar, ProgbarLogger,
                              LearningRateScheduler)
 from keras.engine.training import GeneratorEnqueuer
@@ -174,7 +174,7 @@ class Save_results(Callback):
 
         # Create a data generator
         enqueuer = GeneratorEnqueuer(self.generator, pickle_safe=True)
-        enqueuer.start(nb_worker=self.nb_worker, max_q_size=self.max_q_size,
+        enqueuer.start(workers=self.nb_worker, max_q_size=self.max_q_size,
                        wait_time=0.05)
 
         # Process the dataset
@@ -195,7 +195,7 @@ class Save_results(Callback):
             y_pred = self.model.predict(x_true)
 
             # Reshape y_true and compute the y_pred argmax
-            if K.image_dim_ordering() == 'th':
+            if K.image_data_format() == 'channels_first':
                 y_pred = np.argmax(y_pred, axis=1)
                 y_true = np.reshape(y_true, (y_true.shape[0], y_true.shape[2],
                                              y_true.shape[3]))

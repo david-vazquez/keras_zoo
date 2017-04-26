@@ -41,7 +41,7 @@ class Dataset_Generators():
                                        spline_warp=cf.da_spline_warp,
                                        warp_sigma=cf.da_warp_sigma,
                                        warp_grid_size=cf.da_warp_grid_size,
-                                       dim_ordering='th' if 'yolo' in cf.model_name else 'default',
+                                       data_format='channels_first' if 'yolo' in cf.model_name else 'default',
                                        class_mode=cf.dataset.class_mode
                                        )
 
@@ -109,7 +109,7 @@ class Dataset_Generators():
                                        gcn=cf.norm_gcn,
                                        zca_whitening=cf.norm_zca_whitening,
                                        crop_size=cf.crop_size_valid,
-                                       dim_ordering='th' if 'yolo' in cf.model_name else 'default',
+                                       data_format='channels_first' if 'yolo' in cf.model_name else 'default',
                                        class_mode=cf.dataset.class_mode)
             valid_gen = dg_va.flow_from_directory(directory=cf.dataset.path_valid_img,
                                                   gt_directory=cf.dataset.path_valid_mask,
@@ -139,7 +139,7 @@ class Dataset_Generators():
                                        gcn=cf.norm_gcn,
                                        zca_whitening=cf.norm_zca_whitening,
                                        crop_size=cf.crop_size_test,
-                                       dim_ordering='th' if 'yolo' in cf.model_name else 'default',
+                                       data_format='channels_first' if 'yolo' in cf.model_name else 'default',
                                        class_mode=cf.dataset.class_mode)
             test_gen = dg_ts.flow_from_directory(directory=cf.dataset.path_test_img,
                                                  gt_directory=cf.dataset.path_test_mask,

@@ -1,5 +1,5 @@
 from keras.layers.convolutional import Convolution2D
-from keras.utils.np_utils import conv_input_length
+from keras.utils.conv_utils import conv_input_length
 from keras import backend as K
 dim_ordering = K.image_dim_ordering()
 if dim_ordering == 'th':

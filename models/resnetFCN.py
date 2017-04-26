@@ -9,7 +9,7 @@ from keras.layers.normalization import BatchNormalization
 from keras.layers.core import Activation, Dropout
 from keras.layers import merge
 from keras.regularizers import l2
-from keras import initializations
+from keras import initializers
 
 # Custom layers import
 from layers.ourlayers import (CropLayer2D, NdSoftmax)
