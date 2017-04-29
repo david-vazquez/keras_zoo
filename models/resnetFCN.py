@@ -4,27 +4,29 @@ import numpy as np
 # Keras imports
 from keras.models import Model
 from keras.layers import Input
-from keras.layers.convolutional import (Convolution2D, AtrousConvolution2D)
+from keras.layers.convolutional import (Conv2D, Deconvolution2D)
 from keras.layers.normalization import BatchNormalization
 from keras.layers.core import Activation, Dropout
 from keras.layers import merge
 from keras.regularizers import l2
 from keras import initializers
+from keras import layers
 
 # Custom layers import
 from layers.ourlayers import (CropLayer2D, NdSoftmax)
-from layers.deconv import Deconvolution2D
+# from layers.deconv import Deconvolution2D
 from initializations.initializations import bilinear_init
 from tools.numpy2keras import load_numpy
 
 # Keras dim orders
 from keras import backend as K
-dim_ordering = K.image_dim_ordering()
-if dim_ordering == 'th':
-    channel_idx = 1
-else:
-    channel_idx = 3
-
+def channel_idx():
+    if K.image_data_format() == 'channels_first':
+        return 1
+    elif  K.image_data_format() == 'channels_last':
+        return 3
+    else:
+        raise ValueError('Unknown image shape')
 
 # Paper: https://arxiv.org/abs/1611.10080
 # Original code in Mxnet: https://github.com/itijyou/ademxapp
@@ -34,24 +36,16 @@ else:
 def bn_relu_conv(inputs, n_filters, filter_size, stride, dropout,
                  use_bias, dilation=1, name=None, l2_reg=0.):
 
-    first = BatchNormalization(mode=0, axis=channel_idx, name="bn"+name)(inputs)
+    first = BatchNormalization(axis=channel_idx(), name="bn"+name)(inputs)
     first = Activation('relu', name="res"+name+"_relu")(first)
     if dropout > 0:
         first = Dropout(dropout, name="res"+name+"_dropout")(first)
 
-    if dilation == 1:
-        second = Convolution2D(n_filters, filter_size, filter_size,
-                               'he_normal', subsample=(stride, stride),
-                               bias=use_bias, border_mode='same',
-                               name="res"+name,
-                               W_regularizer=l2(l2_reg))(first)
-    else:
-        second = AtrousConvolution2D(n_filters, filter_size, filter_size,
-                                     'he_normal', subsample=(stride, stride),
-                                     atrous_rate=(dilation, dilation),
-                                     border_mode='same', bias=use_bias,
-                                     name="res"+name,
-                                     W_regularizer=l2(l2_reg))(first)
+    second = Conv2D(n_filters, (filter_size, filter_size),
+                    kernel_initializer='he_normal', strides=(stride, stride),
+                    use_bias=use_bias, dilation_rate=(dilation, dilation),
+                    padding='same', name="res"+name,
+                    kernel_regularizer=l2(l2_reg))(first)
 
     return first, second
 
@@ -84,14 +78,16 @@ def create_block_n(inputs, n_filters, filter_size, strides, dropouts,
         shortcut = inputs
     else:
         shortcut_name = "res"+name[0:-1]+"1"
-        shortcut = Convolution2D(n_filters[-1], 1, 1, 'he_normal',
-                                 subsample=(strides[0], strides[0]),
-                                 bias=False, name=shortcut_name,
-                                 W_regularizer=l2(l2_reg))(shortcut0)
+        shortcut = Conv2D(n_filters[-1], (1, 1),
+                          kernel_initializer='he_normal',
+                          strides=(strides[0], strides[0]), use_bias=False,
+                          name=shortcut_name,
+                          kernel_regularizer=l2(l2_reg))(shortcut0)
 
     # Fuse branches
-    fused = merge([last_layer, shortcut], mode='sum',
-                  name="a_plus"+str(plus_lvl))
+#    fused = merge([last_layer, shortcut], mode='sum',
+#                  name="a_plus"+str(plus_lvl))
+    fused = layers.add([last_layer, shortcut], name="a_plus"+str(plus_lvl))
 
     return fused
 
@@ -101,9 +97,8 @@ def create_body(inputs, blocks, n_filters, dilations, strides, dropouts,
                 l2_reg=0.):
 
     # Create the first convolutional layer
-    inputs = Convolution2D(64, 3, 3, bias=False, name="conv1a",
-                           border_mode='same',
-                           W_regularizer=l2(l2_reg))(inputs)
+    inputs = Conv2D(64, (3, 3), use_bias=False, name="conv1a", padding='same',
+                    kernel_regularizer=l2(l2_reg))(inputs)
 
     # Create the next blocks
     cont = 0
@@ -123,24 +118,26 @@ def create_body(inputs, blocks, n_filters, dilations, strides, dropouts,
 # Create the classifier part
 def create_classifier(body, data, n_classes, l2_reg=0.):
     # Include last layers
-    top = BatchNormalization(mode=0, axis=channel_idx, name="bn7")(body)
+    top = BatchNormalization(axis=channel_idx(), name="bn7")(body)
     top = Activation('relu', name="relu7")(top)
-    top = AtrousConvolution2D(512, 3, 3, 'he_normal', atrous_rate=(12, 12),
-                              border_mode='same', name="conv6a",
-                              W_regularizer=l2(l2_reg))(top)
+    top = Conv2D(512, (3, 3), kernel_initializer='he_normal',
+                 dilation_rate=(12, 12), padding='same', name="conv6a",
+                 kernel_regularizer=l2(l2_reg))(top)
     top = Activation('relu', name="conv6a_relu")(top)
     name = "hyperplane_num_cls_%d_branch_%d" % (n_classes, 12)
 
-    def my_init(shape, name=None, dim_ordering='th'):
-        return initializations.normal(shape, scale=0.01, name=name)
-    top = AtrousConvolution2D(n_classes, 3, 3, my_init,
-                              atrous_rate=(12, 12), border_mode='same',
-                              name=name, W_regularizer=l2(l2_reg))(top)
 
-    top = Deconvolution2D(n_classes, 16, 16, top._keras_shape, bilinear_init,
-                          'linear', border_mode='valid', subsample=(8, 8),
-                          bias=False, name="upscaling_"+str(n_classes),
-                          W_regularizer=l2(l2_reg))(top)
+    def my_init(shape, dtype=None):
+        return K.random_normal(shape, stddev=0.01, dtype=dtype)
+    top = Conv2D(n_classes, (3, 3), kernel_initializer=my_init,
+                 dilation_rate=(12, 12), padding='same',
+                 name=name, kernel_regularizer=l2(l2_reg))(top)
+
+    top = Deconvolution2D(n_classes, (16, 16),
+                          kernel_initializer=bilinear_init,
+                          activation='linear', padding='valid', strides=(8, 8),
+                          use_bias=False, name="upscaling_"+str(n_classes),
+                          kernel_regularizer=l2(l2_reg))(top)
 
     top = CropLayer2D(data, name='score')(top)
     top = NdSoftmax()(top)
@@ -170,7 +167,7 @@ def deeplab_resnet38_aspp_ssm(inputs, n_classes, l2_reg=0.):
     top = create_classifier(body, inputs, n_classes, l2_reg)
 
     # Complete model
-    model = Model(input=inputs, output=top)
+    model = Model(inputs=inputs, outputs=top)
 
     return model
 

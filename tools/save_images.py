@@ -10,7 +10,7 @@ from PIL import ImageDraw
 import math
 import skimage.io as io
 from keras import backend as K
-dim_ordering = K.image_dim_ordering()
+data_format = K.image_data_format()
 
 
 # Normalizes image to 0-1 range
@@ -127,7 +127,7 @@ def save_img3(image_batch, mask_batch, output, out_images_folder, epoch,
     images = []
     for j in range(output.shape[0]):
         img = image_batch[j]
-        if dim_ordering == 'th':
+        if data_format == 'channels_first':
             img = img.transpose((1, 2, 0))
 
         #img = norm_01(img, mask_batch[j], void_label)*255
@@ -163,7 +163,7 @@ def save_img4(image_batch, mask_batch, output, output2, out_images_folder,
     images = []
     for j in range(output.shape[0]):
         img = image_batch[j]
-        if dim_ordering == 'th':
+        if data_format == 'channels_first':
             img = img.transpose((1, 2, 0))
         img = norm_01(img, mask_batch[j], void_label)
 
@@ -190,7 +190,7 @@ def save_img4(image_batch, mask_batch, output, output2, out_images_folder,
 
 # Save 2 images (Image and mask)
 def save_img2(img, mask, fname, color_map, void_label):
-    if dim_ordering == 'th':
+    if data_format == 'channels_first':
         img = img.transpose((1, 2, 0))
 
     mask = mask.reshape(mask.shape[1:3])

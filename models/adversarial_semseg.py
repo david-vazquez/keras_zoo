@@ -98,13 +98,14 @@ class Adversarial_Semseg(Model):
         return discriminator
 
 
-
-    def channel_idx(self):
-        dim_ordering = K.image_dim_ordering()
-        if dim_ordering == 'th':
+    # Keras dim orders
+    def channel_idx():
+        if K.image_data_format() == 'channels_first':
             return 1
-        else:
+        elif  K.image_data_format() == 'channels_last':
             return 3
+        else:
+            raise ValueError('Unknown image shape')
 
 
     # To build the discriminator, its a block from SegNet

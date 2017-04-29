@@ -1,6 +1,7 @@
 from keras import backend as K
-dim_ordering = K.image_dim_ordering()
-if dim_ordering == 'th':
+
+data_format = K.image_data_format()
+if data_format == 'channels_first':
     import theano
     from theano import tensor as T
     from theano.scalar.basic import Inv
@@ -73,27 +74,27 @@ def get_input_shape(output_length, filter_size, stride, pad=0):
 class CropLayer2D(Layer):
     def __init__(self, img_in, *args, **kwargs):
         self.img_in = img_in
-        self.dim_ordering = K.image_dim_ordering()
+        self.data_format = K.image_data_format()
         super(CropLayer2D, self).__init__(*args, **kwargs)
 
     def build(self, input_shape):
-        if self.dim_ordering == 'th':
+        if self.data_format == 'channels_first':
             self.crop_size = self.img_in._keras_shape[-2:]
-        if self.dim_ordering == 'tf':
+        if self.data_format == 'channels_last':
             self.crop_size = self.img_in._keras_shape[1:3]
         super(CropLayer2D, self).build(input_shape)
 
     def call(self, x, mask=False):
         input_shape = K.shape(x)
         cs = K.shape(self.img_in)
-        if self.dim_ordering == 'th':
+        if self.data_format == 'channels_first':
             input_shape = input_shape[-2:]
             cs = cs[-2:]
         else:
             input_shape = input_shape[1:3]
             cs = cs[1:3]
         dif = (input_shape - cs)/2
-        if self.dim_ordering == 'th':
+        if self.data_format == 'channels_first':
             if K.ndim(x) == 5:
                 return x[:, :, :, dif[0]:dif[0]+cs[0], dif[1]:dif[1]+cs[1]]
             return x[:, :, dif[0]:dif[0]+cs[0], dif[1]:dif[1]+cs[1]]
@@ -102,19 +103,16 @@ class CropLayer2D(Layer):
                 return x[:, :, dif[0]:dif[0]+cs[0], dif[1]:dif[1]+cs[1], :]
             return x[:, dif[0]:dif[0]+cs[0], dif[1]:dif[1]+cs[1], :]
 
-    def get_output_shape_for(self, input_shape):
-        if self.dim_ordering == 'th':
+    def compute_output_shape(self, input_shape):
+        if self.data_format == 'channels_first':
             return tuple(input_shape[:-2]) + (self.crop_size[0],
                                               self.crop_size[1])
-        if self.dim_ordering == 'tf':
-            return ((input_shape[:1], ) + tuple(self.crop_size) +
+        elif self.data_format == 'channels_last':
+            return ((input_shape[:1]) + (self.crop_size[0],
+                                              self.crop_size[1]) +
                     (input_shape[-1], ))
-
-    # def get_config(self):
-    #     config = {'img_in': self.img_in,
-    #               'dim_ordering': self.dim_ordering}
-    #     base_config = super(CropLayer2D, self).get_config()
-    #     return dict(list(base_config.items()) + list(config.items()))
+        else:
+            raise ValueError('Invalid data format: {0}'.format(data_format))
 
 
 class MergeSequences(Layer):
@@ -159,18 +157,18 @@ class NdSoftmax(Layer):
     Will compute the Softmax on channel_idx and return a tensor of the
     same shape as the input
     '''
-    def __init__(self, dim_ordering='default', *args, **kwargs):
+    def __init__(self, data_format='default', *args, **kwargs):
 
-        if dim_ordering == 'default':
-            dim_ordering = K.image_dim_ordering()
-        if dim_ordering == 'th':
+        if data_format == 'default':
+            data_format = K.image_data_format()
+        if data_format == 'channels_first':
             self.channel_index = 1
-        if dim_ordering == 'tf':
+        if data_format == 'channels_last':
             self.channel_index = 3
 
         super(NdSoftmax, self).__init__(*args, **kwargs)
 
-    def get_output_shape_for(self, input_shape):
+    def compute_output_shape(self, input_shape):
         return input_shape
 
     def call(self, x, mask=None):
@@ -192,18 +190,18 @@ class DePool2D(UpSampling2D):
     '''Simplar to UpSample, yet traverse only maxpooled elements
     # Input shape
         4D tensor with shape:
-        `(samples, channels, rows, cols)` if dim_ordering='th'
+        `(samples, channels, rows, cols)` if data_format='channels_first'
         or 4D tensor with shape:
-        `(samples, rows, cols, channels)` if dim_ordering='tf'.
+        `(samples, rows, cols, channels)` if data_format='channels_last'.
     # Output shape
         4D tensor with shape:
         `(samples, channels, upsampled_rows, upsampled_cols)` if
-        dim_ordering='th' or 4D tensor with shape:
+        data_format='channels_first' or 4D tensor with shape:
         `(samples, upsampled_rows, upsampled_cols, channels)` if
-        dim_ordering='tf'.
+        data_format='channels_last'.
     # Arguments
         size: tuple of 2 integers. The upsampling factors for rows and columns.
-        dim_ordering: 'th' or 'tf'.
+        data_format: 'channels_first' or 'channels_last'.
             In 'th' mode, the channels dimension (the depth)
             is at index 1, in 'tf' mode is it at index 3.
     '''
@@ -215,60 +213,16 @@ class DePool2D(UpSampling2D):
 
     def get_output(self, train=False):
         X = self.get_input(train)
-        if self.dim_ordering == 'th':
+        if self.data_format == 'channels_first':
             output = K.repeat_elements(X, self.size[0], axis=2)
             output = K.repeat_elements(output, self.size[1], axis=3)
-        elif self.dim_ordering == 'tf':
+        elif self.data_format == 'channels_last':
             output = K.repeat_elements(X, self.size[0], axis=1)
             output = K.repeat_elements(output, self.size[1], axis=2)
         else:
-            raise Exception('Invalid dim_ordering: ' + self.dim_ordering)
+            raise Exception('Invalid data_format: ' + self.data_format)
 
         f = T.grad(T.sum(self._pool2d_layer.get_output(train)),
                    wrt=self._pool2d_layer.get_input(train)) * output
 
         return f
-
-
-# 1D Bilinear interpolation for even size filters
-def bilinear1D(ratio, normalize=True):
-    half_kern = T.arange(1, ratio+1, dtype=theano.config.floatX)
-    kern = T.concatenate([half_kern, half_kern[-1::-1]])
-    if normalize:
-        kern /= (ratio)
-    return kern
-
-
-# 2D Bilinear interpolation for even size filters
-def bilinear2D(ratio, normalize=True):
-    hkern = bilinear1D(ratio=ratio, normalize=normalize).dimshuffle('x', 0)
-    vkern = bilinear1D(ratio=ratio, normalize=normalize).dimshuffle(0, 'x')
-    kern = hkern * vkern
-    return kern
-
-
-# 4D Bilinear interpolation for even size filters
-def bilinear4D_(ratio, num_input_channels, num_filters, normalize=True):
-    kern = bilinear2D(ratio=ratio, normalize=normalize)
-    kern = kern.dimshuffle('x', 'x', 0, 1)
-    kern = T.extra_ops.repeat(kern, num_input_channels, axis=0)
-    kern = T.extra_ops.repeat(kern, num_filters, axis=1)
-    return kern.eval()
-
-
-def bilinear4D(ratio, num_input_channels, num_filters, normalize=True):
-    W = bilinear4D_(ratio, num_input_channels, num_filters, normalize)
-    for i in range(num_input_channels):
-        for j in range(num_filters):
-            if i != j:
-                W[i, j, :, :] = 0
-    return W
-
-
-# 4D Bilinear interpolation for even size filters
-def bilinear4D_T(ratio, num_input_channels, num_filters, normalize=True):
-    kern = T.nnet.abstract_conv.bilinear_kernel_2D(ratio, normalize=True)
-    kern = kern.dimshuffle('x', 'x', 0, 1)
-    kern = T.extra_ops.repeat(kern, num_input_channels, axis=0)
-    kern = T.extra_ops.repeat(kern, num_filters, axis=1)
-    return kern.eval()

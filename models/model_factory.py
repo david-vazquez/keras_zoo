@@ -21,7 +21,7 @@ from models.unet import build_unet
 from models.segnet import build_segnet
 from models.resnetFCN import build_resnetFCN
 from models.densenetFCN import build_densenetFCN
-from models.densenetFCNtitu import DenseNetFCN
+# from models.densenetFCNtitu import DenseNetFCN
 # Adversarial models
 from models.adversarial_semseg import Adversarial_Semseg
 
@@ -37,14 +37,16 @@ class Model_Factory():
     def basic_model_properties(self, cf, variable_input_size):
         # Define the input size, loss and metrics
         if cf.dataset.class_mode == 'categorical':
-            if K.image_dim_ordering() == 'th':
+            if K.image_data_format() == 'channels_first':
                 in_shape = (cf.dataset.n_channels,
                             cf.target_size_train[0],
                             cf.target_size_train[1])
-            else:
+            elif K.image_data_format() == 'channels_last':
                 in_shape = (cf.target_size_train[0],
                             cf.target_size_train[1],
                             cf.dataset.n_channels)
+            else:
+                raise ValueError('Unknown image data format')
             loss = 'categorical_crossentropy'
             metrics = ['accuracy']
         elif cf.dataset.class_mode == 'detection':
@@ -55,20 +57,22 @@ class Model_Factory():
             loss = YOLOLoss(in_shape, cf.dataset.n_classes, cf.dataset.priors)
             metrics = [YOLOMetrics(in_shape, cf.dataset.n_classes, cf.dataset.priors)]
         elif cf.dataset.class_mode == 'segmentation':
-            if K.image_dim_ordering() == 'th':
+            if K.image_data_format() == 'channels_first':
                 if variable_input_size:
                     in_shape = (cf.dataset.n_channels, None, None)
                 else:
                     in_shape = (cf.dataset.n_channels,
                                 cf.target_size_train[0],
                                 cf.target_size_train[1])
-            else:
+            elif K.image_data_format() == 'channels_last':
                 if variable_input_size:
                     in_shape = (None, None, cf.dataset.n_channels)
                 else:
                     in_shape = (cf.target_size_train[0],
                                 cf.target_size_train[1],
                                 cf.dataset.n_channels)
+            else:
+                raise ValueError('Unknown image data format')
             loss = cce_flatt(cf.dataset.void_class, cf.dataset.cb_weights)
             #metrics = [IoU(cf.dataset.n_classes, cf.dataset.void_class)]
             metrics = []
@@ -133,7 +137,7 @@ class Model_Factory():
                                       path_weights=None)
         elif cf.model_name == 'densenetFCN_titu':
             model = DenseNetFCN(in_shape, nb_dense_block=5, growth_rate=16,
-                                      nb_layers_per_block=4, upsampling_type='deconv', 
+                                      nb_layers_per_block=4, upsampling_type='deconv',
                                       classes=cf.dataset.n_classes,
                                       weight_decay=cf.weight_decay)
         elif cf.model_name == 'lenet':

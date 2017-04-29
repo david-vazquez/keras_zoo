@@ -53,38 +53,38 @@ class YOLOConvolution2D(Layer):
             (eg. maxnorm, nonneg), applied to the main weights matrix.
         b_constraint: instance of the [constraints](../constraints.md) module,
             applied to the bias.
-        dim_ordering: 'th' or 'tf'. In 'th' mode, the channels dimension
-            (the depth) is at index 1, in 'tf' mode is it at index 3.
-            It defaults to the `image_dim_ordering` value found in your
+        data_format: 'channels_first' or 'channels_last'. In 'th' mode, the channels dimension
+            (the depth) is at index 1, in 'channels_last' mode is it at index 3.
+            It defaults to the `image_data_format` value found in your
             Keras config file at `~/.keras/keras.json`.
-            If you never set it, then it will be "tf".
+            If you never set it, then it will be "channels_last".
         bias: whether to include a bias
             (i.e. make the layer affine rather than linear).
 
     # Input shape
         4D tensor with shape:
-        `(samples, channels, rows, cols)` if dim_ordering='th'
+        `(samples, channels, rows, cols)` if data_format='channels_first'
         or 4D tensor with shape:
-        `(samples, rows, cols, channels)` if dim_ordering='tf'.
+        `(samples, rows, cols, channels)` if data_format='channels_last'.
 
     # Output shape
         4D tensor with shape:
-        `(samples, nb_filter, new_rows, new_cols)` if dim_ordering='th'
+        `(samples, nb_filter, new_rows, new_cols)` if data_format='channels_first'
         or 4D tensor with shape:
-        `(samples, new_rows, new_cols, nb_filter)` if dim_ordering='tf'.
+        `(samples, new_rows, new_cols, nb_filter)` if data_format='channels_last'.
         `rows` and `cols` values might have changed due to padding.
     """
 
     def __init__(self, nb_filter, nb_row, nb_col,
                  init='glorot_uniform', activation=None, weights=None,
-                 border_mode='valid', subsample=(1, 1), dim_ordering='default',
+                 border_mode='valid', subsample=(1, 1), data_format='default',
                  W_regularizer=None, b_regularizer=None, activity_regularizer=None,
                  W_constraint=None, b_constraint=None,
                  bias=True, epsilon=1e-3, momentum=0.99,
                  beta_init='zero', gamma_init='one',
                  gamma_regularizer=None, beta_regularizer=None, **kwargs):
-        if dim_ordering == 'default':
-            dim_ordering = K.image_dim_ordering()
+        if data_format == 'default':
+            data_format = K.image_data_format()
         if border_mode not in {'valid', 'same', 'full'}:
             raise ValueError('Invalid border mode for Convolution2D:', border_mode)
         self.nb_filter = nb_filter
@@ -94,9 +94,9 @@ class YOLOConvolution2D(Layer):
         self.activation = activations.get(activation)
         self.border_mode = border_mode
         self.subsample = tuple(subsample)
-        if dim_ordering not in {'tf', 'th'}:
-            raise ValueError('dim_ordering must be in {tf, th}.')
-        self.dim_ordering = dim_ordering
+        if data_format not in {'channels_first', 'channels_last'}:
+            raise ValueError('data_format must be in {channels_first, channels_last}.')
+        self.data_format = data_format
 
         self.W_regularizer = regularizers.get(W_regularizer)
         self.b_regularizer = regularizers.get(b_regularizer)
@@ -121,17 +121,17 @@ class YOLOConvolution2D(Layer):
         super(YOLOConvolution2D, self).__init__(**kwargs)
 
     def build(self, input_shape):
-        if self.dim_ordering == 'th':
+        if self.data_format == 'channels_first':
             stack_size = input_shape[1]
             self.W_shape = (self.nb_filter, stack_size, self.nb_row, self.nb_col)
-        elif self.dim_ordering == 'tf':
+        elif self.data_format == 'channels_last':
             stack_size = input_shape[3]
             self.W_shape = (self.nb_row, self.nb_col, stack_size, self.nb_filter)
         else:
-            raise ValueError('Invalid dim_ordering:', self.dim_ordering)
+            raise ValueError('Invalid data_format:', self.data_format)
         self.W = self.add_weight(self.W_shape,
                                  initializer=functools.partial(self.init,
-                                                               dim_ordering=self.dim_ordering),
+                                                               data_format=self.data_format),
                                  name='{}_W'.format(self.name),
                                  regularizer=self.W_regularizer,
                                  constraint=self.W_constraint)
@@ -168,29 +168,29 @@ class YOLOConvolution2D(Layer):
         self.built = True
 
     def get_output_shape_for(self, input_shape):
-        if self.dim_ordering == 'th':
+        if self.data_format == 'channels_first':
             rows = input_shape[2]
             cols = input_shape[3]
-        elif self.dim_ordering == 'tf':
+        elif self.data_format == 'channels_last':
             rows = input_shape[1]
             cols = input_shape[2]
         else:
-            raise ValueError('Invalid dim_ordering:', self.dim_ordering)
+            raise ValueError('Invalid data_format:', self.data_format)
 
         rows = conv_output_length(rows, self.nb_row,
                                   self.border_mode, self.subsample[0])
         cols = conv_output_length(cols, self.nb_col,
                                   self.border_mode, self.subsample[1])
 
-        if self.dim_ordering == 'th':
+        if self.data_format == 'channels_first':
             return (input_shape[0], self.nb_filter, rows, cols)
-        elif self.dim_ordering == 'tf':
+        elif self.data_format == 'channels_last':
             return (input_shape[0], rows, cols, self.nb_filter)
 
     def call(self, x, mask=None):
         output = K.conv2d(x, self.W, strides=self.subsample,
                           border_mode=self.border_mode,
-                          dim_ordering=self.dim_ordering,
+                          data_format=self.data_format,
                           filter_shape=self.W_shape)
 
         # added for batch normalization
@@ -230,12 +230,12 @@ class YOLOConvolution2D(Layer):
 
 
         if self.bias:
-            if self.dim_ordering == 'th':
+            if self.data_format == 'channels_first':
                 output_normed += K.reshape(self.b, (1, self.nb_filter, 1, 1))
-            elif self.dim_ordering == 'tf':
+            elif self.data_format == 'channels_last':
                 output_normed += K.reshape(self.b, (1, 1, 1, self.nb_filter))
             else:
-                raise ValueError('Invalid dim_ordering:', self.dim_ordering)
+                raise ValueError('Invalid data_format:', self.data_format)
         output = self.activation(output_normed)
         return output
 
@@ -247,7 +247,7 @@ class YOLOConvolution2D(Layer):
                   'activation': self.activation.__name__,
                   'border_mode': self.border_mode,
                   'subsample': self.subsample,
-                  'dim_ordering': self.dim_ordering,
+                  'data_format': self.data_format,
                   'W_regularizer': self.W_regularizer.get_config() if self.W_regularizer else None,
                   'b_regularizer': self.b_regularizer.get_config() if self.b_regularizer else None,
                   'activity_regularizer': self.activity_regularizer.get_config() if self.activity_regularizer else None,
@@ -267,7 +267,7 @@ class Reorg(Layer):
     """ This class implements REORG layer as in Darknet framework.
     When we bring finer grained features in from earlier in the network, the reorg layer
     makes these features match the feature map size at the later layer.
-    E.g. if the end feature map is 13x13 and the feature map from earlier is 26x26x512, 
+    E.g. if the end feature map is 13x13 and the feature map from earlier is 26x26x512,
     the reorg layer maps the 26x26x512 feature map onto a 13x13x2048 feature map so that
     it can be concatenated with the feature maps at 13x13 resolution.
     The Darknet reorg layer does not only perform a simple reshape, but instead slices
@@ -295,4 +295,3 @@ class Reorg(Layer):
 
     def get_output_shape_for(self, input_shape):
         return (input_shape[0], input_shape[1]*4, input_shape[2]/2, input_shape[3]/2)
-

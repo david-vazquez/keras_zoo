@@ -60,7 +60,7 @@ def YOLO(input_shape=(3,416,416),num_classes=80,num_priors=5):
         https://arxiv.org/abs/1612.08242
         https://arxiv.org/abs/1506.02640
     """
-    K.set_image_dim_ordering('th')
+    K.set_image_data_format('channels_first')
 
     net={}
     input_tensor = Input(shape=input_shape)
@@ -152,7 +152,7 @@ def TinyYOLO(input_shape=(3,416,416),num_classes=80,num_priors=5):
         https://arxiv.org/abs/1612.08242
         https://arxiv.org/abs/1506.02640
     """
-    K.set_image_dim_ordering('th')
+    K.set_image_data_format('channels_first')
 
     net={}
     input_tensor = Input(shape=input_shape)
@@ -192,5 +192,3 @@ def TinyYOLO(input_shape=(3,416,416),num_classes=80,num_priors=5):
 
     model = Model(net['input'], net['conv9'])
     return model
-
-

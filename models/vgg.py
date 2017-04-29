@@ -38,7 +38,7 @@ def build_vgg(img_shape=(3, 224, 224), n_classes=1000, n_layers=16, l2_reg=0.,
     predictions = Activation("softmax", name="softmax")(x)
 
     # This is the model we will train
-    model = Model(input=base_model.input, output=predictions)
+    model = Model(inputs=base_model.input, outputs=predictions)
 
     # Freeze some layers
     if freeze_layers_from is not None:

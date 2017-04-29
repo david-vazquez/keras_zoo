@@ -1,14 +1,14 @@
 # Dataset
 problem_type                 = 'classification'  # ['classification' | 'detection' | 'segmentation']
-dataset_name                 = 'mit'           # Dataset name
+dataset_name                 = 'mit_master'    # Dataset name
 dataset_name2                = None            # Second dataset name. None if not Domain Adaptation
 perc_mb2                     = None            # Percentage of data from the second dataset in each minibatch
 
 # Model
-model_name                   = 'densenetFCN'         # Model to use ['fcn8' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19' | 'resnet50' | 'InceptionV3']
-freeze_layers_from           = None    # Freeze layers from 0 to this layer during training (Useful for finetunning) [None | 'base_model' | Layer_id]
-show_model                   = True           # Show the architecture layers
-load_imageNet                = False            # Load Imagenet weights and normalize following imagenet procedure (NOTE: enable norm_imageNet_preprocess)
+model_name                   = 'alexNet'         # Model to use ['fcn8' | 'lenet' | 'alexNet' | 'vgg16' |  'vgg19' | 'resnet50' | 'InceptionV3']
+freeze_layers_from           = None            # Freeze layers from 0 to this layer during training (Useful for finetunning) [None | 'base_model' | Layer_id]
+show_model                   = True            # Show the architecture layers
+load_imageNet                = True           # Load Imagenet weights and normalize following imagenet procedure (NOTE: enable norm_imageNet_preprocess)
 load_pretrained              = False           # Load a pretrained model for doing finetuning
 weights_file                 = 'weights.hdf5'  # Training weight file name
 
@@ -18,7 +18,7 @@ test_model                   = False           # Test the model
 pred_model                   = False           # Predict using the model
 
 # Debug
-debug                        = False           # Use only few images for debuging
+debug                        = True           # Use only few images for debuging
 debug_images_train           = 50              # N images for training in debug mode (-1 means all)
 debug_images_valid           = 50              # N images for validation in debug mode (-1 means all)
 debug_images_test            = 50              # N images for testing in debug mode (-1 means all)
@@ -34,6 +34,8 @@ crop_size_test               = None            # Crop size during testing
 resize_train                 = (224, 224)      # Resize the image during training (Height, Width) or None
 resize_valid                 = (224, 224)      # Resize the image during validation
 resize_test                  = (224, 224)      # Resize the image during testing
+max_q_size                   = 10              # Maximum size for the data generator queue
+workers                      = 5               # Maximum number of processes to spin up when using process based threading
 
 # Data shuffle
 shuffle_train                = True            # Whether to shuffle the training data
@@ -73,6 +75,23 @@ checkpoint_verbose           = 0               # Verbosity of the checkpoint
 # Callback plot
 plotHist_enabled             = True            # Enable the Callback
 plotHist_verbose             = 0               # Verbosity of the callback
+
+
+# Callback learning rate scheduler
+LRScheduler_enabled          = False             # Enable the Callback
+LRScheduler_batch_epoch      = 'batch'          # Schedule the LR each 'batch' or 'epoch'
+LRScheduler_type             = 'linear'         # Type of scheduler ['linear' | 'step' | 'square' | 'sqrt' | 'poly']
+LRScheduler_M                = 75000            # Number of iterations/epochs expected until convergence
+LRScheduler_decay            = 0.1              # Decay for 'step' method
+LRScheduler_S                = 10000            # Step for the 'step' method
+LRScheduler_power            = 0.9              # Power for te poly method
+
+# Callback TensorBoard
+TensorBoard_enabled          = True             # Enable the Callback
+TensorBoard_logs_folder      = None             # Logs folder. If None it would make /home/youruser/TensorBoardLogs/. Either put a regular path.
+TensorBoard_histogram_freq   = 1                # Frequency (in epochs) at which to compute activation histograms for the layers of the model. If set to 0, histograms won't be computed.
+TensorBoard_write_graph      = True             # Whether to visualize the graph in Tensorboard. The log file can become quite large when write_graph is set to True.
+TensorBoard_write_images     = False            # Whether to write model weights to visualize as image in Tensorboard.
 
 # Data augmentation for training and normalization
 norm_imageNet_preprocess           = False     # Normalize following imagenet procedure

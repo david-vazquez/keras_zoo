@@ -13,14 +13,25 @@ Limitations:
 """
 
 # Keras imports
+from keras import layers
 from keras.models import Model
 from keras.layers import (Input, merge)
-from keras.layers.convolutional import (Convolution2D, MaxPooling2D,
-                                        ZeroPadding2D)
+from keras.layers.convolutional import (Conv2D, MaxPooling2D,
+                                        ZeroPadding2D, Deconvolution2D)
 from keras.layers.core import Dropout
 from keras.regularizers import l2
-from layers.deconv import Deconvolution2D
+#from layers.deconv import Deconvolution2D
 from layers.ourlayers import (CropLayer2D, NdSoftmax)
+
+# Keras dim orders
+from keras import backend as K
+def channel_idx():
+    if K.image_data_format() == 'channels_first':
+        return 1
+    elif  K.image_data_format() == 'channels_last':
+        return 3
+    else:
+        raise ValueError('Unknown image shape')
 
 
 def build_unet(img_shape=(3, None, None), nclasses=8, l2_reg=0.,
@@ -36,91 +47,111 @@ def build_unet(img_shape=(3, None, None), nclasses=8, l2_reg=0.,
     padded = ZeroPadding2D(padding=(padding, padding), name='padded')(inputs)
 
     # Block 1
-    conv1_1 = Convolution2D(64, 3, 3, init, 'relu', border_mode='valid',
-                            name='conv1_1', W_regularizer=l2(l2_reg))(padded)
-    conv1_2 = Convolution2D(64, 3, 3, init, 'relu', border_mode='valid',
-                            name='conv1_2', W_regularizer=l2(l2_reg))(conv1_1)
+    conv1_1 = Conv2D(64, (3, 3), kernel_initializer=init, activation='relu',
+                     padding='valid', name='conv1_1',
+                     kernel_regularizer=l2(l2_reg))(padded)
+    conv1_2 = Conv2D(64, (3, 3), kernel_initializer=init, activation='relu',
+                     padding='valid', name='conv1_2',
+                     kernel_regularizer=l2(l2_reg))(conv1_1)
     pool1 = MaxPooling2D((2, 2), (2, 2), name='pool1')(conv1_2)
 
     # Block 2
-    conv2_1 = Convolution2D(128, 3, 3, init, 'relu', border_mode='valid',
-                            name='conv2_1', W_regularizer=l2(l2_reg))(pool1)
-    conv2_2 = Convolution2D(128, 3, 3, init, 'relu', border_mode='valid',
-                            name='conv2_2', W_regularizer=l2(l2_reg))(conv2_1)
+    conv2_1 = Conv2D(128, (3, 3), kernel_initializer=init, activation='relu',
+                     padding='valid', name='conv2_1',
+                     kernel_regularizer=l2(l2_reg))(pool1)
+    conv2_2 = Conv2D(128, (3, 3), kernel_initializer=init, activation='relu',
+                     padding='valid', name='conv2_2',
+                     kernel_regularizer=l2(l2_reg))(conv2_1)
     pool2 = MaxPooling2D((2, 2), (2, 2), name='pool2')(conv2_2)
 
     # Block 3
-    conv3_1 = Convolution2D(256, 3, 3, init, 'relu', border_mode='valid',
-                            name='conv3_1', W_regularizer=l2(l2_reg))(pool2)
-    conv3_2 = Convolution2D(256, 3, 3, init, 'relu', border_mode='valid',
-                            name='conv3_2', W_regularizer=l2(l2_reg))(conv3_1)
+    conv3_1 = Conv2D(256, (3, 3), kernel_initializer=init, activation='relu',
+                     padding='valid', name='conv3_1',
+                     kernel_regularizer=l2(l2_reg))(pool2)
+    conv3_2 = Conv2D(256, (3, 3), kernel_initializer=init, activation='relu',
+                     padding='valid', name='conv3_2',
+                     kernel_regularizer=l2(l2_reg))(conv3_1)
     pool3 = MaxPooling2D((2, 2), (2, 2), name='pool3')(conv3_2)
 
     # Block 4
-    conv4_1 = Convolution2D(512, 3, 3, init, 'relu', border_mode='valid',
-                            name='conv4_1', W_regularizer=l2(l2_reg))(pool3)
-    conv4_2 = Convolution2D(512, 3, 3, init, 'relu', border_mode='valid',
-                            name='conv4_2', W_regularizer=l2(l2_reg))(conv4_1)
+    conv4_1 = Conv2D(512, (3, 3), kernel_initializer=init, activation='relu',
+                     padding='valid', name='conv4_1',
+                     kernel_regularizer=l2(l2_reg))(pool3)
+    conv4_2 = Conv2D(512, (3, 3), kernel_initializer=init, activation='relu',
+                     padding='valid', name='conv4_2',
+                     kernel_regularizer=l2(l2_reg))(conv4_1)
     if dropout:
         conv4_2 = Dropout(0.5, name='drop1')(conv4_2)
     pool4 = MaxPooling2D((2, 2), (2, 2), name='pool4')(conv4_2)
 
     # Block 5
-    conv5_1 = Convolution2D(1024, 3, 3, init, 'relu', border_mode='valid',
-                            name='conv5_1', W_regularizer=l2(l2_reg))(pool4)
-    conv5_2 = Convolution2D(1024, 3, 3, init, 'relu', border_mode='valid',
-                            name='conv5_2', W_regularizer=l2(l2_reg))(conv5_1)
+    conv5_1 = Conv2D(1024, (3, 3), kernel_initializer=init, activation='relu',
+                     padding='valid', name='conv5_1',
+                     kernel_regularizer=l2(l2_reg))(pool4)
+    conv5_2 = Conv2D(1024, (3, 3), kernel_initializer=init, activation='relu',
+                     padding='valid', name='conv5_2',
+                     kernel_regularizer=l2(l2_reg))(conv5_1)
     if dropout:
         conv5_2 = Dropout(0.5, name='drop2')(conv5_2)
     # pool5 = MaxPooling2D((2, 2), (2, 2), name='pool4')(conv5_2)
 
     # Upsampling 1
-    upconv4 = Deconvolution2D(512, 2, 2, conv5_2._keras_shape, init,
-                              'linear', border_mode='valid', subsample=(2, 2),
-                              name='upconv4', W_regularizer=l2(l2_reg))(conv5_2)
+    upconv4 = Deconvolution2D(512, (2, 2), kernel_initializer=init,
+                              activation='linear', padding='valid', strides=(2, 2),
+                              name='upconv4', kernel_regularizer=l2(l2_reg))(conv5_2)
     conv4_2_crop = CropLayer2D(upconv4, name='conv4_2_crop')(conv4_2)
     upconv4_crop = CropLayer2D(upconv4, name='upconv4_crop')(upconv4)
     Concat_4 = merge([conv4_2_crop, upconv4_crop], mode='concat', concat_axis=3, name='Concat_4')
-    conv6_1 = Convolution2D(512, 3, 3, init, 'relu', border_mode='valid',
-                            name='conv6_1', W_regularizer=l2(l2_reg))(Concat_4)
-    conv6_2 = Convolution2D(512, 3, 3, init, 'relu', border_mode='valid',
-                            name='conv6_2', W_regularizer=l2(l2_reg))(conv6_1)
+    # Concat_4 = layers.concatenate([conv4_2_crop, upconv4_crop], axis=channel_idx())
+    conv6_1 = Conv2D(512, (3, 3), kernel_initializer=init, activation='relu',
+                     padding='valid', name='conv6_1',
+                     kernel_regularizer=l2(l2_reg))(Concat_4)
+    conv6_2 = Conv2D(512, (3, 3), kernel_initializer=init, activation='relu',
+                     padding='valid', name='conv6_2',
+                     kernel_regularizer=l2(l2_reg))(conv6_1)
 
     # Upsampling 2
-    upconv3 = Deconvolution2D(256, 2, 2, conv6_2._keras_shape, init,
-                              'linear', border_mode='valid', subsample=(2, 2),
-                              name='upconv3', W_regularizer=l2(l2_reg))(conv6_2)
+    upconv3 = Deconvolution2D(256, (2, 2), kernel_initializer=init,
+                              activation='linear', padding='valid', strides=(2, 2),
+                              name='upconv3', kernel_regularizer=l2(l2_reg))(conv6_2)
     conv3_2_crop = CropLayer2D(upconv3, name='conv3_2_crop')(conv3_2)
     Concat_3 = merge([conv3_2_crop, upconv3], mode='concat', name='Concat_3')
-    conv7_1 = Convolution2D(256, 3, 3, init, 'relu', border_mode='valid',
-                            name='conv7_1', W_regularizer=l2(l2_reg))(Concat_3)
-    conv7_2 = Convolution2D(256, 3, 3, init, 'relu', border_mode='valid',
-                            name='conv7_2', W_regularizer=l2(l2_reg))(conv7_1)
+    conv7_1 = Conv2D(256, (3, 3), kernel_initializer=init, activation='relu',
+                     padding='valid', name='conv7_1',
+                     kernel_regularizer=l2(l2_reg))(Concat_3)
+    conv7_2 = Conv2D(256, (3, 3), kernel_initializer=init, activation='relu',
+                     padding='valid', name='conv7_2',
+                     kernel_regularizer=l2(l2_reg))(conv7_1)
 
     # Upsampling 3
-    upconv2 = Deconvolution2D(128, 2, 2, conv7_2._keras_shape, init,
-                              'linear', border_mode='valid', subsample=(2, 2),
-                              name='upconv2', W_regularizer=l2(l2_reg))(conv7_2)
+    upconv2 = Deconvolution2D(128, (2, 2), kernel_initializer=init,
+                              activation='linear', padding='valid', strides=(2, 2),
+                              name='upconv2', kernel_regularizer=l2(l2_reg))(conv7_2)
     conv2_2_crop = CropLayer2D(upconv2, name='conv2_2_crop')(conv2_2)
     Concat_2 = merge([conv2_2_crop, upconv2], mode='concat', name='Concat_2')
-    conv8_1 = Convolution2D(128, 3, 3, init, 'relu', border_mode='valid',
-                            name='conv8_1', W_regularizer=l2(l2_reg))(Concat_2)
-    conv8_2 = Convolution2D(128, 3, 3, init, 'relu', border_mode='valid',
-                            name='conv8_2', W_regularizer=l2(l2_reg))(conv8_1)
+    conv8_1 = Conv2D(128, (3, 3), kernel_initializer=init, activation='relu',
+                     padding='valid', name='conv8_1',
+                     kernel_regularizer=l2(l2_reg))(Concat_2)
+    conv8_2 = Conv2D(128, (3, 3), kernel_initializer=init, activation='relu',
+                     padding='valid', name='conv8_2',
+                     kernel_regularizer=l2(l2_reg))(conv8_1)
 
     # Upsampling 4
-    upconv1 = Deconvolution2D(64, 2, 2, conv8_2._keras_shape, init,
-                              'linear', border_mode='valid', subsample=(2, 2),
-                              name='upconv1', W_regularizer=l2(l2_reg))(conv8_2)
+    upconv1 = Deconvolution2D(64, (2, 2), kernel_initializer=init,
+                              activation='linear', padding='valid', strides=(2, 2),
+                              name='upconv1', kernel_regularizer=l2(l2_reg))(conv8_2)
     conv1_2_crop = CropLayer2D(upconv1, name='conv1_2_crop')(conv1_2)
     Concat_1 = merge([conv1_2_crop, upconv1], mode='concat', name='Concat_1')
-    conv9_1 = Convolution2D(64, 3, 3, init, 'relu', border_mode='valid',
-                            name='conv9_1', W_regularizer=l2(l2_reg))(Concat_1)
-    conv9_2 = Convolution2D(64, 3, 3, init, 'relu', border_mode='valid',
-                            name='conv9_2', W_regularizer=l2(l2_reg))(conv9_1)
+    conv9_1 = Conv2D(64, (3, 3), kernel_initializer=init, activation='relu',
+                     padding='valid', name='conv9_1',
+                     kernel_regularizer=l2(l2_reg))(Concat_1)
+    conv9_2 = Conv2D(64, (3, 3), kernel_initializerializer=init, activation='relu',
+                     padding='valid', name='conv9_2',
+                     kernel_regularizer=l2(l2_reg))(conv9_1)
 
-    conv10 = Convolution2D(nclasses, 1, 1, init, 'linear', border_mode='valid',
-                           name='conv10', W_regularizer=l2(l2_reg))(conv9_2)
+    conv10 = Conv2D(nclasses, (1, 1), kernel_initializerializer=init, activation='linear',
+                    padding='valid', name='conv10',
+                    kernel_regularizer=l2(l2_reg))(conv9_2)
 
     # Crop
     final_crop = CropLayer2D(inputs, name='final_crop')(conv10)

@@ -18,7 +18,7 @@ def crosschannelnormalization(alpha=1e-4, k=2, beta=0.75, n=5, **kwargs):
 
 
     def f(X):
-        if K.image_dim_ordering()=='tf':
+        if K.image_data_format()=='channels_last':
             b, r, c, ch = X.get_shape()
         else:
             b, ch, r, c = X.shape
@@ -26,14 +26,15 @@ def crosschannelnormalization(alpha=1e-4, k=2, beta=0.75, n=5, **kwargs):
         half = n // 2
         square = K.square(X)
         scale = k
-        if K.image_dim_ordering() == 'th':
+        if K.image_data_format()=='channels_first':
             extra_channels = K.spatial_2d_padding(K.permute_dimensions(square, (0, 2, 3, 1)), (0, half))
             extra_channels = K.permute_dimensions(extra_channels, (0, 3, 1, 2))
             for i in range(n):
                 scale += alpha * extra_channels[:, i:i+ch, :, :]
-        if K.image_dim_ordering() == 'tf':
-            extra_channels = K.spatial_2d_padding(K.permute_dimensions(square, (0, 3, 1, 2)), (half, 0))
-            extra_channels = K.permute_dimensions(extra_channels, (0, 2, 3, 1))
+        if K.image_data_format()=='channels_last':
+            #extra_channels = K.spatial_2d_padding(K.permute_dimensions(square, (0, 3, 1, 2)), padding=(half, 0))
+            extra_channels = K.spatial_2d_padding(square, padding=((half, half), (0,0)))
+            #extra_channels = K.permute_dimensions(extra_channels, (0, 2, 3, 1))
             for i in range(n):
                 scale += alpha * extra_channels[:, :, :, i:i+int(ch)]
         scale = scale ** beta
@@ -69,18 +70,19 @@ def splittensor(axis=1, ratio_split=1, id_split=0, **kwargs):
 
 def build_alexNet(img_shape=(3, 227, 227), n_classes=1000, l2_reg=0.):
 
-    dim_ordering = K.image_dim_ordering()
-    if dim_ordering == 'th':
+    data_format = K.image_data_format()
+    if data_format == 'channels_first':
         batch_index = 0
         channel_index = 1
         row_index = 2
         col_index = 3
-    if dim_ordering == 'tf':
+    elif data_format == 'channels_last':
         batch_index = 0
         channel_index = 3
         row_index = 1
         col_index = 2
-
+    else:
+        raise ValueError('Unknown data_format')
     inputs = Input(img_shape)
 
     conv_1 = Convolution2D(96, 11, 11, subsample=(4, 4), activation='relu',

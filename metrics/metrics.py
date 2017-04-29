@@ -1,7 +1,7 @@
 import numpy as np
 from keras import backend as K
-dim_ordering = K.image_dim_ordering()
-if dim_ordering == 'th':
+data_format = K.image_data_format()
+if data_format == 'channels_first':
     import theano
     from theano import tensor as T
 else:
@@ -12,14 +12,14 @@ def cce_flatt(void_class, weights_class):
     def categorical_crossentropy_flatt(y_true, y_pred):
         '''Expects a binary class matrix instead of a vector of scalar classes.
         '''
-        if dim_ordering == 'th':
+        if data_format == 'channels_first':
             y_pred = K.permute_dimensions(y_pred, (0, 2, 3, 1))
         shp_y_pred = K.shape(y_pred)
         y_pred = K.reshape(y_pred, (shp_y_pred[0]*shp_y_pred[1]*shp_y_pred[2],
                            shp_y_pred[3]))  # go back to b01,c
         # shp_y_true = K.shape(y_true)
 
-        if dim_ordering == 'th':
+        if data_format == 'channels_first':
             y_true = K.cast(K.flatten(y_true), 'int32')  # b,01 -> b01
         else:
             y_true = K.cast(K.flatten(y_true), 'int32')  # b,01 -> b01
@@ -30,7 +30,7 @@ def cce_flatt(void_class, weights_class):
                 # get idx of non void classes and remove void classes
                 # from y_true and y_pred
                 idxs = K.not_equal(y_true, void_class[i])
-                if dim_ordering == 'th':
+                if data_format == 'channels_first':
                     idxs = idxs.nonzero()
                     y_pred = y_pred[idxs]
                     y_true = y_true[idxs]
@@ -38,7 +38,7 @@ def cce_flatt(void_class, weights_class):
                     y_pred = tf.boolean_mask(y_pred, idxs)
                     y_true = tf.boolean_mask(y_true, idxs)
 
-        if dim_ordering == 'th':
+        if data_format == 'channels_first':
             y_true = T.extra_ops.to_one_hot(y_true, nb_class=y_pred.shape[-1])
         else:
             y_true = tf.one_hot(y_true, K.shape(y_pred)[-1], on_value=1, off_value=0, axis=None, dtype=None, name=None)
@@ -59,7 +59,7 @@ def IoU(n_classes, void_labels):
     def IoU_flatt(y_true, y_pred):
         '''Expects a binary class matrix instead of a vector of scalar classes.
         '''
-        if dim_ordering == 'th':
+        if data_format == 'channels_first':
             y_pred = K.permute_dimensions(y_pred, (0, 2, 3, 1))
         shp_y_pred = K.shape(y_pred)
         y_pred = K.reshape(y_pred, (shp_y_pred[0]*shp_y_pred[1]*shp_y_pred[2],
@@ -83,7 +83,7 @@ def IoU(n_classes, void_labels):
             y_true_i = K.equal(y_true, i)
             y_pred_i = K.equal(y_pred, i)
 
-            if dim_ordering == 'th':
+            if data_format == 'channels_first':
                 I_i = K.sum(y_true_i * y_pred_i)
                 U_i = K.sum(T.or_(y_true_i, y_pred_i) * not_void)
                 # I = T.set_subtensor(I[i], I_i)
@@ -98,7 +98,7 @@ def IoU(n_classes, void_labels):
             out['I'+str(i)] = I_i
             out['U'+str(i)] = U_i
 
-        if dim_ordering == 'th':
+        if data_format == 'channels_first':
             accuracy = K.sum(sum_I) / K.sum(not_void)
         else:
             accuracy = K.sum(sum_I) / tf.reduce_sum(tf.cast(not_void, 'float32'))
@@ -233,7 +233,7 @@ def YOLOMetrics(input_shape=(3,640,640),num_classes=45,priors=[[0.25,0.25], [0.5
       intersect_wh = tf.maximum(intersect_wh, 0.0)
       intersect = tf.multiply(intersect_wh[:,:,:,0], intersect_wh[:,:,:,1])
 
-      # calculate the best IOU and metrics 
+      # calculate the best IOU and metrics
       iou = tf.truediv(intersect, _areas + area_pred - intersect)
       best_ious     = tf.reduce_max(iou, [2], True)
       recall        = tf.reduce_sum(tf.to_float(tf.greater(best_ious,0.5)), [1])
@@ -242,8 +242,6 @@ def YOLOMetrics(input_shape=(3,640,640),num_classes=45,priors=[[0.25,0.25], [0.5
       num_gt_obj    = tf.reduce_sum(tf.to_float(tf.greater(gt_obj_areas,tf.zeros_like(gt_obj_areas))), [1])
       avg_iou       = tf.truediv(sum_best_ious, num_gt_obj)
       avg_recall    = tf.truediv(recall, num_gt_obj)
- 
+
       return {'avg_iou':tf.reduce_mean(avg_iou), 'avg_recall':tf.reduce_mean(avg_recall)}
   return _YOLOMetrics
-
-

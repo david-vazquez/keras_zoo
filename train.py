@@ -38,7 +38,7 @@ def process(configuration):
     # Create the callbacks
     print ('\n > Creating callbacks...')
     cb = Callbacks_Factory().make(cf, valid_gen)
-    
+
     try:
         if cf.train_model:
             # Train the model
@@ -72,7 +72,7 @@ def process(configuration):
 # Sets the backend and GPU device.
 class Environment():
     def __init__(self, backend='tensorflow'):
-        #backend = 'tensorflow' # 'theano' or 'tensorflow'
+        # backend = 'tensorflow' # 'theano' or 'tensorflow'
         os.environ['KERAS_BACKEND'] = backend
         os.environ["CUDA_VISIBLE_DEVICES"]="0" # "" to run in CPU, extra slow! just for debuging
         if backend == 'theano':

@@ -32,7 +32,7 @@ def bilinear4D(w, h, num_input_channels, num_filters):
 
 
 # Create a Keras bilinear weight initializer
-def bilinear_init(shape, name=None, dim_ordering='th'):
+def bilinear_init(shape, name=None):
     # print ('Shape: '),
     # print (shape)
     kernel = bilinear4D(shape[0], shape[1], shape[2], shape[3])

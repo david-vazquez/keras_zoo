@@ -23,7 +23,7 @@ def yolo_build_gt_batch(batch_gt,image_shape,num_classes,num_priors=5):
     for i,gt in enumerate(batch_gt):
         if gt.shape[0] == 0:
           # if there are no objects we'll get NaNs on YOLOLoss, set everything to one!
-          # TODO check if the following line harms learning in case of 
+          # TODO check if the following line harms learning in case of
           #      having lots of images with no objects
           batch_y[i] = np.ones((h*w,b,c+4+1+1+2+2))
           continue
@@ -111,7 +111,7 @@ def _softmax(x):
     return out
 
 def yolo_postprocess_net_out(net_out, anchors, labels, threshold, nms_threshold):
-	C = len(labels) 
+	C = len(labels)
         B = len(anchors)
         net_out = np.transpose(net_out, (1,2,0))
 	H,W = net_out.shape[:2]
@@ -195,7 +195,7 @@ def yolo_draw_detections(boxes, im, anchors, labels, threshold, nms_threshold):
 	return imgcv
 
 
-""" 
+"""
    Utilities to convert Darknet models' weights into keras hdf5 format
    code adapted from https://github.com/sunshineatnoon/Darknet.keras
 """
@@ -378,7 +378,7 @@ def ReadYOLONetWeights(d_model,weight_path):
 
 def DarknetToKerasYOLO(yoloNet):
 
-    K.set_image_dim_ordering('th')
+    K.set_image_data_format('channels_first')
 
     net={}
     input_tensor = Input(shape=(3,416,416))
@@ -504,7 +504,7 @@ def DarknetToKerasYOLO(yoloNet):
 def DarknetToKerasTinyYOLO(yoloNet):
     model = Sequential()
 
-    K.set_image_dim_ordering('th')
+    K.set_image_data_format('channels_first')
 
     #Use a for loop to replace all manually defined layers
     for i in range(0,yoloNet.layer_number):
