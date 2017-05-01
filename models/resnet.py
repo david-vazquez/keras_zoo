@@ -26,7 +26,7 @@ def build_resnet50(img_shape=(3, 224, 224), n_classes=1000, l2_reg=0.,
     predictions = Dense(n_classes, activation='softmax', name='fc1000')(x)
 
     # This is the model we will train
-    model = Model(input=base_model.input, output=predictions)
+    model = Model(inputs=base_model.input, outputs=predictions)
 
     # Freeze some layers
     if freeze_layers_from is not None:

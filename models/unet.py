@@ -25,10 +25,12 @@ from layers.ourlayers import (CropLayer2D, NdSoftmax)
 
 # Keras dim orders
 from keras import backend as K
+
+
 def channel_idx():
     if K.image_data_format() == 'channels_first':
         return 1
-    elif  K.image_data_format() == 'channels_last':
+    elif K.image_data_format() == 'channels_last':
         return 3
     else:
         raise ValueError('Unknown image shape')
@@ -97,12 +99,14 @@ def build_unet(img_shape=(3, None, None), nclasses=8, l2_reg=0.,
 
     # Upsampling 1
     upconv4 = Deconvolution2D(512, (2, 2), kernel_initializer=init,
-                              activation='linear', padding='valid', strides=(2, 2),
-                              name='upconv4', kernel_regularizer=l2(l2_reg))(conv5_2)
+                              activation='linear', padding='valid',
+                              strides=(2, 2), name='upconv4',
+                              kernel_regularizer=l2(l2_reg))(conv5_2)
     conv4_2_crop = CropLayer2D(upconv4, name='conv4_2_crop')(conv4_2)
     upconv4_crop = CropLayer2D(upconv4, name='upconv4_crop')(upconv4)
-    Concat_4 = merge([conv4_2_crop, upconv4_crop], mode='concat', concat_axis=3, name='Concat_4')
-    # Concat_4 = layers.concatenate([conv4_2_crop, upconv4_crop], axis=channel_idx())
+    # Concat_4 = merge([conv4_2_crop, upconv4_crop], mode='concat', concat_axis=3, name='Concat_4')
+    Concat_4 = layers.concatenate([conv4_2_crop, upconv4_crop],
+                                  axis=channel_idx())
     conv6_1 = Conv2D(512, (3, 3), kernel_initializer=init, activation='relu',
                      padding='valid', name='conv6_1',
                      kernel_regularizer=l2(l2_reg))(Concat_4)
@@ -112,10 +116,12 @@ def build_unet(img_shape=(3, None, None), nclasses=8, l2_reg=0.,
 
     # Upsampling 2
     upconv3 = Deconvolution2D(256, (2, 2), kernel_initializer=init,
-                              activation='linear', padding='valid', strides=(2, 2),
-                              name='upconv3', kernel_regularizer=l2(l2_reg))(conv6_2)
+                              activation='linear', padding='valid',
+                              strides=(2, 2), name='upconv3',
+                              kernel_regularizer=l2(l2_reg))(conv6_2)
     conv3_2_crop = CropLayer2D(upconv3, name='conv3_2_crop')(conv3_2)
-    Concat_3 = merge([conv3_2_crop, upconv3], mode='concat', name='Concat_3')
+    Concat_3 = layers.concatenate([conv3_2_crop, upconv3], axis=channel_idx(),
+                                  name='Concat_3')
     conv7_1 = Conv2D(256, (3, 3), kernel_initializer=init, activation='relu',
                      padding='valid', name='conv7_1',
                      kernel_regularizer=l2(l2_reg))(Concat_3)
@@ -125,10 +131,12 @@ def build_unet(img_shape=(3, None, None), nclasses=8, l2_reg=0.,
 
     # Upsampling 3
     upconv2 = Deconvolution2D(128, (2, 2), kernel_initializer=init,
-                              activation='linear', padding='valid', strides=(2, 2),
-                              name='upconv2', kernel_regularizer=l2(l2_reg))(conv7_2)
+                              activation='linear', padding='valid',
+                              strides=(2, 2), name='upconv2',
+                              kernel_regularizer=l2(l2_reg))(conv7_2)
     conv2_2_crop = CropLayer2D(upconv2, name='conv2_2_crop')(conv2_2)
-    Concat_2 = merge([conv2_2_crop, upconv2], mode='concat', name='Concat_2')
+    Concat_2 = layers.concatenate([conv2_2_crop, upconv2], axis=channel_idx(),
+                                  name='Concat_2')
     conv8_1 = Conv2D(128, (3, 3), kernel_initializer=init, activation='relu',
                      padding='valid', name='conv8_1',
                      kernel_regularizer=l2(l2_reg))(Concat_2)
@@ -138,19 +146,21 @@ def build_unet(img_shape=(3, None, None), nclasses=8, l2_reg=0.,
 
     # Upsampling 4
     upconv1 = Deconvolution2D(64, (2, 2), kernel_initializer=init,
-                              activation='linear', padding='valid', strides=(2, 2),
-                              name='upconv1', kernel_regularizer=l2(l2_reg))(conv8_2)
+                              activation='linear', padding='valid',
+                              strides=(2, 2), name='upconv1',
+                              kernel_regularizer=l2(l2_reg))(conv8_2)
     conv1_2_crop = CropLayer2D(upconv1, name='conv1_2_crop')(conv1_2)
-    Concat_1 = merge([conv1_2_crop, upconv1], mode='concat', name='Concat_1')
+    Concat_1 = layers.concatenate([conv1_2_crop, upconv1], axis=channel_idx(),
+                                  name='Concat_1')
     conv9_1 = Conv2D(64, (3, 3), kernel_initializer=init, activation='relu',
                      padding='valid', name='conv9_1',
                      kernel_regularizer=l2(l2_reg))(Concat_1)
-    conv9_2 = Conv2D(64, (3, 3), kernel_initializerializer=init, activation='relu',
+    conv9_2 = Conv2D(64, (3, 3), kernel_initializer=init, activation='relu',
                      padding='valid', name='conv9_2',
                      kernel_regularizer=l2(l2_reg))(conv9_1)
 
-    conv10 = Conv2D(nclasses, (1, 1), kernel_initializerializer=init, activation='linear',
-                    padding='valid', name='conv10',
+    conv10 = Conv2D(nclasses, (1, 1), kernel_initializer=init,
+                    activation='linear', padding='valid', name='conv10',
                     kernel_regularizer=l2(l2_reg))(conv9_2)
 
     # Crop
@@ -160,7 +170,7 @@ def build_unet(img_shape=(3, None, None), nclasses=8, l2_reg=0.,
     softmax_unet = NdSoftmax()(final_crop)
 
     # Complete model
-    model = Model(input=inputs, output=softmax_unet)
+    model = Model(inputs=inputs, outputs=softmax_unet)
 
     # Load pretrained Model
     if path_weights:

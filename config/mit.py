@@ -31,9 +31,9 @@ batch_size_test              = 30              # Batch size during testing
 crop_size_train              = None            # Crop size during training (Height, Width) or None
 crop_size_valid              = None            # Crop size during validation
 crop_size_test               = None            # Crop size during testing
-resize_train                 = (224, 224)      # Resize the image during training (Height, Width) or None
-resize_valid                 = (224, 224)      # Resize the image during validation
-resize_test                  = (224, 224)      # Resize the image during testing
+resize_train                 = (227, 227)      # Resize the image during training (Height, Width) or None
+resize_valid                 = (227, 227)      # Resize the image during validation
+resize_test                  = (227, 227)      # Resize the image during testing
 max_q_size                   = 10              # Maximum size for the data generator queue
 workers                      = 5               # Maximum number of processes to spin up when using process based threading
 
