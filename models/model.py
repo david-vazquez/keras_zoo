@@ -40,18 +40,25 @@ class One_Net_Model(Model):
     def train(self, train_gen, valid_gen, cb):
         if (self.cf.train_model):
             print('\n > Training the model...')
+            if self.cf.dataset.class_mode == 'segmentation':
+                validation_data = None
+                validation_steps = 0
+            else:
+                validation_data = valid_gen,
+                validation_steps = math.ceil(float(self.cf.dataset.n_images_valid)/self.cf.batch_size_valid),
+
             hist = self.model.fit_generator(generator=train_gen,
                                             steps_per_epoch=math.ceil(float(self.cf.dataset.n_images_train)/self.cf.batch_size_train),
                                             epochs=self.cf.n_epochs,
                                             verbose=1,
                                             callbacks=cb,
-                                            validation_data=valid_gen,
-                                            validation_steps=math.ceil(float(self.cf.dataset.n_images_valid)/self.cf.batch_size_valid),
+                                            validation_data=validation_data,
+                                            validation_steps=validation_steps,
                                             class_weight=None,
                                             max_q_size=self.cf.max_q_size,
                                             workers=self.cf.workers,
                                             pickle_safe=True,
-                                            initial_epoch=0) # TODO: Change
+                                            initial_epoch=0)  # TODO: Change
 
             print('   Training finished.')
 

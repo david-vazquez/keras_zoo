@@ -20,10 +20,12 @@ from tools.numpy2keras import load_numpy
 
 # Keras dim orders
 from keras import backend as K
+
+
 def channel_idx():
     if K.image_data_format() == 'channels_first':
         return 1
-    elif  K.image_data_format() == 'channels_last':
+    elif K.image_data_format() == 'channels_last':
         return 3
     else:
         raise ValueError('Unknown image shape')

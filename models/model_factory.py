@@ -53,9 +53,11 @@ class Model_Factory():
             in_shape = (cf.dataset.n_channels,
                         cf.target_size_train[0],
                         cf.target_size_train[1])
-            # TODO detection : check model, different detection nets may have different losses and metrics
+            # TODO detection : check model, different detection nets may
+            # have different losses and metrics
             loss = YOLOLoss(in_shape, cf.dataset.n_classes, cf.dataset.priors)
-            metrics = [YOLOMetrics(in_shape, cf.dataset.n_classes, cf.dataset.priors)]
+            metrics = [YOLOMetrics(in_shape, cf.dataset.n_classes,
+                                   cf.dataset.priors)]
         elif cf.dataset.class_mode == 'segmentation':
             if K.image_data_format() == 'channels_first':
                 if variable_input_size:
@@ -74,8 +76,11 @@ class Model_Factory():
             else:
                 raise ValueError('Unknown image data format')
             loss = cce_flatt(cf.dataset.void_class, cf.dataset.cb_weights)
-            #metrics = [IoU(cf.dataset.n_classes, cf.dataset.void_class)]
-            metrics = []
+            # metrics = [IoU(cf.dataset.n_classes, cf.dataset.void_class)]
+            # metrics = [ConfusionMatrix(cf.dataset.n_classes,
+            #                           cf.dataset.void_class)]
+
+            metrics = ['accuracy']
         else:
             raise ValueError('Unknown problem type')
         return in_shape, loss, metrics
@@ -83,8 +88,9 @@ class Model_Factory():
     # Creates a Model object (not a Keras model)
     def make(self, cf, optimizer=None):
         if cf.model_name in ['lenet', 'alexNet', 'vgg16', 'vgg19', 'resnet50',
-                             'InceptionV3', 'fcn8', 'unet', 'segnet_vgg', 'densenetFCN',
-                             'segnet_basic', 'resnetFCN', 'yolo', 'tiny-yolo', 'densenetFCN_titu']:
+                             'InceptionV3', 'fcn8', 'unet', 'segnet_vgg',
+                             'segnet_basic', 'resnetFCN', 'densenetFCN',
+                             'densenetFCN_titu', 'yolo', 'tiny-yolo']:
             if optimizer is None:
                 raise ValueError('optimizer can not be None')
 
@@ -107,8 +113,8 @@ class Model_Factory():
         print ('   Model: ' + cf.model_name)
         return model
 
-    # Creates, compiles, plots and prints a Keras model. Optionally also loads its
-    # weights.
+    # Creates, compiles, plots and prints a Keras model. Optionally also
+    # loads its weights.
     def make_one_net_model(self, cf, in_shape, loss, metrics, optimizer):
         # Create the *Keras* model
         if cf.model_name == 'fcn8':
@@ -120,40 +126,50 @@ class Model_Factory():
                                freeze_layers_from=cf.freeze_layers_from,
                                path_weights=None)
         elif cf.model_name == 'segnet_basic':
-            model = build_segnet(in_shape, cf.dataset.n_classes, cf.weight_decay,
+            model = build_segnet(in_shape, cf.dataset.n_classes,
+                                 cf.weight_decay,
                                  freeze_layers_from=cf.freeze_layers_from,
                                  path_weights=None, basic=True)
         elif cf.model_name == 'segnet_vgg':
-            model = build_segnet(in_shape, cf.dataset.n_classes, cf.weight_decay,
+            model = build_segnet(in_shape, cf.dataset.n_classes,
+                                 cf.weight_decay,
                                  freeze_layers_from=cf.freeze_layers_from,
                                  path_weights=None, basic=False)
         elif cf.model_name == 'resnetFCN':
-            model = build_resnetFCN(in_shape, cf.dataset.n_classes, cf.weight_decay,
+            model = build_resnetFCN(in_shape, cf.dataset.n_classes,
+                                    cf.weight_decay,
                                     freeze_layers_from=cf.freeze_layers_from,
                                     path_weights=cf.load_imageNet)
         elif cf.model_name == 'densenetFCN':
-            model = build_densenetFCN(in_shape, cf.dataset.n_classes, cf.weight_decay,
+            model = build_densenetFCN(in_shape, cf.dataset.n_classes,
+                                      cf.weight_decay,
                                       freeze_layers_from=cf.freeze_layers_from,
                                       path_weights=None)
         elif cf.model_name == 'densenetFCN_titu':
             model = DenseNetFCN(in_shape, nb_dense_block=5, growth_rate=16,
-                                      nb_layers_per_block=4, upsampling_type='deconv',
-                                      classes=cf.dataset.n_classes,
-                                      weight_decay=cf.weight_decay)
+                                nb_layers_per_block=4,
+                                upsampling_type='deconv',
+                                classes=cf.dataset.n_classes,
+                                weight_decay=cf.weight_decay)
         elif cf.model_name == 'lenet':
-            model = build_lenet(in_shape, cf.dataset.n_classes, cf.weight_decay)
+            model = build_lenet(in_shape, cf.dataset.n_classes,
+                                cf.weight_decay)
         elif cf.model_name == 'alexNet':
-            model = build_alexNet(in_shape, cf.dataset.n_classes, cf.weight_decay)
+            model = build_alexNet(in_shape, cf.dataset.n_classes,
+                                  cf.weight_decay)
         elif cf.model_name == 'vgg16':
-            model = build_vgg(in_shape, cf.dataset.n_classes, 16, cf.weight_decay,
+            model = build_vgg(in_shape, cf.dataset.n_classes, 16,
+                              cf.weight_decay,
                               load_pretrained=cf.load_imageNet,
                               freeze_layers_from=cf.freeze_layers_from)
         elif cf.model_name == 'vgg19':
-            model = build_vgg(in_shape, cf.dataset.n_classes, 19, cf.weight_decay,
+            model = build_vgg(in_shape, cf.dataset.n_classes, 19,
+                              cf.weight_decay,
                               load_pretrained=cf.load_imageNet,
                               freeze_layers_from=cf.freeze_layers_from)
         elif cf.model_name == 'resnet50':
-            model = build_resnet50(in_shape, cf.dataset.n_classes, cf.weight_decay,
+            model = build_resnet50(in_shape, cf.dataset.n_classes,
+                                   cf.weight_decay,
                                    load_pretrained=cf.load_imageNet,
                                    freeze_layers_from=cf.freeze_layers_from)
         elif cf.model_name == 'InceptionV3':
@@ -165,12 +181,14 @@ class Model_Factory():
             model = build_yolo(in_shape, cf.dataset.n_classes,
                                cf.dataset.n_priors,
                                load_pretrained=cf.load_imageNet,
-                               freeze_layers_from=cf.freeze_layers_from, tiny=False)
+                               freeze_layers_from=cf.freeze_layers_from,
+                               tiny=False)
         elif cf.model_name == 'tiny-yolo':
             model = build_yolo(in_shape, cf.dataset.n_classes,
                                cf.dataset.n_priors,
                                load_pretrained=cf.load_imageNet,
-                               freeze_layers_from=cf.freeze_layers_from, tiny=True)
+                               freeze_layers_from=cf.freeze_layers_from,
+                               tiny=True)
         else:
             raise ValueError('Unknown model')
 

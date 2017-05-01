@@ -3,8 +3,7 @@ import os
 
 from keras.callbacks import (EarlyStopping, ModelCheckpoint, CSVLogger,
                              LearningRateScheduler, TensorBoard)
-
-from callbacks import (History_plot, Jacc_new, Save_results,
+from callbacks import (History_plot, Jacc_new, Validation_IoU, Save_results,
                        LearningRateSchedulerBatch, Scheduler)
 
 
@@ -18,20 +17,30 @@ class Callbacks_Factory():
 
         # Jaccard callback
         if cf.dataset.class_mode == 'segmentation':
-            '''print('   Jaccard metric')
-            cb += [Jacc_new(cf.dataset.n_classes)]'''
+            print('   Jaccard metric')
+            # cb += [Jacc_new(cf.dataset.n_classes)]
 
-        # Save image results
-        if cf.save_results_enabled:
-            print('   Save image result')
-            cb += [Save_results(n_classes=cf.dataset.n_classes,
-                                void_label=cf.dataset.void_class,
-                                save_path=cf.savepath,
-                                generator=valid_gen,
-                                epoch_length=int(math.ceil(cf.save_results_nsamples/float(cf.save_results_batch_size))),
-                                color_map=cf.dataset.color_map,
-                                classes=cf.dataset.classes,
-                                tag='valid')]
+            cb += [Validation_IoU(n_classes=cf.dataset.n_classes,
+                                  void_label=cf.dataset.void_class,
+                                  save_path=cf.savepath,
+                                  generator=valid_gen,
+                                  epoch_length=int(math.ceil(float(cf.dataset.n_images_valid)/cf.batch_size_valid)),
+                                  color_map=cf.dataset.color_map,
+                                  classes=cf.dataset.classes,
+                                  n_images_to_save=cf.save_results_nsamples if cf.save_results_enabled else 0,
+                                  tag='valid')]
+
+        # # Save image results
+        # if cf.save_results_enabled:
+        #     print('   Save image result')
+        #     cb += [Save_results(n_classes=cf.dataset.n_classes,
+        #                         void_label=cf.dataset.void_class,
+        #                         save_path=cf.savepath,
+        #                         generator=valid_gen,
+        #                         epoch_length=int(math.ceil(cf.save_results_nsamples/float(cf.save_results_batch_size))),
+        #                         color_map=cf.dataset.color_map,
+        #                         classes=cf.dataset.classes,
+        #                         tag='valid')]
 
         # Early stopping
         if cf.earlyStopping_enabled:

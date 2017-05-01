@@ -1,6 +1,5 @@
 # Imports
 from keras import backend as K
-data_format = K.image_data_format()
 from keras.callbacks import (Callback, Progbar, ProgbarLogger,
                              LearningRateScheduler)
 from keras.engine.training import GeneratorEnqueuer
@@ -10,6 +9,19 @@ import numpy as np
 import time
 import math
 
+
+data_format = K.image_data_format()
+
+
+def channel_idx():
+    if K.image_data_format() == 'channels_first':
+        return 1
+    elif K.image_data_format() == 'channels_last':
+        return 3
+    else:
+        raise ValueError('Unknown image shape')
+
+
 # PROGBAR replacements
 def progbar__set_params(self, params):
     self.params = params
@@ -17,18 +29,27 @@ def progbar__set_params(self, params):
     self.params['metrics'].extend(self.add_metrics)
 
 
-def progbar_on_epoch_begin(self, epoch, logs={}):
+def progbar_on_epoch_begin(self, epoch, logs=None):
     if self.verbose:
-        print('Epoch %d/%d' % (epoch + 1, self.nb_epoch))
-        self.progbar = Progbar(target=self.params['nb_sample'],
+        print('Epoch %d/%d' % (epoch + 1, self.epochs))
+        if self.use_steps:
+            target = self.params['steps']
+        else:
+            target = self.params['samples']
+        self.target = target
+        self.progbar = Progbar(target=self.target,
                                verbose=self.verbose)
     # self.params['metrics'].extend(self.add_metrics)
     self.seen = 0
 
 
-def progbar_on_batch_end(self, batch, logs={}):
+def progbar_on_batch_end(self, batch, logs=None):
+    logs = logs or {}
     batch_size = logs.get('size', 0)
-    self.seen += batch_size
+    if self.use_steps:
+        self.seen += 1
+    else:
+        self.seen += batch_size
 
     for k in self.params['metrics']:
         if k in logs and k not in self.remove_metrics:
@@ -38,13 +59,14 @@ def progbar_on_batch_end(self, batch, logs={}):
         if k in logs and k not in self.remove_metrics:
             self.log_values.append((k, logs[k]))
 
-    # skip progbar update for the last batch;
-    # will be handled by on_epoch_end
-    if self.verbose and self.seen < self.params['nb_sample']:
+    # Skip progbar update for the last batch;
+    # will be handled by on_epoch_end.
+    if self.verbose and self.seen < self.target:
         self.progbar.update(self.seen, self.log_values)
 
 
-def progbar_on_epoch_end(self, epoch, logs={}):
+def progbar_on_epoch_end(self, epoch, logs=None):
+    logs = logs or {}
     for k in self.params['metrics']:
         if k in logs and k not in self.remove_metrics:
             self.log_values.append((k, logs[k]))
@@ -207,6 +229,142 @@ class Save_results(Callback):
             save_img3(x_true, y_true, y_pred, self.save_path, epoch,
                       self.color_map, self.classes, self.tag+str(_),
                       self.void_label, self.n_legend_rows)
+
+        # Stop data generator
+        if enqueuer is not None:
+            enqueuer.stop()
+
+
+def cce_voids(y_pred, y_true, void_label, _EPS=10e-8):
+    '''
+    Compute the masked categorical crossentropy loss.
+    '''
+
+    # Move classes to the end (bc01 -> b01c) [THEANO ordering]
+    if K.image_data_format() == 'channels_first':
+        y_true = y_true.transpose([0, 2, 3, 1])
+        y_pred = y_pred.transpose([0, 2, 3, 1])
+
+    # Reshape to (b01, n_classes)
+    y_true = y_true.flatten()
+    y_pred = y_pred.reshape(-1, y_pred.shape[-1])
+
+    # Compute the void mask
+    mask = np.ones_like(y_true).astype('int32')
+    for el in void_label:
+        mask[y_true == el] = 0.
+        y_true[y_true == el] = 0.
+
+    # Avoid numerical instability with _EPSILON clipping
+    y_pred = np.clip(y_pred, _EPS, 1.0 - _EPS)
+
+    # Compute the negative log likelihood for each pixel
+    indices = [np.arange(len(y_pred)), y_true[:len(y_pred)]]
+    cost = -np.log(y_pred[indices])
+
+    # Compute the average cost
+    cost *= mask
+    mask_sum = np.sum(mask).astype(float)
+    cost = np.sum(cost)
+    if mask_sum > 0:
+        cost /= mask_sum
+
+    # Return the cost
+    return cost
+
+
+# Save the image results
+class Validation_IoU(Callback):
+    def __init__(self, n_classes, void_label, save_path,
+                 generator, epoch_length, color_map, classes, tag,
+                 n_legend_rows=1, nb_worker=5, max_q_size=10,
+                 n_images_to_save=0, *args):
+        super(Callback, self).__init__()
+        self.n_classes = n_classes
+        self.void_label = void_label
+        self.save_path = save_path
+        self.generator = generator
+        self.epoch_length = epoch_length
+        self.color_map = color_map
+        self.classes = classes
+        self.n_legend_rows = n_legend_rows
+        self.tag = tag
+        self.nb_worker = nb_worker
+        self.max_q_size = max_q_size
+        self.n_images_to_save = n_images_to_save
+
+        self.add_metrics = []
+        self.add_metrics.append('val_jaccard')
+        self.add_metrics.append('val_accuracy')
+        for i in range(n_classes):
+            self.add_metrics.append(str(i) + '_val_jacc')
+        self.remove_metrics = []
+        setattr(ProgbarLogger, 'add_metrics', self.add_metrics)
+        setattr(ProgbarLogger, 'remove_metrics', self.remove_metrics)
+        setattr(ProgbarLogger, '_set_params', progbar__set_params)
+        setattr(ProgbarLogger, 'on_batch_end', progbar_on_batch_end)
+        setattr(ProgbarLogger, 'on_epoch_end', progbar_on_epoch_end)
+
+    def on_epoch_begin(self, epoch, logs={}):
+        # Create the confusion matrix
+        self.cm = np.zeros((self.n_classes, self.n_classes))
+        self.losses = []
+
+    def on_epoch_end(self, epoch, logs={}):
+
+        # Create a data generator
+        enqueuer = GeneratorEnqueuer(self.generator, pickle_safe=True)
+        enqueuer.start(workers=self.nb_worker, max_q_size=self.max_q_size,
+                       wait_time=0.05)
+
+        # Process the dataset
+        n_images_saved = 0
+        for _ in range(self.epoch_length):
+
+            # Get data for this minibatch
+            data = None
+            while enqueuer.is_running():
+                if not enqueuer.queue.empty():
+                    data = enqueuer.queue.get()
+                    break
+                else:
+                    time.sleep(0.05)
+            x_true = data[0]
+            y_true = np.squeeze(data[1].astype('int32'), axis=channel_idx())
+
+            # Get prediction for this minibatch
+            y_pred = np.array(self.model.predict(x_true))
+
+            # Accumulate the loss
+            self.losses.append(cce_voids(np.copy(y_pred), np.copy(y_true),
+                                         self.void_label))
+
+            # Compute the y_pred argmax
+            y_pred = np.argmax(y_pred, axis=channel_idx())
+
+            # Save output images
+            if n_images_saved >= self.n_images_to_save:
+                save_img3(x_true, y_true, y_pred, self.save_path, epoch,
+                          self.color_map, self.classes, self.tag+str(_),
+                          self.void_label, self.n_legend_rows)
+                n_images_saved += y_true.shape[0]
+
+            # Fill the confusion matrix
+            y_true = y_true.flatten()
+            y_pred = y_pred.flatten()
+            for i in range(self.n_classes):
+                for j in range(self.n_classes):
+                    self.cm[i, j] += ((y_pred == i) * (y_true == j)).sum()
+
+        # Compute metrics
+        TP_perclass = self.cm.diagonal().astype('float32')
+        jaccard_perclass = TP_perclass/(self.cm.sum(1) + self.cm.sum(0) - TP_perclass)
+
+        logs['val_loss'] = np.mean(self.losses)
+        logs['val_accuracy'] = TP_perclass.sum()/self.cm.sum()
+        logs['val_jaccard'] = np.nanmean(jaccard_perclass)
+        for i in range(self.n_classes):
+            logs[str(i)+'_val_jacc'] = jaccard_perclass[i]
 
         # Stop data generator
         if enqueuer is not None:
