@@ -25,7 +25,10 @@ def process(configuration):
     print (' ---> Init experiment: ' + cf.exp_name + ' <---')
 
     # Create the data generators
-    train_gen, valid_gen, test_gen = Dataset_Generators().make(cf)
+    if cf.dataset.data_format != 'npz':
+        train_gen, valid_gen, test_gen = Dataset_Generators().make(cf)
+    else:
+        train_gen, valid_gen, test_gen = None, None, None
 
     # Create the optimizer
     print ('\n > Creating optimizer...')
@@ -42,7 +45,12 @@ def process(configuration):
     try:
         if cf.train_model:
             # Train the model
-            model.train(train_gen, valid_gen, cb)
+            if cf.dataset.data_format == 'npz':
+                model.train2(cf.dataset.load_data_func, cb)
+            elif cf.dataset.data_format == 'folders':
+                model.train(train_gen, valid_gen, cb)
+            else:
+                raise ValueError('Unknown data format')
 
         if cf.test_model:
             # Compute validation metrics

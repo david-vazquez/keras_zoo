@@ -10,7 +10,8 @@ freeze_layers_from           = None            # Freeze layers from 0 to this la
 show_model                   = True            # Show the architecture layers
 load_imageNet                = False            # Load Imagenet weights and normalize following imagenet procedure
 load_pretrained              = True           # Load a pretrained model for doing finetuning
-weights_file                 = 'weights.hdf5'  # Training weight file name
+weights_file                 = '/datatmp/dvazquez/Experiments/synthia_audi_new/resnetFCN_basic_gray3ch/weights.hdf5'  # Training weight file name
+
 
 # Parameters
 train_model                  = True            # Train the model
@@ -48,7 +49,7 @@ seed_test                    = 1924            # Random seed for the testing shu
 # Training parameters
 optimizer                    = 'adam'          # Optimizer
 learning_rate                = 0.0001          # Training learning rate
-weight_decay                 = 0.0005          # Weight decay or L2 parameter norm penalty
+weight_decay                 = 0.0             # Weight decay or L2 parameter norm penalty
 n_epochs                     = 1000            # Number of epochs during training
 
 # Callback save results
@@ -77,7 +78,7 @@ plotHist_enabled             = True            # Enable the Callback
 plotHist_verbose             = 0               # Verbosity of the callback
 
 # Callback learning rate scheduler
-LRScheduler_enabled          = True            # Enable the Callback
+LRScheduler_enabled          = False           # Enable the Callback
 LRScheduler_batch_epoch      = 'batch'         # Schedule the LR each 'batch' or 'epoch'
 LRScheduler_type             = 'poly'          # Type of scheduler ['linear' | 'step' | 'square' | 'sqrt' | 'poly']
 LRScheduler_M                = 750000          # Number of iterations/epochs expected until convergence
@@ -109,11 +110,11 @@ da_rotation_range                  = 0         # Rnd rotation degrees 0-180
 da_width_shift_range               = 0.0       # Rnd horizontal shift
 da_height_shift_range              = 0.0       # Rnd vertical shift
 da_shear_range                     = 0.0       # Shear in radians
-da_zoom_range                      = 0.55      # Zoom
+da_zoom_range                      = 0.0       # Zoom
 da_channel_shift_range             = 0.        # Channecf.l shifts
 da_fill_mode                       = 'constant'# Fill mode
 da_cval                            = 0.        # Void image value
-da_horizontal_flip                 = True      # Rnd horizontal flip
+da_horizontal_flip                 = False     # Rnd horizontal flip
 da_vertical_flip                   = False     # Rnd vertical flip
 da_spline_warp                     = False     # Enable elastic deformation
 da_warp_sigma                      = 10        # Elastic deformation sigma

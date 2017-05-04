@@ -1,10 +1,20 @@
 # import os
 import math
 import time
+import os
 import numpy as np
 from keras.engine.training import GeneratorEnqueuer
 from tools.save_images import save_img3
+from keras import backend as K
 # from tools.yolo_utils import *
+
+
+# Keras dim orders
+def channel_idx():
+    if K.image_dim_ordering() == 'th':
+        return 1
+    else:
+        return 3
 
 
 class Model():
@@ -14,6 +24,9 @@ class Model():
     Model_Factory class.
     """
     def train(self, train_gen, valid_gen, cb):
+        pass
+
+    def train2(self, load_data_func, cb):
         pass
 
     def predict(self, test_gen, tag='pred'):
@@ -51,6 +64,51 @@ class One_Net_Model(Model):
                                             max_q_size=self.cf.max_q_size,
                                             nb_worker=self.cf.workers,
                                             pickle_safe=True)
+            print('   Training finished.')
+
+            return hist
+        else:
+            return None
+
+    def train2(self, load_data_func, cb):
+        if (self.cf.train_model):
+            print('\n > Training the model...')
+            # Load data
+            (x_train, y_train), (x_test, y_test) = load_data_func(os.path.join(self.cf.dataset.path, self.cf.dataset.dataset_name+'.pkl.gz'))
+            img_rows, img_cols = self.cf.dataset.img_shape
+
+            # Reshape
+            if K.image_dim_ordering() == 'th':
+                x_train = x_train.reshape(x_train.shape[0], 1, img_rows, img_cols)
+                x_test = x_test.reshape(x_test.shape[0], 1, img_rows, img_cols)
+            elif K.image_dim_ordering() == 'tf':
+                x_train = x_train.reshape(x_train.shape[0], img_rows, img_cols, 1)
+                x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 1)
+
+            # Normalize
+            x_train = x_train.astype('float32')
+            x_test = x_test.astype('float32')
+            x_train /= 255
+            x_test /= 255
+
+            # One hot encoding
+            y_train2 = np.zeros((len(y_train), self.cf.dataset.n_classes), dtype='float32')
+            for i, label in enumerate(y_train):
+                y_train2[i, label] = 1.
+            y_train = y_train2
+
+            hist = self.model.fit(x=x_train,
+                                  y=y_train,
+                                  batch_size=self.cf.batch_size_train,
+                                  validation_split=0.2,
+                                  # samples_per_epoch=self.cf.dataset.n_images_train,
+                                  nb_epoch=self.cf.n_epochs,
+                                  verbose=1,
+                                  callbacks=cb,
+                                  # validation_data=valid_gen,
+                                  # nb_val_samples=self.cf.dataset.n_images_valid,
+                                  class_weight=None
+                                  )
             print('   Training finished.')
 
             return hist

@@ -24,6 +24,7 @@ from models.densenetFCN import build_densenetFCN
 
 # Adversarial models
 from models.adversarial_semseg import Adversarial_Semseg
+from models.gan import GAN
 
 from models.model import One_Net_Model
 
@@ -47,6 +48,7 @@ class Model_Factory():
                             cf.dataset.n_channels)
             loss = 'categorical_crossentropy'
             metrics = ['accuracy']
+    
         elif cf.dataset.class_mode == 'detection':
             in_shape = (cf.dataset.n_channels,
                         cf.target_size_train[0],
@@ -54,6 +56,7 @@ class Model_Factory():
             # TODO detection : check model, different detection nets may have different losses and metrics
             loss = YOLOLoss(in_shape, cf.dataset.n_classes, cf.dataset.priors)
             metrics = [YOLOMetrics(in_shape, cf.dataset.n_classes, cf.dataset.priors)]
+
         elif cf.dataset.class_mode == 'segmentation':
             if K.image_dim_ordering() == 'th':
                 if variable_input_size:
@@ -77,23 +80,26 @@ class Model_Factory():
 
     # Creates a Model object (not a Keras model)
     def make(self, cf, optimizer=None):
+
+        if optimizer is None:
+            raise ValueError('optimizer can not be None')
+
         if cf.model_name in ['lenet', 'alexNet', 'vgg16', 'vgg19', 'resnet50',
                              'InceptionV3', 'fcn8', 'unet', 'segnet_vgg',
                              'segnet_basic', 'resnetFCN', 'yolo', 'tiny-yolo']:
-            if optimizer is None:
-                raise ValueError('optimizer can not be None')
-
             in_shape, loss, metrics = self.basic_model_properties(cf, True)
             model = self.make_one_net_model(cf, in_shape, loss, metrics,
                                             optimizer)
 
         elif cf.model_name == 'adversarial_semseg':
-            if optimizer is None:
-                raise ValueError('optimizer is not None')
-
             # loss, metrics and optimizer are made in class Adversarial_Semseg
             in_shape, _, _ = self.basic_model_properties(cf, False)
             model = Adversarial_Semseg(cf, in_shape)
+
+        elif cf.model_name == 'gan':
+            # loss, metrics and optimizer are made in class Adversarial_Semseg
+            in_shape, _, _ = self.basic_model_properties(cf, False)
+            model = GAN(cf, in_shape)
 
         else:
             raise ValueError('Unknown model name')

@@ -74,6 +74,22 @@ checkpoint_verbose           = 0               # Verbosity of the checkpoint
 plotHist_enabled             = True            # Enable the Callback
 plotHist_verbose             = 0               # Verbosity of the callback
 
+# Callback learning rate scheduler
+LRScheduler_enabled          = False            # Enable the Callback
+LRScheduler_batch_epoch      = 'batch'         # Schedule the LR each 'batch' or 'epoch'
+LRScheduler_type             = 'poly'          # Type of scheduler ['linear' | 'step' | 'square' | 'sqrt' | 'poly']
+LRScheduler_M                = 75000           # Number of iterations/epochs expected until convergence
+LRScheduler_decay            = 0.1             # Decay for 'step' method
+LRScheduler_S                = 10000           # Step for the 'step' method
+LRScheduler_power            = 0.9             # Power for te poly method
+
+# Callback TensorBoard
+TensorBoard_enabled          = False           # Enable the Callback
+TensorBoard_logs_folder      = None            # Logs folder. If None it would make /home/youruser/TensorBoardLogs/. Either put a regular path.
+TensorBoard_histogram_freq   = 1               # Frequency (in epochs) at which to compute activation histograms for the layers of the model. If set to 0, histograms won't be computed.
+TensorBoard_write_graph      = True            # Whether to visualize the graph in Tensorboard. The log file can become quite large when write_graph is set to True.
+TensorBoard_write_images     = False           # Whether to write model weights to visualize as image in Tensorboard.
+
 # Data augmentation for training and normalization
 norm_imageNet_preprocess           = False     # Normalize following imagenet procedure
 norm_fit_dataset                   = False      # If True it recompute std and mean from images. Either it uses the std and mean set at the dataset config file
